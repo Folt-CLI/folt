@@ -10,6 +10,20 @@
 - **Crate structure:** a virtual Cargo workspace with `folt-core` (library) and
   `folt-cli` (the `folt` binary), selected in
   [#7](https://github.com/Folt-CLI/folt/issues/7).
+- **Storage:** an own per-Folio store of immutable whole-file objects named by
+  SHA-256, with no dependency on Git
+  ([#3](https://github.com/Folt-CLI/folt/issues/3)).
+- **Sync protocol:** a minimal HTTPS request/response API with a stateless host
+  that stores objects by hash, verifies them and moves refs by compare-and-swap;
+  capabilities are negotiated ([#4](https://github.com/Folt-CLI/folt/issues/4)).
+- **Home:** one global home, `~/.folt` (`%USERPROFILE%\.folt` on Windows), with a
+  `FOLT_HOME` environment override; Folt writes nothing into user directories
+  ([#14](https://github.com/Folt-CLI/folt/issues/14)).
+- **Registry:** an embedded SQLite database in the home through `rusqlite` with
+  the bundled C library; a Folio exists independently of its placements.
+  Building needs a C compiler ([#27](https://github.com/Folt-CLI/folt/issues/27)).
+- **Tests:** the test structure and tiers are described in [Testing](testing.md)
+  ([#96](https://github.com/Folt-CLI/folt/issues/96)).
 
 Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
@@ -24,13 +38,20 @@ solution for [#82](https://github.com/Folt-CLI/folt/issues/82).
 
 ## Pending decisions
 
-- Sync protocol: an own protocol or an adaptation of Git's.
-- Local Folio and workspace format.
 - How remotes are configured and authenticated; each host defines its own
-  authentication.
-- Command set.
+  authentication ([#5](https://github.com/Folt-CLI/folt/issues/5)).
+- Command set ([#6](https://github.com/Folt-CLI/folt/issues/6)).
+- Merge and rebase ([#74](https://github.com/Folt-CLI/folt/issues/74)).
+- The lifecycle of registered Folios
+  ([#15](https://github.com/Folt-CLI/folt/issues/15)).
+- One Folio at several paths ([#16](https://github.com/Folt-CLI/folt/issues/16)).
+- Portability and multi-user use of the home
+  ([#17](https://github.com/Folt-CLI/folt/issues/17)).
+- Local path resolution for references
+  ([#28](https://github.com/Folt-CLI/folt/issues/28)).
 
 ## Delivery status
 
-The workspace scaffold exists: a `folt` binary that prints its version. Nothing
-else is implemented.
+The `folt` binary still only prints its version; `folt-core` has the library
+capabilities listed under "What exists today" in [README.md](../../README.md);
+terms are in [GLOSSARY.md](../../GLOSSARY.md).
