@@ -42,18 +42,129 @@ attachment. Leave Details pending until investigation has produced findings.
 - <important finding>
 ```
 
-The orchestrator investigates and proposes solutions from code findings. The
-developer selects the solution; a recommendation is not a selection.
+The orchestrator, not Codex, investigates and writes Analysis inline in the
+ticket, as if the developer had already asked for context, comparison and the
+next step. The developer selects the solution; a recommendation is not a
+selection. XS and S tickets have no Analysis or attachments; their Solution is
+in the ticket. XL has no analysis.
 
-1. Record facts with exact `file:line` references in `<N>-code-findings.md`.
-2. Write each viable solution as `<N>-solution-<k>.md`. Offer alternatives only
-   when there is a real trade-off.
-3. In Analysis, summarize the current state, constraints, compatibility, and links
-   to the solution attachments. Discuss the options with the developer.
+1. Record facts with exact `file:line` references in `<N>-code-findings.md`,
+   linked from Details.
+2. Write each viable solution as a complete Codex scope of work in
+   `<N>-solution-<k>.md`, using the layout below. Codex must be able to run the
+   selected scope as written, without another prompt after selection. Offer
+   alternatives only when there is a real trade-off.
+3. Write Analysis inline using the layout below. Discuss the options with the
+   developer.
 4. Wait for the developer's choice before implementation. Leave Solution pending.
-   If no option fits, revise the proposals.
+   If no option fits, revise the scopes.
 5. Mark the chosen attachment **[Selected Solution]**, record the decision in the
    issue, and fill Solution from it.
+
+### Analysis layout
+
+Use this order in the ticket's `## Analysis` section:
+
+1. A `> [!IMPORTANT]` callout stating the decision in one sentence.
+2. `### Where we are`: bullets of facts and their consequences, followed by
+   **Out of scope** and **Terms**. Use terms exactly as defined in
+   [GLOSSARY.md](../../GLOSSARY.md); list a missing term as unresolved, never
+   invent it.
+3. A comparison table when there are two or more options. Use rows such as rule
+   duplication, diff size, main risk and reader.
+4. One `### Option N: <name>` block per option, with bold labels **You get**,
+   **Changes**, **Watch out** and **Codex scope**. The last links to its scope
+   attachment.
+5. `### Recommendation`: one option and one sentence of reason.
+6. A `> [!TIP]` callout telling the developer to reply with the option number.
+
+Use short bullets, bold labels, tables and callouts. No paragraph may exceed
+three lines. Use no emojis. A short skeleton for two options:
+
+```markdown
+## Analysis
+
+> [!IMPORTANT]
+> <Decision in one sentence.>
+
+### Where we are
+
+- <Fact and its consequence.>
+
+**Out of scope**
+
+- <Excluded work.>
+
+**Terms**
+
+- <Glossary term and its exact meaning, or missing term listed as unresolved.>
+
+| Comparison | Option 1 | Option 2 |
+| --- | --- | --- |
+| Rule duplication | <Extent> | <Extent> |
+| Diff size | <Extent> | <Extent> |
+| Main risk | <Risk> | <Risk> |
+| Reader | <Who benefits> | <Who benefits> |
+
+### Option 1: <name>
+
+**You get**
+
+- <Result.>
+
+**Changes**
+
+- <Change.>
+
+**Watch out**
+
+- <Risk or limitation.>
+
+**Codex scope:** [<N>-solution-1.md](<attachment-url>)
+
+### Option 2: <name>
+
+**You get**
+
+- <Result.>
+
+**Changes**
+
+- <Change.>
+
+**Watch out**
+
+- <Risk or limitation.>
+
+**Codex scope:** [<N>-solution-2.md](<attachment-url>)
+
+### Recommendation
+
+Option <N>: <one sentence of reason>.
+
+> [!TIP]
+> Reply with the option number to select its Codex scope.
+```
+
+### Codex scope layout
+
+Each `<N>-solution-<k>.md` attachment is a complete scope of work. Use these
+sections in order:
+
+- **Standing rules:** implement only; no Git commit, push or `gh`; the exact
+  worktree path and Git branch; the exact files Codex may touch; no attribution
+  lines; no emojis. Require reading `GLOSSARY.md` first and using its terms
+  exactly as defined, never in another sense.
+- **Source of truth** and **Vocabulary changes:** include both when words
+  change. State the authoritative definitions and exact vocabulary changes;
+  leave missing terms unresolved rather than inventing them.
+- **File-by-file changes:** give line references and the exact intent for each
+  file, including affected areas.
+- **Do not change:** list the boundaries Codex must preserve.
+- **Verification:** give commands and their expected output.
+- **Final message:** state what Codex returns.
+- **Notes for the orchestrator (not for Codex):** give the Git commit plan, PR
+  fields and review focus. These are instructions for the orchestrator only.
 
 Solution contains the selected result, not another plan document:
 
@@ -71,13 +182,12 @@ Solution contains the selected result, not another plan document:
 
 Match the affected-area list to Scope: one page for a page change, a list for a
 feature group, or a table for a change across the application. Copy the affected
-areas from the selected solution attachment. Unselected proposals keep their
+areas from the selected solution attachment. Unselected scopes keep their
 affected-area lists only in their own attachments.
 
-Each solution attachment contains: Description, What changes, Applies to,
-Outcome, Limitations, Possible issues, and Components. Findings contain facts;
-solutions contain proposals. Long material stays in attachments and issue comments
-stay short. Name files with the issue number so they remain identifiable.
+Findings contain facts; solution attachments contain executable Codex scopes.
+Long material stays in attachments and issue comments stay short. Name files
+with the issue number so they remain identifiable.
 
 Upload Markdown files using the `gh-attach` extension, then link their returned
 URLs from the issue. See [the upload procedure](github-cli.md#markdown-attachments).
