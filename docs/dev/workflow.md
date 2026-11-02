@@ -19,7 +19,10 @@ no implementation.
    outcome and scope before implementation starts.
 2. **Analyse and discuss.** For M and L, the orchestrator inspects the code
    and records factual findings, constraints, and compatibility concerns. Each
-   possible solution is a separate Markdown attachment linked from Analysis. The
+   possible solution is a complete Codex scope attachment. The orchestrator
+   writes Analysis inline as if the developer had already asked for context,
+   comparison and the next step, following
+   [Issue format](issue-format.md#analysis-and-solution-selection). The
    orchestrator explains the trade-offs and may recommend an option; the
    developer chooses. Leave the Solution section pending until that choice is
    made. Then mark the chosen attachment **[Selected Solution]** and fill

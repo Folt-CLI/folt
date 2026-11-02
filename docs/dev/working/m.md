@@ -10,12 +10,17 @@ Set the milestone, Priority, Size, Status and ownership from the [shared steps](
 
 ## Analysis and review
 
-M needs analysis AND review. The orchestrator records findings and solution attachments using [Issue format](../issue-format.md).
+M needs analysis AND review. The orchestrator writes Analysis inline in the
+ticket, links the findings
+attachment from Details and attaches each solution as a complete Codex scope.
+Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection)
+for the layouts, uploads and selection.
 Use a read-only Codex [review](../review.md).
 
 ## Solution
 
-The developer selects the solution before implementation. Mark its attachment [Selected Solution].
+The developer selects the solution before implementation. Mark its Codex scope
+attachment **[Selected Solution]**.
 Summarize changes, Affected areas and Why this one in Solution; link findings and two to four key points in Details.
 
 ## Statuses
