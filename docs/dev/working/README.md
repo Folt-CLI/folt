@@ -30,6 +30,12 @@ Reading order: size file first, then the type row.
   as in [Issue format](../issue-format.md); fill Summary and Scope at creation.
   Follow the size file for analysis and solution readiness, and the Incident
   and Epic rows below for their report and Objective formats.
+- For M and L, the orchestrator writes Analysis inline and attaches findings as
+  `<N>-code-findings.md` and each solution as a complete Codex scope
+  `<N>-solution-<k>.md`. Follow
+  [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection)
+  for the layouts, uploads and selection. XS, S and XL have no analysis; XS and
+  S have no attachments and carry their Solution in the ticket.
 - Use these Status values: `S0: To Do`, `S1: In Analysis`,
   `S3: Ready For Implementation`, `S4: In Implementation`, `S5: Done`.
   XS and S are ready when created; their suggested path is S0 -> S4 -> S5.

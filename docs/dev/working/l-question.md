@@ -9,12 +9,17 @@ Set type Question and the milestone, Priority, Size, Status and ownership from t
 
 ## Analysis and review
 
-L needs analysis and review. The orchestrator records findings and solution attachments using [Issue format](../issue-format.md).
+L needs analysis and review. The orchestrator writes Analysis inline in the
+ticket, links the findings
+attachment from Details and attaches each solution as a complete Codex scope.
+Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection)
+for the layouts, uploads and selection.
 Use a read-only Codex [review](../review.md).
 
 ## Solution
 
-The developer selects the answer. Mark its attachment [Selected Solution] and summarize changes, Affected areas and Why this one.
+The developer selects the answer. Mark its Codex scope attachment
+**[Selected Solution]** and summarize changes, Affected areas and Why this one.
 Link findings and two to four key points in Details. Derive the child tickets from the answer.
 
 ## Statuses
