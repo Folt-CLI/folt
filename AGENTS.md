@@ -26,8 +26,12 @@ under docs/dev and GitHub issue forms under .github/ISSUE_TEMPLATE.
 - See [working templates](docs/dev/working/README.md) for how a ticket is worked
   by its size and issue type.
 - Implementation agents implement and fix only; they do not analyse code, reviews or CI. The orchestrator investigates. For M and L tickets the developer selects the solution before implementation; XS and S carry their solution. Follow [Testing](docs/dev/testing.md) for roles and handoffs.
-- Attach findings as <N>-code-findings.md and each solution as
-  <N>-solution-<k>.md using gh-attach. Verify uploads and use real attachment links.
+- Write Analysis inline in the ticket using the layout in
+  [Issue format](docs/dev/issue-format.md#analysis-and-solution-selection).
+  Attach findings as `<N>-code-findings.md` and each solution as a complete
+  Codex scope `<N>-solution-<k>.md` using gh-attach. Verify uploads and use real
+  attachment links. Analyses and scopes use `GLOSSARY.md` terms exactly and no
+  emojis.
 - Parents wait for closed children; see [closing rules](docs/dev/working/README.md#shared-steps).
 - Set ticket and PR metadata; see [ticket planning](docs/dev/ticket-planning.md#at-issue-creation) and [PRs](docs/dev/workflow.md#pull-requests).
 - Ticket work in its repository; see [repository rules](docs/dev/working/README.md#shared-steps).
