@@ -18,41 +18,76 @@ trap 'rm -rf "$temp"' EXIT
 git diff --no-renames --name-only -z "$merge_base" "$head" -- '*.rs' > "$temp/paths"
 : > "$temp/lines"
 while IFS= read -r -d '' path; do
-  # Only existing files can produce findings; new files can receive moved lines.
-  git cat-file -e "$head:$path" 2>/dev/null || continue
-  existing=false
+  # Read both complete files so assertion spans and attributes can begin
+  # before a diff hunk. Missing files have no lines on that side of the diff.
+  : > "$temp/old"
+  : > "$temp/head"
   if git cat-file -e "$merge_base:$path" 2>/dev/null; then
-    existing=true
+    git show "$merge_base:$path" > "$temp/old"
+  fi
+  if git cat-file -e "$head:$path" 2>/dev/null; then
+    git show "$head:$path" > "$temp/head"
   fi
   git diff --no-ext-diff --no-textconv --no-renames --unified=3 \
     "$merge_base" "$head" -- ":(literal)$path" > "$temp/diff"
   # Quote paths for unambiguous diagnostics and tab-separated internal records.
   printf -v TEST_INTEGRITY_PATH '%q' "$path"
   export TEST_INTEGRITY_PATH
-  awk -v existing="$existing" '
+  test_path=false
+  case "/$path" in
+    */tests/*|*tests.rs|*_test.rs) test_path=true ;;
+  esac
+  awk -v old_file="$temp/old" -v head_file="$temp/head" \
+    -v test_path="$test_path" '
+    FILENAME == old_file {
+      text = $0
+      if (text ~ /^[[:space:]]*(debug_)?assert[[:alnum:]_]*![[:space:]]*\(/)
+        assertion = 1
+      sensitive[FNR] = (assertion || text ~ /assert|#\[test\]|#\[should_panic(\]|\()/ ||
+                        (text ~ /fn / && test_attribute))
+      if (assertion) {
+        # Text heuristic: parentheses inside strings also affect this count.
+        opens = text
+        closes = text
+        depth += gsub(/\(/, "", opens) - gsub(/\)/, "", closes)
+        if (depth <= 0) {
+          assertion = 0
+          depth = 0
+        }
+      }
+      if (text ~ /^[[:space:]]*#\[/) {
+        if (text ~ /#\[test\]/) test_attribute = 1
+      } else {
+        test_attribute = 0
+      }
+      next
+    }
+    FILENAME == head_file {
+      if (!cfg_test && $0 ~ /^[[:space:]]*#\[cfg\(test\)\]/) cfg_test = FNR
+      next
+    }
     /^@@ / {
       split($2, range, ",")
       old = -range[1]
-      previous = ""
+      split($3, range, ",")
+      head = range[1] + 0
       hunk = 1
       next
     }
     !hunk { next }
     /^\+/ {
-      print "A\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t0\t" substr($0, 2)
+      if (test_path == "true" || (cfg_test && head > cfg_test))
+        print "A\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t" head "\t" substr($0, 2)
+      head++
       next
     }
     /^[- ]/ {
-      text = substr($0, 2)
-      if (existing == "true" && substr($0, 1, 1) == "-" &&
-          (text ~ /assert|#\[test\]|#\[should_panic\]/ ||
-           (text ~ /fn / && previous ~ /#\[test\]/))) {
-        print "R\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t" old "\t" text
-      }
-      previous = text
+      if (substr($0, 1, 1) == "-" && sensitive[old])
+        print "R\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t" old "\t" substr($0, 2)
+      if (substr($0, 1, 1) == " ") head++
       old++
     }
-  ' "$temp/diff" >> "$temp/lines"
+  ' "$temp/old" "$temp/head" "$temp/diff" >> "$temp/lines"
 done < "$temp/paths"
 
 # Consume identical added lines in other files once each, so a move is allowed
