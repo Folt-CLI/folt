@@ -497,8 +497,8 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 ### publish
 
 - **Layer:** Operations
-- **Definition:** To make prepared filesystem content visible at its final path by renaming it there. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:134` (`build_and_publish`); `crates/folt-core/src/placement_fs.rs:556` (`atomic_rewrite`)
+- **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
+- **Code:** `crates/folt-core/src/folio_dir.rs:134` (`build_and_publish`); `crates/folt-core/src/placement_fs.rs:556` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:179` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
