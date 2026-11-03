@@ -46,6 +46,14 @@ Reading order: size file first, then the type row.
   opens the PR. Only the developer merges. Follow [Testing](../testing.md) for
   roles, tests and the gate, and [Review](../review.md) for read-only Codex
   review where the size requires review.
+- Ask the developer only on Question tickets: nothing is known yet; scope work
+  items. Otherwise use the ticket and analysis options, state assumptions in the
+  result and continue; for M/L the developer selects an option. Hard-to-reverse
+  or outward-facing actions need confirmation unless already permitted.
+- Background Claude sub-agents unblock the orchestrator: move ticket Status,
+  project fields, links, Disposition; watch Codex or CI to completion and
+  report. No code/review/CI analysis or decisions. The orchestrator reviews the
+  diff, runs the gate, commits, pushes, opens the PR; only the developer merges.
 - Copy the issue's type into commit subjects: `<Issue Type>[#N]: ...`.
   Follow [Workflow](../workflow.md) for commit bodies and PR delivery, and
   [Stacked pull requests](../stacked-prs.md) for dependent branches and PRs.
