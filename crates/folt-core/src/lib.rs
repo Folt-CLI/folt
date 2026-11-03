@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(clippy::unreachable))]
+
 pub mod checkout;
 pub mod config;
 pub mod folio_dir;

@@ -1,3 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::too_many_lines
+)]
+
 #[allow(dead_code)]
 #[path = "../common/mod.rs"]
 mod common;

@@ -1,3 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::too_many_lines
+)]
+
 #[test]
 fn binary_prints_version() {
     let output = assert_cmd::cargo::cargo_bin_cmd!("folt")
