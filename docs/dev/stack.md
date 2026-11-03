@@ -16,12 +16,21 @@
 - **Sync protocol:** a minimal HTTPS request/response API with a stateless host
   that stores objects by hash, verifies them and moves refs by compare-and-swap;
   capabilities are negotiated ([#4](https://github.com/Folt-CLI/folt/issues/4)).
-- **Home:** one global home, `~/.folt` (`%USERPROFILE%\.folt` on Windows), with a
-  `FOLT_HOME` environment override; Folt writes nothing into user directories
-  ([#14](https://github.com/Folt-CLI/folt/issues/14)).
+- **Home:** one global home, `~/.folt` (`%USERPROFILE%\.folt` on Windows),
+  with a `FOLT_HOME` environment override; Folt writes nothing into user
+  directories ([#14](https://github.com/Folt-CLI/folt/issues/14)).
+  The home holds a one-line integer `format` file, written by temp file
+  and rename. A missing format file in a non-empty directory, an unparseable
+  one or a newer version is refused
+  ([#18](https://github.com/Folt-CLI/folt/issues/18)). This replaces the
+  per-workspace `.folt/` marker of
+  [#2](https://github.com/Folt-CLI/folt/issues/2).
 - **Registry:** an embedded SQLite database in the home through `rusqlite` with
   the bundled C library; a Folio exists independently of its placements.
   Building needs a C compiler ([#27](https://github.com/Folt-CLI/folt/issues/27)).
+- **Lock:** an exclusive file lock on a permanent `lock` file in the home;
+  temporary files live in `<home>/tmp/`; leftovers are deleted when the lock is
+  acquired ([#19](https://github.com/Folt-CLI/folt/issues/19)).
 - **Tests:** the test structure and tiers are described in [Testing](testing.md)
   ([#96](https://github.com/Folt-CLI/folt/issues/96)).
 
