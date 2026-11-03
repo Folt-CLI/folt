@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Usage: scripts/test-integrity <base-ref> [<head-ref>]
+set -euo pipefail
+
+usage() {
+  printf 'Usage: scripts/test-integrity <base-ref> [<head-ref>]\n' >&2
+  exit 2
+}
+
+[[ $# -ge 1 && $# -le 2 ]] || usage
+[[ -n "$1" && -n "${2-HEAD}" ]] || usage
+base=$(git rev-parse --verify --end-of-options "$1^{commit}" 2>/dev/null) || usage
+head=$(git rev-parse --verify --end-of-options "${2-HEAD}^{commit}" 2>/dev/null) || usage
+merge_base=$(git merge-base "$base" "$head") || usage
+
+temp=$(mktemp -d)
+trap 'rm -rf "$temp"' EXIT
+git diff --no-renames --name-only -z "$merge_base" "$head" -- '*.rs' > "$temp/paths"
+: > "$temp/lines"
+while IFS= read -r -d '' path; do
+  # Only existing files can produce findings; new files can receive moved lines.
+  git cat-file -e "$head:$path" 2>/dev/null || continue
+  existing=false
+  if git cat-file -e "$merge_base:$path" 2>/dev/null; then
+    existing=true
+  fi
+  git diff --no-ext-diff --no-textconv --no-renames --unified=3 \
+    "$merge_base" "$head" -- ":(literal)$path" > "$temp/diff"
+  # Quote paths for unambiguous diagnostics and tab-separated internal records.
+  printf -v TEST_INTEGRITY_PATH '%q' "$path"
+  export TEST_INTEGRITY_PATH
+  awk -v existing="$existing" '
+    /^@@ / {
+      split($2, range, ",")
+      old = -range[1]
+      previous = ""
+      hunk = 1
+      next
+    }
+    !hunk { next }
+    /^\+/ {
+      print "A\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t0\t" substr($0, 2)
+      next
+    }
+    /^[- ]/ {
+      text = substr($0, 2)
+      if (existing == "true" && substr($0, 1, 1) == "-" &&
+          (text ~ /assert|#\[test\]|#\[should_panic\]/ ||
+           (text ~ /fn / && previous ~ /#\[test\]/))) {
+        print "R\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t" old "\t" text
+      }
+      previous = text
+      old++
+    }
+  ' "$temp/diff" >> "$temp/lines"
+done < "$temp/paths"
+
+# Consume identical added lines in other files once each, so a move is allowed
+# without hiding an additional removal of the same assertion.
+awk -F '\t' '
+  {
+    text = $0
+    sub(/^[^\t]*\t[^\t]*\t[^\t]*\t/, "", text)
+    if ($1 == "A") {
+      added[text, $2]++
+      files[$2] = 1
+    } else {
+      count++
+      paths[count] = $2
+      numbers[count] = $3
+      texts[count] = text
+    }
+  }
+  END {
+    for (i = 1; i <= count; i++) {
+      moved = 0
+      for (file in files) {
+        if (file != paths[i] && added[texts[i], file] > 0) {
+          added[texts[i], file]--
+          moved = 1
+          break
+        }
+      }
+      if (!moved) printf "%s:%s: -%s\n", paths[i], numbers[i], texts[i]
+    }
+  }
+' "$temp/lines" > "$temp/findings"
+
+if [[ ! -s "$temp/findings" ]]; then
+  printf 'Test integrity: no existing test assertions or test declarations changed.\n'
+  exit 0
+fi
+
+cat "$temp/findings"
+reasons=$(git log --format='%(trailers:key=Test-change,valueonly)' "$merge_base..$head" |
+  awk 'NF { print }')
+if [[ -n "$reasons" ]]; then
+  printf 'Test integrity: allowed by Git commit trailer:\nTest-change: %s\n' "$reasons"
+  exit 0
+fi
+printf 'Test integrity: existing test assertions or test declarations changed.\nAdd a Git commit trailer in this PR: Test-change: <non-empty reason>\n' >&2
+exit 1
