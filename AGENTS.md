@@ -26,6 +26,9 @@ under docs/dev and GitHub issue forms under .github/ISSUE_TEMPLATE.
 - See [working templates](docs/dev/working/README.md) for how a ticket is worked
   by its size and issue type.
 - Implementation agents implement and fix only; they do not analyse code, reviews or CI. The orchestrator investigates. For M and L tickets the developer selects the solution before implementation; XS and S carry their solution. Follow [Testing](docs/dev/testing.md) for roles and handoffs.
+- Ask the developer questions only on Question tickets, and give ticket tracking
+  to background sub-agents; see
+  [shared steps](docs/dev/working/README.md#shared-steps).
 - Write Analysis inline in the ticket using the layout in
   [Issue format](docs/dev/issue-format.md#analysis-and-solution-selection).
   Attach findings as `<N>-code-findings.md` and each solution as a complete
