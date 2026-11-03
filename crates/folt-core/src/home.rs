@@ -123,6 +123,8 @@ impl Home {
         self.acquire_lock(true)
     }
 
+    // split in the folt-core refactor (#203)
+    #[allow(clippy::too_many_lines)]
     fn acquire_lock(&self, nonblocking: bool) -> Result<HomeLock, HomeError> {
         let lock_path = self.path.join("lock");
         match fs::metadata(&lock_path) {
@@ -434,7 +436,7 @@ fn has_folt_application_id(path: &Path) -> bool {
     if file.read_exact(&mut header).is_err() || &header[..16] != SQLITE_HEADER {
         return false;
     }
-    u32::from_be_bytes(header[68..72].try_into().expect("four-byte header slice")) == APPLICATION_ID
+    u32::from_be_bytes([header[68], header[69], header[70], header[71]]) == APPLICATION_ID
 }
 
 /// Errors that can occur while resolving or opening a Folt home.

@@ -215,11 +215,12 @@ fn resolve_path(input: &Path, append_marker: bool) -> Result<Vec<u8>, RegistryEr
 pub struct Registry {
     connection: Option<Connection>,
     path: PathBuf,
+    home: PathBuf,
 }
 
 impl Registry {
     pub(crate) fn home_path(&self) -> &Path {
-        self.path.parent().expect("registry path has a home")
+        &self.home
     }
 
     /// Opens or creates the registry while the caller holds the home lock.
@@ -274,6 +275,7 @@ impl Registry {
         }
         Ok(Self {
             connection: Some(connection),
+            home: home.path().to_path_buf(),
             path,
         })
     }
@@ -293,7 +295,11 @@ impl Registry {
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => None,
             Err(source) => return Err(RegistryError::Io(source)),
         };
-        Ok(Self { connection, path })
+        Ok(Self {
+            connection,
+            path,
+            home: home.path().to_path_buf(),
+        })
     }
 
     pub fn placement_at(&self, path: &PlacementPath) -> Result<Option<Placement>, RegistryError> {

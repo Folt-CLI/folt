@@ -158,7 +158,7 @@ impl<W: Write> ObjectWriter<W> {
         } else {
             self.output
                 .as_mut()
-                .expect("uncompressed output")
+                .ok_or(ObjectError::InvalidFrame)?
                 .write_all(bytes)
                 .map_err(ObjectError::Io)
         }
@@ -170,7 +170,7 @@ impl<W: Write> ObjectWriter<W> {
         let output = if let Some(encoder) = self.encoder.take() {
             encoder.finish().map_err(ObjectError::Io)?
         } else {
-            self.output.take().expect("uncompressed output")
+            self.output.take().ok_or(ObjectError::InvalidFrame)?
         };
         Ok((output, self.hasher.finish()))
     }

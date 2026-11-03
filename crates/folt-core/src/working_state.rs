@@ -110,7 +110,11 @@ pub fn stage(
         .into());
     }
     let Observation::File { signature } = before else {
-        unreachable!("read_working requires a regular file");
+        return Err(Refusal {
+            path: row.path.to_path_buf(),
+            reason: RefusalReason::NotAFile,
+        }
+        .into());
     };
     let staged = if row.base.as_ref().is_some_and(|base| base.hash == hash) {
         None
@@ -226,7 +230,9 @@ fn write_stage(
         if let Some(references) = &references {
             let live = live_branches
                 .as_ref()
-                .unwrap()
+                .ok_or_else(|| {
+                    RegistryError::References("missing live branches for staged references".into())
+                })?
                 .iter()
                 .map(|(name, _)| name.as_str())
                 .collect::<Vec<_>>();

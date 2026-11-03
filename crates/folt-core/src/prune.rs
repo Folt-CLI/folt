@@ -123,13 +123,19 @@ fn observe(row: &Placement, fs: &impl PlacementOps) -> PruneFacts {
         } else {
             None
         };
-    let parent_exists =
-        match fs::metadata(placement.path.parent().expect("absolute placement path")) {
-            Ok(metadata) if metadata.is_dir() => Ok(true),
-            Ok(_) => Err("parent is not a directory".into()),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-            Err(error) => Err(error.to_string()),
-        };
+    let parent_exists = match placement
+        .path
+        .parent()
+        .ok_or_else(|| {
+            io::Error::other(format!("path has no parent: {}", placement.path.display()))
+        })
+        .and_then(fs::metadata)
+    {
+        Ok(metadata) if metadata.is_dir() => Ok(true),
+        Ok(_) => Err("parent is not a directory".into()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.to_string()),
+    };
     PruneFacts {
         row: row.clone(),
         observation,
@@ -209,7 +215,7 @@ pub fn judge(facts: &PruneFacts) -> Option<String> {
             Drift::Detached => "a different file than expected",
             Drift::PlacementEdited => "edited or different",
             Drift::Unusable => "unusable entry",
-            Drift::Gone => unreachable!("missing handled above"),
+            Drift::Gone => return None,
         }
         .into(),
     )

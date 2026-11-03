@@ -226,7 +226,9 @@ impl RefStore {
         let base = self.root.join("refs").join(kind.directory());
         let mut result = Vec::new();
         walk(&base, &mut |path| {
-            let relative = path.strip_prefix(&base).expect("walk stays beneath base");
+            let relative = path
+                .strip_prefix(&base)
+                .map_err(|_| RefError::InvalidRef(path.into()))?;
             let value = relative
                 .components()
                 .map(|part| part.as_os_str().to_str())
@@ -312,7 +314,9 @@ fn temporary_name(name: &str) -> bool {
 }
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), RefError> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
-    let parent = path.parent().expect("ref has a parent directory");
+    let parent = path
+        .parent()
+        .ok_or_else(|| RefError::InvalidRef(path.into()))?;
     fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
     let (temporary, mut file) = loop {
         let temporary = parent.join(format!(
@@ -421,7 +425,9 @@ pub(crate) fn inspect_refs(root: &Path) -> Result<(), RefError> {
         };
         check_directory(&path)?;
         walk(&path, &mut |file| {
-            let relative = file.strip_prefix(&path).expect("walk stays beneath base");
+            let relative = file
+                .strip_prefix(&path)
+                .map_err(|_| RefError::InvalidRef(file.into()))?;
             let value = relative
                 .components()
                 .map(|part| part.as_os_str().to_str())

@@ -124,6 +124,8 @@ fn renamed(bytes: &[u8], name: &FolioName) -> Result<Vec<u8>, RenameError> {
 
 /// Reads only the internal row. Referrers are checked in apply's registry
 /// transaction, with the caller's cross-Folio branch-ref liveness callback.
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 pub fn plan_rename(
     old: &FolioName,
     new: &FolioName,

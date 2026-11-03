@@ -307,7 +307,10 @@ fn tokenize(bytes: &[u8], block: &mut Block) -> Result<()> {
                     if let Some(end) = flow_end(tail) {
                         let absolute = value_start + end;
                         let final_line = line(bytes, absolute, block.body.end);
-                        let node = block.nodes.last_mut().unwrap();
+                        let node = block
+                            .nodes
+                            .last_mut()
+                            .ok_or(FrontMatterError::InvalidValue)?;
                         node.value.end = absolute;
                         node.comment = absolute..final_line.end;
                         node.continuation.start = final_line.next;
@@ -472,7 +475,7 @@ fn mapping(s: &str) -> Result<Vec<(&str, &str, usize)>> {
         .strip_prefix('{')
         .and_then(|s| s.strip_suffix('}'))
         .ok_or(FrontMatterError::InvalidValue)?;
-    let base = s.find('{').unwrap() + 1;
+    let base = s.find('{').ok_or(FrontMatterError::InvalidValue)? + 1;
     let mut starts = vec![0];
     starts.extend(punctuation(inner, ',').into_iter().map(|n| n + 1));
     let mut result = Vec::new();
@@ -533,6 +536,8 @@ fn reference<'a>(alias: &'a str, value: &'a str) -> Result<Reference<'a>> {
     }
     Ok(result)
 }
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 fn references<'a>(bytes: &'a [u8], n: &Node) -> Result<Vec<ReferenceNode<'a>>> {
     supported(bytes, n)?;
     let value = text(&bytes[n.value.clone()])?;
@@ -1033,6 +1038,8 @@ fn render_flow_reference(r: &Reference<'_>) -> Result<String> {
     Ok(format!("{}: {{{}}}", r.alias, fields.join(", ")))
 }
 /// Sets or removes one alias, writing quoted block mappings.
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 pub fn set_reference(
     bytes: &[u8],
     alias: &str,
@@ -1119,7 +1126,7 @@ pub fn set_reference(
                 let mut rendered = rendered.unwrap_or_default();
                 let header = line(bytes, entry.range.start, entry.range.end);
                 let raw = text(&bytes[entry.range.start..header.end])?;
-                let header_value = &raw[colon(raw).expect("validated alias header") + 1..];
+                let header_value = &raw[colon(raw).ok_or(FrontMatterError::InvalidValue)? + 1..];
                 let nested =
                     header_value.trim().is_empty() || header_value.trim_start().starts_with('#');
                 let flow_comments = if nested {
@@ -1141,7 +1148,9 @@ pub fn set_reference(
                 if let Some(comment) = header_comment {
                     let comment = &raw[comment..];
                     if value.is_some() {
-                        let end = rendered.find(block.line_ending).expect("rendered header");
+                        let end = rendered
+                            .find(block.line_ending)
+                            .ok_or(FrontMatterError::InvalidValue)?;
                         rendered.insert_str(end, &format!(" {comment}"));
                     } else {
                         rendered = format!("{}{comment}{}", " ".repeat(indent), block.line_ending);
@@ -1176,7 +1185,7 @@ pub fn set_reference(
                         preserved.extend_from_slice(&bytes[pos..l.next]);
                     } else if let Some(comment) = punctuation(raw, '#').first() {
                         let comment = &raw[*comment..];
-                        let key = raw[..colon(raw).expect("validated reference field")].trim();
+                        let key = raw[..colon(raw).ok_or(FrontMatterError::InvalidValue)?].trim();
                         let field =
                             format!("{}{}{key}:", block.line_ending, " ".repeat(indent + 2));
                         if let Some(start) = rendered.find(&field) {
@@ -1184,7 +1193,7 @@ pub fn set_reference(
                             let end = start
                                 + rendered[start..]
                                     .find(block.line_ending)
-                                    .expect("rendered field ending");
+                                    .ok_or(FrontMatterError::InvalidValue)?;
                             rendered.insert_str(end, &format!(" {comment}"));
                         } else {
                             // Removed fields keep their original indentation;
