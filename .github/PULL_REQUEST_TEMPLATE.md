@@ -17,6 +17,10 @@ For work in another repository, use a full repository reference or URL.
 For a stacked pull request, state its position and name the pull request
 below it. -->
 
+## Metadata
+
+<!-- Milestone, assignee and the Folt project are set on the pull request. Write them here only as a record of what was set. -->
+
 ## Verification
 
 <!-- Local suite and result; each CI job per system and result; what did not run.

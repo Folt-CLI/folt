@@ -1,17 +1,18 @@
-name: Work item
-description: Track one bounded change with a clear outcome.
+name: Documentation
+description: "Change documentation: what is added, corrected or removed."
+type: Documentation
+assignees: ["Bojan-Ivanovski"]
 body:
   - type: markdown
     attributes:
       value: >-
-        Keep one issue to one reviewable outcome. Fill in the request and scope now;
-        leave Analysis, Solution, and Details pending until their stage of the work.
+        For an XS or S ticket, write the Solution now and put 'No analysis needed.' under Analysis; for M, leave Analysis and Solution pending.
 
   - type: textarea
     id: summary
     attributes:
       label: Summary
-      description: State the current situation, the expected outcome, and who benefits. For a new capability, describe the user need.
+      description: Describe the documentation change and who benefits.
       value: |
         **Existing behavior.**
 
@@ -44,7 +45,7 @@ body:
     id: analysis
     attributes:
       label: Analysis
-      description: Codex discusses solutions based on findings. Link each solution as a separate Markdown attachment; the developer chooses.
+      description: For M and L, the orchestrator writes the options here and attaches each as a Codex scope; the developer chooses.
       value: _Not analyzed yet._
 
   - type: textarea
