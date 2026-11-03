@@ -1,5 +1,5 @@
 name: Bug
-description: Report a defect: what happens, what should happen and how to reproduce it.
+description: "Report a defect: what happens, what should happen and how to reproduce it."
 type: Bug
 assignees: ["Bojan-Ivanovski"]
 body:

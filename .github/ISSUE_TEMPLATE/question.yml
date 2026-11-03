@@ -1,5 +1,5 @@
 name: Question
-description: Record a decision for the developer to select; derived work becomes child tickets.
+description: "Record a decision for the developer to select; derived work becomes child tickets."
 type: Question
 assignees: ["Bojan-Ivanovski"]
 body:

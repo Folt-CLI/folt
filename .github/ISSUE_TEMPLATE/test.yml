@@ -1,5 +1,5 @@
 name: Test
-description: Add test cases whose whole outcome is tests.
+description: "Add test cases whose whole outcome is tests."
 type: Test
 assignees: ["Bojan-Ivanovski"]
 body:

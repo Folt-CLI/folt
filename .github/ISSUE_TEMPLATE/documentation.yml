@@ -1,5 +1,5 @@
 name: Documentation
-description: Change documentation: what is added, corrected or removed.
+description: "Change documentation: what is added, corrected or removed."
 type: Documentation
 assignees: ["Bojan-Ivanovski"]
 body:

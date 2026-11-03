@@ -1,5 +1,5 @@
 name: Task
-description: Track one bounded piece of work that is not a defect, feature, maintenance, documentation or test.
+description: "Track one bounded piece of work that is not a defect, feature, maintenance, documentation or test."
 type: Task
 assignees: ["Bojan-Ivanovski"]
 body:

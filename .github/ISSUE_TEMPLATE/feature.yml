@@ -1,5 +1,5 @@
 name: Feature
-description: Propose a user-visible capability and its intended result.
+description: "Propose a user-visible capability and its intended result."
 type: Feature
 assignees: ["Bojan-Ivanovski"]
 body:

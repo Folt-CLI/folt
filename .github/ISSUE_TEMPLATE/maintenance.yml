@@ -1,5 +1,5 @@
 name: Maintenance
-description: Refactoring, dependencies, CI, tooling or cleanup.
+description: "Refactoring, dependencies, CI, tooling or cleanup."
 type: Maintenance
 assignees: ["Bojan-Ivanovski"]
 body:
