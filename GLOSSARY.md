@@ -580,8 +580,8 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - **Layer:** Code structure
 - **Definition:** A guard that restores rewritten files when an operation fails before it completes.
 - **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
-- **Related:** The conflict row "rollback" in [Terms in conflict](#terms-in-conflict) (say restore).
-- **Not:** A different meaning for the conflict row "rollback"; say restore.
+- **Related:** none.
+- **Not:** Rollback names the guard; restore names the action it performs. See the conflict row for rollback in Terms in conflict.
 - **Status:** decided
 
 ## Process
