@@ -7,6 +7,10 @@ request. A bug fix adds a regression case that fails before the fix. The
 implementing agent writes the tests. The local suite must pass before anything
 is pushed.
 
+Non-test code denies Clippy’s `unwrap_used`, `expect_used`, `panic` and
+`unreachable` lints. Exceptions require `#[expect(clippy::<lint>, reason = "...")]`
+on the smallest item, explaining why the type system cannot express the invariant.
+
 ## Test tickets
 
 The Test issue type is for a ticket whose whole outcome is adding test cases, such as
