@@ -169,6 +169,13 @@ mod common;
 The allowance lets different suites use different helpers under Clippy's
 `-D warnings`. Validation-specific setup lives in `validation/support.rs`.
 
+Use `common::expected_path` whenever an expected message or plan text contains a
+path the test created under a temporary directory. The helper canonicalizes the
+existing parent and keeps the final component's on-disk spelling without
+following a final symbolic link, matching placement path resolution across
+Linux, macOS and Windows. Paths taken from values returned by the code, such as
+`plan.entries[n].path`, already carry its spelling and stay unchanged.
+
 To add a regression test, declare a module in `regression/main.rs`, record the
 bug it covers, and keep the smallest reproducer. To add a data case, create a
 directory under `fixtures/cases/` containing its inputs, expected results and a
