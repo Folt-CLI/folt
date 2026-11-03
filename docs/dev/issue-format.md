@@ -8,7 +8,8 @@ or design material in a linked document; comments should remain brief.
 
 Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-Use the **Work item** form for one bounded change. Follow the
+Use the forms under `.github/ISSUE_TEMPLATE`, one per issue type: Task, Bug,
+Feature, Question, Epic, Maintenance, Documentation, Incident and Test. Follow the
 [working templates](working/README.md) for what each size contains; the table
 below describes sections when their stage applies.
 
