@@ -20,6 +20,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [directory Folio](#directory-folio)
 - [Disposition](#disposition)
 - [drift](#drift)
+- [Environment](#environment)
 - [Epic](#epic)
 - [explicit key](#explicit-key)
 - [facts](#facts)
@@ -29,6 +30,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [Folio id](#folio-id)
 - [folio-name](#folio-name)
 - [front matter](#front-matter)
+- [fsx](#fsx)
 - [gate](#gate)
 - [home](#home)
 - [home lock](#home-lock)
@@ -41,6 +43,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [object](#object)
 - [object store](#object-store)
 - [observation](#observation)
+- [ops](#ops)
 - [orchestrator](#orchestrator)
 - [owned key](#owned-key)
 - [parent](#parent)
@@ -59,11 +62,15 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [register](#register)
 - [registry](#registry)
 - [rename](#rename)
+- [Rollback](#rollback)
 - [scan limit](#scan-limit)
+- [Settings](#settings)
 - [signature](#signature)
 - [size](#size)
 - [stage](#stage)
 - [tag](#tag)
+- [TempFile](#tempfile)
+- [test_support](#test_support)
 - [tip](#tip)
 - [unresolved reference](#unresolved-reference)
 - [unstage](#unstage)
@@ -510,6 +517,71 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - **Code:** `crates/folt-core/src/home.rs:250` (`HomeLock`)
 - **Related:** [home](#home), [plan and apply](#plan-and-apply), [register](#register), [prune](#prune).
 - **Not:** A filesystem lock against external editors or permission to share one implementation worktree.
+- **Status:** decided
+
+## Code structure
+
+### fsx
+
+- **Layer:** Code structure
+- **Definition:** The single module that owns file-system writes (temporary files, atomic rename, directory sync and mode setting) and the `FileSystem` trait with a real and a fault-injecting implementation.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** [publish](#publish).
+- **Not:** Raw `std::fs` mutations elsewhere.
+- **Status:** decided
+
+### ops
+
+- **Layer:** Code structure
+- **Definition:** The module tree of operations (register, rename, checkout, prune and history operations), each following plan and apply.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** [register](#register), [rename](#rename), [checkout](#checkout), [prune](#prune), [plan and apply](#plan-and-apply).
+- **Not:** The CLI commands.
+- **Status:** decided
+
+### test_support
+
+- **Layer:** Code structure
+- **Definition:** The shared test fixtures module, enabled by the `test-support` Cargo feature of `folt-core` and by `cfg(test)`.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** none.
+- **Not:** The `tests/` crate itself.
+- **Status:** decided
+
+### Settings
+
+- **Layer:** Code structure
+- **Definition:** The typed runtime settings of Folt (for example `large_file_bytes`), with defaults and optional environment overrides read through Environment.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** none.
+- **Not:** Compile-time constants, which live in `config::names`, `config::limits` and `config::formats`.
+- **Status:** decided
+
+### Environment
+
+- **Layer:** Code structure
+- **Definition:** The only reader of the process environment, the OS home directory and the current directory; every other module receives values from it.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** [home](#home).
+- **Not:** The Folt home.
+- **Status:** decided
+
+### TempFile
+
+- **Layer:** Code structure
+- **Definition:** A guard that owns a temporary file in the home `tmp/` and removes it unless it was published.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** [home](#home), [publish](#publish).
+- **Not:** A published file.
+- **Status:** decided
+
+### Rollback
+
+- **Layer:** Code structure
+- **Definition:** A guard that restores rewritten files when an operation fails before it completes.
+- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Related:** The conflict row "rollback" in [Terms in conflict](#terms-in-conflict) (say restore).
+- **Not:** A different meaning for the conflict row "rollback"; say restore.
 - **Status:** decided
 
 ## Process
