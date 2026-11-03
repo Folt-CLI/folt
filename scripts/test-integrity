@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Usage: scripts/test-integrity <base-ref> [<head-ref>]
+set -euo pipefail
+
+usage() {
+  printf 'Usage: scripts/test-integrity <base-ref> [<head-ref>]\n' >&2
+  exit 2
+}
+
+[[ $# -ge 1 && $# -le 2 ]] || usage
+[[ -n "$1" && -n "${2-HEAD}" ]] || usage
+base=$(git rev-parse --verify --end-of-options "$1^{commit}" 2>/dev/null) || usage
+head=$(git rev-parse --verify --end-of-options "${2-HEAD}^{commit}" 2>/dev/null) || usage
+merge_base=$(git merge-base "$base" "$head") || usage
+
+temp=$(mktemp -d)
+trap 'rm -rf "$temp"' EXIT
+git diff --no-renames --name-only -z "$merge_base" "$head" -- '*.rs' > "$temp/paths"
+: > "$temp/lines"
+while IFS= read -r -d '' path; do
+  # Read both complete files so assertion spans and attributes can begin
+  # before a diff hunk. Missing files have no lines on that side of the diff.
+  : > "$temp/old"
+  : > "$temp/head"
+  if git cat-file -e "$merge_base:$path" 2>/dev/null; then
+    git show "$merge_base:$path" > "$temp/old"
+  fi
+  if git cat-file -e "$head:$path" 2>/dev/null; then
+    git show "$head:$path" > "$temp/head"
+  fi
+  git diff --no-ext-diff --no-textconv --no-renames --unified=3 \
+    "$merge_base" "$head" -- ":(literal)$path" > "$temp/diff"
+  # Quote paths for unambiguous diagnostics and tab-separated internal records.
+  printf -v TEST_INTEGRITY_PATH '%q' "$path"
+  export TEST_INTEGRITY_PATH
+  test_path=false
+  case "/$path" in
+    */tests/*|*tests.rs|*_test.rs) test_path=true ;;
+  esac
+  awk -v old_file="$temp/old" -v head_file="$temp/head" \
+    -v test_path="$test_path" '
+    FILENAME == old_file {
+      text = $0
+      if (!attribute && text ~ /^[[:space:]]*#\[/) {
+        attribute = 1
+        panic_attribute = (text ~ /#\[should_panic(\]|\()/)
+        if (text ~ /#\[test\]/) test_attribute = 1
+      }
+      if (text ~ /^[[:space:]]*(debug_)?assert[[:alnum:]_]*![[:space:]]*\(/)
+        assertion = 1
+      sensitive[FNR] = (assertion || panic_attribute || text ~ /assert|#\[test\]|#\[should_panic(\]|\()/ ||
+                        (text ~ /fn / && test_attribute))
+      if (assertion) {
+        # Text heuristic: parentheses inside strings also affect this count.
+        opens = text
+        closes = text
+        depth += gsub(/\(/, "", opens) - gsub(/\)/, "", closes)
+        if (depth <= 0) {
+          assertion = 0
+          depth = 0
+        }
+      }
+      if (attribute) {
+        # Keep every attribute line together, including its closing bracket.
+        opens = text
+        closes = text
+        attribute_depth += gsub(/\[/, "", opens) - gsub(/\]/, "", closes)
+        if (attribute_depth <= 0) {
+          attribute = 0
+          panic_attribute = 0
+          attribute_depth = 0
+        }
+      } else {
+        test_attribute = 0
+      }
+      next
+    }
+    FILENAME == head_file {
+      if (!cfg_test && $0 ~ /^[[:space:]]*#\[cfg\(test\)\]/) cfg_test = FNR
+      next
+    }
+    /^@@ / {
+      split($2, range, ",")
+      old = -range[1]
+      split($3, range, ",")
+      head = range[1] + 0
+      hunk = 1
+      next
+    }
+    !hunk { next }
+    /^\+/ {
+      if (test_path == "true" || (cfg_test && head > cfg_test))
+        print "A\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t" head "\t" substr($0, 2)
+      head++
+      next
+    }
+    /^[- ]/ {
+      if (substr($0, 1, 1) == "-" && sensitive[old])
+        print "R\t" ENVIRON["TEST_INTEGRITY_PATH"] "\t" old "\t" substr($0, 2)
+      if (substr($0, 1, 1) == " ") head++
+      old++
+    }
+  ' "$temp/old" "$temp/head" "$temp/diff" >> "$temp/lines"
+done < "$temp/paths"
+
+# Consume identical added lines in other files once each, so a move is allowed
+# without hiding an additional removal of the same assertion.
+awk -F '\t' '
+  {
+    text = $0
+    sub(/^[^\t]*\t[^\t]*\t[^\t]*\t/, "", text)
+    if ($1 == "A") {
+      added[text, $2]++
+      files[$2] = 1
+    } else {
+      count++
+      paths[count] = $2
+      numbers[count] = $3
+      texts[count] = text
+    }
+  }
+  END {
+    for (i = 1; i <= count; i++) {
+      moved = 0
+      for (file in files) {
+        if (file != paths[i] && added[texts[i], file] > 0) {
+          added[texts[i], file]--
+          moved = 1
+          break
+        }
+      }
+      if (!moved) printf "%s:%s: -%s\n", paths[i], numbers[i], texts[i]
+    }
+  }
+' "$temp/lines" > "$temp/findings"
+
+if [[ ! -s "$temp/findings" ]]; then
+  printf 'Test integrity: no existing test assertions or test declarations changed.\n'
+  exit 0
+fi
+
+cat "$temp/findings"
+reasons=$(git log --format='%(trailers:key=Test-change,valueonly)' "$merge_base..$head" |
+  awk 'NF { print }')
+if [[ -n "$reasons" ]]; then
+  printf 'Test integrity: allowed by Git commit trailer:\nTest-change: %s\n' "$reasons"
+  exit 0
+fi
+printf 'Test integrity: existing test assertions or test declarations changed.\nAdd a Git commit trailer in this PR: Test-change: <non-empty reason>\n' >&2
+exit 1

@@ -7,6 +7,21 @@ request. A bug fix adds a regression case that fails before the fix. The
 implementing agent writes the tests. The local suite must pass before anything
 is pushed.
 
+On pull requests, `scripts/test-integrity <base-ref> [<head-ref>]` checks the
+diff from the merge base for removed or edited assertions and test declarations
+in Rust files, including deleted test files, multi-line assertions and all lines
+of `#[should_panic(...)]` attributes. Multi-line attributes between `#[test]`
+and its function preserve the test declaration context. Pure
+additions, new files and non-Rust changes pass. Identical lines moved to another
+Rust file pass only when the added line is in test context: a path containing
+`/tests/` or ending in `tests.rs` or `_test.rs`, or after the first `#[cfg(test)]`
+line in the head file. Each added line excuses only one removed line.
+Intentional changes require a Git commit trailer `Test-change: <non-empty reason>`
+in at least one Git commit in the PR; the script prints the affected lines and
+the reason. This is a text heuristic: reworded assertions can slip past, and a
+string containing parentheses or brackets can confuse the multi-line counts.
+Run its offline tests with `bash scripts/test-integrity-test.sh`.
+
 ## Test tickets
 
 The Test issue type is for a ticket whose whole outcome is adding test cases, such as
