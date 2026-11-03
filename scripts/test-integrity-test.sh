@@ -312,6 +312,47 @@ done
 reset_case
 cat > existing.rs <<'EOF'
 #[test]
+#[should_panic(
+    expected = "failure"
+)]
+fn existing() {
+    panic!("failure");
+}
+EOF
+commit_case
+fixture=$(git rev-parse HEAD)
+sed 's/expected = "failure"/expected = "other"/' existing.rs > edited.rs
+mv edited.rs existing.rs
+commit_case
+expect 1 'edited expected line inside multi-line should_panic attribute' "$fixture"
+grep -Fq 'existing.rs:3: -    expected = "failure"' "$temp/output"
+git commit -q --allow-empty -m $'Explain expectation\n\nTest-change: Update expected panic message'
+expect 0 'edited multi-line should_panic attribute with trailer' "$fixture"
+
+reset_case
+cat > existing.rs <<'EOF'
+#[test]
+#[cfg(any(
+    unix,
+    windows,
+))]
+fn existing() {
+    assert_eq!(1, 1);
+}
+EOF
+commit_case
+fixture=$(git rev-parse HEAD)
+sed 's/fn existing()/fn renamed()/' existing.rs > edited.rs
+mv edited.rs existing.rs
+commit_case
+expect 1 'renamed test function after multi-line cfg attribute' "$fixture"
+grep -Fq 'existing.rs:6: -fn existing() {' "$temp/output"
+git commit -q --allow-empty -m $'Explain rename\n\nTest-change: Clarify test function name'
+expect 0 'renamed test function after multi-line cfg attribute with trailer' "$fixture"
+
+reset_case
+cat > existing.rs <<'EOF'
+#[test]
 fn existing() {
     assert_eq!(1, 1);
 }
