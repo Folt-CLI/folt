@@ -19,10 +19,10 @@
 - **Home:** one global home, `~/.folt` (`%USERPROFILE%\.folt` on Windows),
   with a `FOLT_HOME` environment override; Folt writes nothing into user
   directories ([#14](https://github.com/Folt-CLI/folt/issues/14)).
-  The home holds a one-line integer `format` file, written by temp file
-  and rename. A missing format file in a non-empty directory, an unparseable
-  one or a newer version is refused
-  ([#18](https://github.com/Folt-CLI/folt/issues/18)). This replaces the
+  The home's layout version is the `format_version` row in the registry's
+  `folt_metadata` table; a newer version is refused. A directory that is neither
+  empty nor recognisably a Folt home is refused before the lock is taken
+  ([#65](https://github.com/Folt-CLI/folt/issues/65)). This replaces the
   per-workspace `.folt/` marker of
   [#2](https://github.com/Folt-CLI/folt/issues/2).
 - **Registry:** an embedded SQLite database in the home through `rusqlite` with
