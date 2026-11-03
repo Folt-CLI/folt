@@ -434,7 +434,7 @@ fn repointed_parent_blocks_file_registration() {
             reason.to_string(),
             format!(
                 "{}: destination changed since the plan",
-                destination.display()
+                crate::common::expected_path(&destination).display()
             )
         );
         assert_eq!(fs::read(&plan.entries[0].path).unwrap(), b"original a");
@@ -820,7 +820,7 @@ fn repointed_parent_blocks_directory_registration() {
             reason.to_string(),
             format!(
                 "{}: destination changed since the plan",
-                destination.display()
+                crate::common::expected_path(&destination).display()
             )
         );
         if existing_marker {
