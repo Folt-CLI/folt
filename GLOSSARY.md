@@ -543,7 +543,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Code structure
 - **Definition:** The shared test fixtures module, enabled by the `test-support` Cargo feature of `folt-core` and by `cfg(test)`.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/test_support/mod.rs`
 - **Related:** none.
 - **Not:** The `tests/` crate itself.
 - **Status:** decided

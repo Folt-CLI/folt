@@ -472,10 +472,12 @@ impl Error for FolioDirError {
 mod tests {
     use super::*;
     use crate::home::Home;
+    use crate::test_support::TempDir;
 
     #[test]
     fn publishes_staged_folios_with_both_durability_modes() {
-        let path = std::env::temp_dir().join(format!("folt-create-{}", Uuid::new_v4()));
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().join("home");
         let home = Home::open_or_create(path.clone()).unwrap();
         let lock = home.try_lock().unwrap();
 
@@ -525,6 +527,5 @@ mod tests {
         }
 
         drop(lock);
-        fs::remove_dir_all(path).unwrap();
     }
 }

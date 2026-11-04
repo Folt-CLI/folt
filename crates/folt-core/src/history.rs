@@ -742,7 +742,7 @@ impl Error for HistoryError {
 mod tests {
     use super::*;
     use crate::placement::StagedBlob;
-    use crate::placement_rules::tests::{facts, target};
+    use crate::test_support::{TempDir, facts, target};
 
     fn commit_facts() -> CommitFacts {
         let mut working = facts();
@@ -842,7 +842,8 @@ mod tests {
         use crate::layout::FOLIO_LAYOUT_VERSION;
         use crate::registry::{FolioFormat, NewFolio};
 
-        let root = std::env::temp_dir().join(format!("folt-delete-{}", FolioId::generate()));
+        let directory = TempDir::new().unwrap();
+        let root = directory.path().join("home");
         {
             let home = Home::open_or_create(root.clone()).unwrap();
             let mut lock = home.try_lock().unwrap();
@@ -911,7 +912,6 @@ mod tests {
                 .unwrap();
             assert!(registry.references(folio.id(), "topic").unwrap().is_empty());
         }
-        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

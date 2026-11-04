@@ -335,7 +335,7 @@ fn read_working(row: &Placement, fs: &impl PlacementOps) -> Result<Observation, 
 mod tests {
     use super::*;
     use crate::object::hash_blob;
-    use crate::placement_rules::tests::facts;
+    use crate::test_support::facts;
 
     #[test]
     fn working_target_decision_table() {

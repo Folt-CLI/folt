@@ -73,21 +73,21 @@ fn sync_directory_impl(_path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
 
     #[test]
     fn syncs_a_real_directory() {
-        let path = std::env::temp_dir().join(format!("folt-sync-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir(&path).unwrap();
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().to_path_buf();
         let result = sync_directory(&path);
-        std::fs::remove_dir(&path).unwrap();
         result.unwrap();
     }
 
     #[cfg(unix)]
     #[test]
     fn sync_failure_matches_canonical_paths_after_directory_creation() {
-        let root = std::env::temp_dir().join(format!("folt-sync-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir(&root).unwrap();
+        let directory = TempDir::new().unwrap();
+        let root = directory.path().to_path_buf();
         let alias = root.join("alias");
         std::os::unix::fs::symlink(&root, &alias).unwrap();
         let target = alias.join("directory");
@@ -103,13 +103,13 @@ mod tests {
             );
         });
         sync_directory(&target).unwrap();
-        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(unix)]
     #[test]
     fn propagates_directory_open_errors() {
-        let path = std::env::temp_dir().join(format!("folt-sync-{}", uuid::Uuid::new_v4()));
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().join("missing");
         assert_eq!(
             sync_directory(&path).unwrap_err().kind(),
             io::ErrorKind::NotFound

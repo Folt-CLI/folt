@@ -284,7 +284,7 @@ impl Error for PlacementError {
 mod tests {
     use super::*;
     use crate::object::hash_blob;
-    use crate::placement_rules::tests::facts;
+    use crate::test_support::facts;
 
     #[test]
     fn user_kind_excludes_internal() {

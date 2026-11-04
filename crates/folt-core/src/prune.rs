@@ -376,7 +376,7 @@ mod tests {
     use super::*;
     use crate::object::hash_blob;
     use crate::placement::StagedBlob;
-    use crate::placement_rules::tests::facts;
+    use crate::test_support::facts;
 
     fn missing() -> PruneFacts {
         PruneFacts {
