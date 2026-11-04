@@ -1,6 +1,9 @@
 ## When it applies
 
-Use M for work that needs analysis and review; the ticket may leave several solutions open.
+Use M when a ticket is still loose and can be read several ways. It needs
+analysis and review, and the developer selects a solution. If there is one
+straightforward solution, use S or XS, not M.
+
 Split it into M/S items when warranted.
 
 ## The ticket must contain
@@ -10,9 +13,13 @@ Set the milestone, Priority, Size, Status and ownership from the [shared steps](
 
 ## Analysis and review
 
-M needs analysis AND review. The orchestrator writes Analysis inline in the
-ticket, links the findings
-attachment from Details and attaches each solution as a complete Codex scope.
+M needs analysis AND review. Analysis agents are read-only and produce drafts
+as files: findings, solution scopes and Analysis text. The orchestrator publishes
+them to the ticket and attaches them.
+
+The orchestrator writes Analysis inline, links the findings attachment from
+Details and attaches each solution as a complete Codex scope.
+
 Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection)
 for the layouts, uploads and selection.
 Use a read-only Codex [review](../review.md).
@@ -26,6 +33,11 @@ Summarize changes, Affected areas and Why this one in Solution; link findings an
 ## Statuses
 
 Suggested path: `S0: To Do` -> `S1: In Analysis` -> `S3: Ready For Implementation` -> `S4: In Implementation` -> `S5: Done`.
+
+S3 requires a recorded selected solution: mark the attachment
+**[Selected Solution]** and fill Solution. Do not start Codex or move the ticket
+to S3 or S4 before this is recorded.
+
 Project workflows set Done on close and on merge.
 
 ## Who does what

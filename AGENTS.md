@@ -46,8 +46,12 @@ under docs/dev and GitHub issue forms under .github/ISSUE_TEMPLATE.
   [working templates](docs/dev/working/README.md). The orchestrator runs the
   gate in [Testing](docs/dev/testing.md), then commits in the issue format,
   pushes and opens or updates the PR without another request. Only the developer
-  merges; an agent merges only when instructed for that PR. Follow
-  [Review](docs/dev/review.md) and [Stacked pull requests](docs/dev/stacked-prs.md).
+  merges; an agent merges only when instructed for that PR as the developer
+  last saw it. If the Git branch changes afterwards, including conflict
+  resolution or new Git commits, the instruction lapses: stop when checks are
+  green and ask again. Never chain cleanup after a merge command that may have
+  failed. Follow [Review](docs/dev/review.md) and
+  [Stacked pull requests](docs/dev/stacked-prs.md).
 - All agents, including Codex and delegated agents, must do implementation work
   in a dedicated Git worktree for the issue branch. Do not implement in the
   primary checkout or share one worktree between concurrent issue work. Fetch

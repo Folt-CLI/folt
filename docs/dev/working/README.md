@@ -13,6 +13,10 @@ Reading order: size file first, then the type row.
 | [L](l-question.md) | Yes | Yes | Several; each represented by its own child | Always a Question, split into M/S/XS children |
 | [XL](xl-epic.md) | No | No | Not specified; see Open points | Always an Epic; a release that only groups work |
 
+Use M when a ticket is still loose and can be read several ways: it needs
+analysis and the developer selects a solution. If there is one straightforward
+solution, use S or XS, not M.
+
 ## Shared steps
 
 - Ticket work in the repository where it happens. Reference other repositories
@@ -34,12 +38,19 @@ Reading order: size file first, then the type row.
   `<N>-code-findings.md` and each solution as a complete Codex scope
   `<N>-solution-<k>.md`. Follow
   [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection)
-  for the layouts, uploads and selection. XS, S and XL have no analysis; XS and
-  S have no attachments and carry their Solution in the ticket.
+  for the layouts, uploads and selection. XS, S and XL have no analysis.
+  S and XS carry their Solution at creation, derived from the enabling Question;
+  its answer does not replace a missing Solution or scope.
+  S always has a complete `<N>-solution-1.md` Codex scope attachment; XS may skip
+  it when self-descriptive. Attach with gh-attach and verify by downloading and
+  comparing at creation; see [S and XS Solution layout](../issue-format.md#s-and-xs-solution-layout).
 - Use these Status values: `S0: To Do`, `S1: In Analysis`,
   `S3: Ready For Implementation`, `S4: In Implementation`, `S5: Done`.
-  XS and S are ready when created; their suggested path is S0 -> S4 -> S5.
-  M and L have the suggested path S0 -> S1 -> S3 -> S4 -> S5.
+  XS and S require their Solution and scope at creation before S4; only
+  self-descriptive XS may skip the scope. Their suggested path is S0 -> S4 -> S5.
+  M and L require a recorded selected solution before S3: mark the attachment
+  **[Selected Solution]** and fill Solution. Their suggested path is S0 -> S1 -> S3 -> S4 -> S5.
+  Do not start Codex or move a ticket to S3 or S4 before these requirements are met.
   Project workflows set Done on close and on merge.
 - Codex implements and fixes in a dedicated worktree and does not analyse code,
   reviews or CI. The orchestrator analyses, runs the gate, commits, pushes and
@@ -52,8 +63,12 @@ Reading order: size file first, then the type row.
   or outward-facing actions need confirmation unless already permitted.
 - Background Claude sub-agents unblock the orchestrator: move ticket Status,
   project fields, links, Disposition; watch Codex or CI to completion and
-  report. No code/review/CI analysis or decisions. The orchestrator reviews the
-  diff, runs the gate, commits, pushes, opens the PR; only the developer merges.
+  report. No code/review/CI analysis or decisions.
+  Analysis agents are read-only and produce drafts as files: findings, solution
+  scopes and Analysis text. The orchestrator publishes them to the ticket and
+  attaches them.
+  The orchestrator reviews the diff, runs the gate, commits, pushes, opens the
+  PR; only the developer merges.
 - Copy the issue's type into commit subjects: `<Issue Type>[#N]: ...`.
   Follow [Workflow](../workflow.md) for commit bodies and PR delivery, and
   [Stacked pull requests](../stacked-prs.md) for dependent branches and PRs.
@@ -77,7 +92,7 @@ Reading order: size file first, then the type row.
 | Maintenance | Describe the maintenance outcome and scope; follow the size steps. | `Maintenance[#N]: ...` |
 | Documentation | Describe the documentation change; see [Skipping PR builds](../testing.md#skipping-pr-builds) for when CI skips. | `Documentation[#N]: ...` |
 | Test | The whole outcome is test cases; see [Testing](../testing.md#test-tickets). Tests belonging to another change stay in that change's ticket. | `Test[#N]: ...` |
-| Question | Record a decision selected by the developer. Derive children from the answer. Close with `Disposition: Answered` only after all children are closed; Done with Answered may precede closure. | `Question[#N]: ...` |
+| Question | Record a decision selected by the developer. Derive children from the answer; write each S/XS child's Solution and required scope at creation, as decided in this Question. The answer does not replace a missing Solution or scope. Close with `Disposition: Answered` only after all children are closed; Done with Answered may precede closure. | `Question[#N]: ...` |
 | Epic | Use only `## Objective` in the body. Follow XL: title `<version> -- Folt`, group release work, close with `Disposition: Released` after all children close. | `Epic[#N]: ...` |
 | Incident | Follow [Incidents](../incidents.md) for evidence, impact, linked response tickets and resolution; the report is not itself the fix. | `Incident[#N]: ...` |
 
