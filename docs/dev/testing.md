@@ -172,6 +172,12 @@ their entry point. Shared helpers live in `tests/common/mod.rs`, and data lives
 in `tests/fixtures/`. Cargo sets `FOLT_TESTS_DIR` to the absolute `tests/` path,
 so fixture lookup does not depend on the working directory.
 
+`folt-core` unit tests share fixtures from `crates/folt-core/src/test_support/`
+(`TempDir`, `TempHome`, `facts`, `target`, `RelocateFixture`). The module exists
+under `cfg(test)` and under the `test-support` Cargo feature, which the `tests/`
+crate enables. Only `expected_path` is public; the other fixtures are test-only.
+Temporary storage is unique and removed on drop.
+
 To add a unit test, put a small `#[test]` function in a `#[cfg(test)] mod tests`
 next to the pure function. Prefer tables of meaningful boundary cases. Add a
 validation test to the relevant `tests/validation/<module>.rs`, or declare a new
@@ -188,9 +194,9 @@ mod common;
 The allowance lets different suites use different helpers under Clippy's
 `-D warnings`. Validation-specific setup lives in `validation/support.rs`.
 
-Use `common::expected_path` whenever an expected message or plan text contains a
-path the test created under a temporary directory. The helper canonicalizes the
-existing parent and keeps the final component's on-disk spelling without
+Use `folt_core::test_support::expected_path` whenever an expected message or plan
+text contains a path the test created under a temporary directory. The helper
+canonicalizes the existing parent and keeps the final component's on-disk spelling without
 following a final symbolic link, matching placement path resolution across
 Linux, macOS and Windows. Paths taken from values returned by the code, such as
 `plan.entries[n].path`, already carry its spelling and stay unchanged.

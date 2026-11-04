@@ -11,7 +11,7 @@ autobenches = false
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
-folt-core.workspace = true
+folt-core = { workspace = true, features = ["test-support"] }
 tempfile.workspace = true
 proptest.workspace = true
 

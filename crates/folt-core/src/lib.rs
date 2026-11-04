@@ -21,6 +21,9 @@ pub mod rename;
 pub mod store;
 pub mod working_state;
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
+
 /// Returns the version of `folt`.
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")

@@ -1155,6 +1155,7 @@ from_error!(crate::placement::PlacementError, Placement);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempHome;
 
     #[test]
     fn directory_resolution_failure_keeps_root_destination() {
@@ -1167,39 +1168,6 @@ mod tests {
         fs::canonicalize(path).unwrap()
     }
 
-    struct Fixture {
-        root: PathBuf,
-        home: Home,
-    }
-    impl Fixture {
-        fn new() -> Self {
-            let root = std::env::temp_dir().join(format!(
-                "folt-register-{}",
-                crate::folio_dir::FolioId::generate()
-            ));
-            fs::create_dir(&root).unwrap();
-            let root = resolved_path(root);
-            let home = Home::open_or_create(root.join("home")).unwrap();
-            Self { root, home }
-        }
-        fn folio_count(&self) -> usize {
-            fs::read_dir(self.home.path().join("folios"))
-                .unwrap()
-                .filter_map(Result::ok)
-                .filter(|entry| entry.file_name() != ".new")
-                .count()
-        }
-        fn dir(&self, name: &str) -> PathBuf {
-            let path = self.root.join(name);
-            fs::create_dir(&path).unwrap();
-            path
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
-        }
-    }
     fn injected() -> RegistryError {
         RegistryError::Io(io::Error::other("injected failure"))
     }
@@ -1207,7 +1175,7 @@ mod tests {
     #[test]
     fn name_writes_restore_the_whole_batch_at_transaction_and_commit_failures() {
         for fail_commit in [false, true] {
-            let fixture = Fixture::new();
+            let fixture = TempHome::new().unwrap();
             let paths = [fixture.root.join("one.md"), fixture.root.join("two.md")];
             let originals: [&[u8]; 2] = [b"first body", b"---\ntitle: keep\n---\nsecond body"];
             for (path, bytes) in paths.iter().zip(originals) {
@@ -1258,7 +1226,7 @@ mod tests {
 
     #[test]
     fn restore_preserves_external_edits_and_reports_the_retained_name() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let path = fixture.root.join("file.md");
         fs::write(&path, b"body").unwrap();
         let plan = plan_register(&fixture.home, [&path]).unwrap();
@@ -1298,7 +1266,7 @@ mod tests {
 
     #[test]
     fn changed_after_refresh_blocks_without_writing_and_restores_earlier_files() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let first = fixture.root.join("first.md");
         let second = fixture.root.join("second.md");
         fs::write(&first, b"first body").unwrap();
@@ -1322,7 +1290,7 @@ mod tests {
 
     #[test]
     fn missing_refreshed_marker_signature_blocks_and_rolls_back_earlier_files() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let first = fixture.root.join("first.md");
         let notes = fixture.dir("notes");
         let original = b"body";
@@ -1375,7 +1343,7 @@ mod tests {
 
     #[test]
     fn captured_size_confirmation_restores_names_and_removes_new_markers() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         fs::create_dir(fixture.home.path().join("folios")).unwrap();
         fs::write(
             fixture.home.path().join("config.toml"),
@@ -1402,7 +1370,7 @@ mod tests {
 
     #[test]
     fn metadata_failure_after_name_publish_restores_or_reports_retained_name() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         fs::create_dir(fixture.home.path().join("folios")).unwrap();
         let path = fixture.root.join("file.md");
         let original = b"body";
@@ -1433,7 +1401,7 @@ mod tests {
 
     #[test]
     fn restore_failure_before_publication_reports_the_retained_name_with_path() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let path = fixture.root.join("file.md");
         fs::write(&path, b"body").unwrap();
         let plan = plan_register(&fixture.home, [&path]).unwrap();
@@ -1461,7 +1429,7 @@ mod tests {
 
     #[test]
     fn directory_sync_failure_after_name_publish_still_attempts_restore() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         fs::create_dir(fixture.home.path().join("folios")).unwrap();
         let path = fixture.root.join("file.md");
         fs::write(&path, b"body").unwrap();
@@ -1491,7 +1459,7 @@ mod tests {
 
     #[test]
     fn published_folio_sync_failure_rolls_back_directory_markers_and_rows() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let directory = fixture.dir("directory");
         let plan = plan_register(&fixture.home, [&directory]).unwrap();
         let folios = fixture.home.path().join("folios");
@@ -1521,7 +1489,7 @@ mod tests {
     #[test]
     fn ordinary_failures_roll_back_all_rows_and_remove_only_owned_artifacts() {
         for fail_before_transaction in [false, true] {
-            let fixture = Fixture::new();
+            let fixture = TempHome::new().unwrap();
             let new = fixture.dir("new");
             let existing = fixture.dir("existing");
             let marker = existing.join(DIRECTORY_MARKER);
@@ -1555,7 +1523,7 @@ mod tests {
 
     #[test]
     fn marker_that_appears_during_apply_is_used_and_preserved_on_failure() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let dir = fixture.dir("directory");
         let marker = dir.join(DIRECTORY_MARKER);
         let plan = plan_register(&fixture.home, [&dir]).unwrap();
@@ -1578,7 +1546,7 @@ mod tests {
 
     #[test]
     fn replaced_owned_marker_is_never_removed() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let dir = fixture.dir("directory");
         let marker = dir.join(DIRECTORY_MARKER);
         let plan = plan_register(&fixture.home, [&dir]).unwrap();
@@ -1601,7 +1569,7 @@ mod tests {
 
     #[test]
     fn crash_before_transaction_leaves_orphan_and_retry_creates_a_new_folio() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let path = fixture.root.join("file");
         fs::write(&path, b"content").unwrap();
         let plan = plan_register(&fixture.home, [&path]).unwrap();
@@ -1636,7 +1604,7 @@ mod tests {
 
     #[test]
     fn oversized_appearing_marker_blocks_and_cleans_only_the_new_marker() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         fs::write(
             fixture.home.path().join("config.toml"),
             "large_file_bytes = 4\n",
@@ -1668,7 +1636,7 @@ mod tests {
     #[test]
     fn case_variant_appearing_marker_replans_and_cleans_up_on_failure() {
         for fail_transaction in [false, true] {
-            let fixture = Fixture::new();
+            let fixture = TempHome::new().unwrap();
             let owned = fixture.dir("owned");
             let appeared = fixture.dir("appeared");
             let marker = appeared.join("__FOLIO__.MD");
@@ -1759,7 +1727,7 @@ mod tests {
     fn collapsed_directory_request_is_blocked_before_creating_markers() {
         use std::os::unix::fs::symlink;
 
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let a = fixture.dir("a");
         let b = fixture.dir("b");
         fs::create_dir(a.join("notes")).unwrap();
@@ -1813,7 +1781,7 @@ mod tests {
 
     #[test]
     fn registration_syncs_markers_and_uses_durable_folios_before_transaction() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let directory = fixture.dir("directory");
         let file = fixture.root.join("file");
         fs::write(&file, b"content").unwrap();
@@ -1851,7 +1819,7 @@ mod tests {
 
     #[test]
     fn probes_the_entire_batch_before_creating_anything() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let first = fixture.dir("first");
         let second = fixture.dir("second");
         let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
@@ -1888,7 +1856,7 @@ mod tests {
 
     #[test]
     fn blocked_link_registration_does_not_probe_or_create_markers() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let directory = fixture.dir("directory");
         let missing = fixture.root.join("missing");
         let plan = plan_register(&fixture.home, [&directory, &missing]).unwrap();
@@ -1904,7 +1872,7 @@ mod tests {
 
     #[test]
     fn link_registration_failure_rolls_back_before_commit() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let directory = fixture.dir("directory");
         let plan = plan_register(&fixture.home, [&directory]).unwrap();
         let folios = fixture.home.path().join("folios");
@@ -1926,7 +1894,7 @@ mod tests {
     #[cfg_attr(windows, ignore = "real symlinks require privileges")]
     #[test]
     fn crash_after_registration_keeps_copies_and_retry_converts_without_new_folios() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let path = fixture.root.join("file");
         fs::write(&path, b"content").unwrap();
         let plan = plan_register(&fixture.home, [&path]).unwrap();
@@ -1951,7 +1919,7 @@ mod tests {
     #[cfg_attr(windows, ignore = "real symlinks require privileges")]
     #[test]
     fn edited_path_is_reported_and_other_conversions_continue() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let paths = ["first", "edited", "last"].map(|name| fixture.root.join(name));
         for path in &paths {
             fs::write(path, b"original").unwrap();
@@ -1992,7 +1960,7 @@ mod tests {
     #[test]
     fn conversion_syncs_link_creation_and_rename_and_retry_finishes_copy_row() {
         for successful_syncs in [0, 1] {
-            let fixture = Fixture::new();
+            let fixture = TempHome::new().unwrap();
             let directory = fixture.dir("source").canonicalize().unwrap();
             let path = directory.join("file");
             fs::write(&path, b"content").unwrap();
@@ -2045,7 +2013,7 @@ mod tests {
 
     #[test]
     fn unique_name_index_failure_rolls_back_the_entire_registration() {
-        let fixture = Fixture::new();
+        let fixture = TempHome::new().unwrap();
         let paths = ["first.txt", "second.txt"].map(|p| fixture.root.join(p));
         for path in &paths {
             fs::write(path, b"body").unwrap();

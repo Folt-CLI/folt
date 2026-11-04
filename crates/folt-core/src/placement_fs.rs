@@ -754,10 +754,11 @@ fn create_symlink(target: &Path, link: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempHome;
 
     #[test]
     fn rewrite_publication_signature_matches_renamed_file() {
-        let home = TestHome::new();
+        let home = TempHome::new().unwrap();
         let path = home.root.join("file.md");
         fs::write(&path, b"body").unwrap();
         let expected = signature(&fs::metadata(&path).unwrap());
@@ -774,7 +775,7 @@ mod tests {
     fn rewrite_temp_is_private_before_writing_and_rewrite_preserves_mode() {
         use std::os::unix::fs::PermissionsExt;
 
-        let home = TestHome::new();
+        let home = TempHome::new().unwrap();
         let source = home.root.join("private.md");
         fs::write(&source, b"private content\n").unwrap();
         fs::set_permissions(&source, fs::Permissions::from_mode(0o600)).unwrap();
@@ -796,42 +797,6 @@ mod tests {
         );
     }
 
-    struct TestHome {
-        home: Home,
-        root: PathBuf,
-    }
-
-    impl TestHome {
-        fn new() -> Self {
-            let root = temporary_path(&std::env::temp_dir(), "folt-rename-test");
-            let home = Home::open_or_create(root.join("home")).unwrap();
-            let root = fs::canonicalize(root).unwrap();
-            Self { home, root }
-        }
-
-        fn source(&self, directory: bool) -> Placement {
-            let path = self.root.join("source");
-            if directory {
-                fs::create_dir(&path).unwrap();
-            } else {
-                fs::write(&path, b"source").unwrap();
-            }
-            Placement {
-                path,
-                kind: PlacementKind::Copy,
-                head: "main".into(),
-                commit_id: None,
-                base: None,
-            }
-        }
-    }
-
-    impl Drop for TestHome {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
-        }
-    }
-
     #[test]
     fn single_link_is_required() {
         assert!(ensure_single(1).is_ok());
@@ -844,7 +809,7 @@ mod tests {
 
     #[test]
     fn unreadable_link_count_refuses_conversion() {
-        let home = TestHome::new();
+        let home = TempHome::new().unwrap();
         let path = home.root.join("missing");
         let error = require_single_link(&path).unwrap_err();
         let PlacementError::OperationFailed {
@@ -862,7 +827,7 @@ mod tests {
     fn no_clobber_rename_refuses_destinations_created_after_absence_check() {
         for directory in [false, true] {
             for target_directory in [false, true] {
-                let home = TestHome::new();
+                let home = TempHome::new().unwrap();
                 let placement = home.source(directory);
                 let fs = PlacementFs::new(&home.home);
                 let id = FolioId::from_bytes([38; 16]);
@@ -893,7 +858,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn no_clobber_rename_refuses_a_link_created_after_absence_check() {
-        let home = TestHome::new();
+        let home = TempHome::new().unwrap();
         let placement = home.source(false);
         let fs = PlacementFs::new(&home.home);
         let id = FolioId::from_bytes([38; 16]);
@@ -915,7 +880,7 @@ mod tests {
                 io::ErrorKind::CrossesDevices,
                 io::ErrorKind::PermissionDenied,
             ] {
-                let home = TestHome::new();
+                let home = TempHome::new().unwrap();
                 let placement = home.source(directory);
                 let fs = PlacementFs::new(&home.home);
                 let id = FolioId::from_bytes([38; 16]);
