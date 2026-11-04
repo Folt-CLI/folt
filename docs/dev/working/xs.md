@@ -13,11 +13,27 @@ XS needs no analysis and no review.
 
 ## Solution
 
-Make the ticket self-descriptive; follow the applicable [type row](README.md#by-issue-type).
+Write Solution at creation, short and readable for the developer, in the style
+of Analysis. It comes from the enabling Question, with no solution selection;
+the Question's answer does not replace a missing Solution or scope.
+
+Use a `> [!IMPORTANT]` decision line, **Agreed in #N** (what the parent Question
+decided), **You get**, **Changes**, **Not changed** and **Watch out**, then
+**Codex scope** linking the complete `<N>-solution-1.md` scope attachment.
+
+Attach with gh-attach and verify at creation by downloading and comparing.
+
+XS may skip the scope file when the ticket is self-descriptive. Follow the
+[S and XS Solution layout](../issue-format.md#s-and-xs-solution-layout) and the
+applicable [type row](README.md#by-issue-type).
 
 ## Statuses
 
-The ticket is ready when created. Suggested path: `S0: To Do` -> `S4: In Implementation` -> `S5: Done`.
+The ticket is ready when its Solution and scope exist at creation.
+Only self-descriptive XS may skip the scope.
+Do not start Codex or move the ticket to S3 or S4 before these requirements are met.
+
+Suggested path: `S0: To Do` -> `S4: In Implementation` -> `S5: Done`.
 Project workflows set Done on close and on merge.
 
 ## Who does what

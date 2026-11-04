@@ -220,7 +220,11 @@ Do not add attribution lines.
 - Do not claim verification that was not run. List relevant checks and manual
   review plainly.
 - Merge only when the developer merges or instructs the agent to merge, and after
-  the required checks and review are complete.
+  the required checks and review are complete. The instruction covers the pull
+  request as the developer last saw it.
+  If the Git branch changes afterwards, including conflict resolution or new
+  Git commits, the instruction lapses: stop when checks are green and ask again.
+  Never chain cleanup after a merge command that may have failed.
 
 ## Blocked work
 
