@@ -18,7 +18,7 @@ below describes sections when their stage applies.
 | Summary | At creation | State the current situation or user need, expected outcome, and who benefits. |
 | Scope | At creation | Name affected area and what is in and out. |
 | Analysis | During refinement | Record current behavior, cause when relevant, constraints, compatibility, and viable options. |
-| Solution | After the developer chooses | Summarize the selected solution, affected areas, and reason for choosing it. |
+| Solution | At creation for S/XS; after the developer chooses for M/L | S/XS: record the enabling Question's decision and required Codex scope. M/L: summarize the selected solution, affected areas, and reason for choosing it. |
 | Details | After investigation | Link the code findings attachment and summarize two to four key facts. |
 
 For a defect, describe what happens and what should happen without presuming a
@@ -46,8 +46,13 @@ attachment. Leave Details pending until investigation has produced findings.
 The orchestrator, not Codex, investigates and writes Analysis inline in the
 ticket, as if the developer had already asked for context, comparison and the
 next step. The developer selects the solution; a recommendation is not a
-selection. XS and S tickets have no Analysis or attachments; their Solution is
-in the ticket. XL has no analysis.
+selection.
+
+XS and S tickets have no Analysis; write their Solution in the ticket at creation,
+from the enabling Question, with no solution selection.
+
+S always has a scope attachment; self-descriptive XS may skip it. A Question's
+answer does not replace a missing Solution or scope. XL has no analysis.
 
 1. Record facts with exact `file:line` references in `<N>-code-findings.md`,
    linked from Details.
@@ -147,6 +152,45 @@ Option <N>: <one sentence of reason>.
 > Reply with the option number to select its Codex scope.
 ```
 
+### S and XS Solution layout
+
+Write a short, readable Solution at creation, in the style of Analysis. Use the
+order below; **Agreed in #N** records what the parent Question decided.
+The solution comes from that Question; it is not selected on the S/XS ticket.
+
+**Codex scope** links the complete `<N>-solution-1.md` scope, using the layout
+below. Attach with gh-attach and verify by downloading and comparing at creation.
+S always has this file; XS may skip it when the ticket is self-descriptive.
+
+```markdown
+## Solution
+
+> [!IMPORTANT]
+> <Decision in one sentence.>
+
+**Agreed in #N**
+
+- <What the parent Question decided.>
+
+**You get**
+
+- <Result.>
+
+**Changes**
+
+- <Change.>
+
+**Not changed**
+
+- <Excluded work.>
+
+**Watch out**
+
+- <Risk or limitation.>
+
+**Codex scope:** [<N>-solution-1.md](<attachment-url>)
+```
+
 ### Codex scope layout
 
 Each `<N>-solution-<k>.md` attachment is a complete scope of work. Use these
@@ -167,7 +211,7 @@ sections in order:
 - **Notes for the orchestrator (not for Codex):** give the Git commit plan, PR
   fields and review focus. These are instructions for the orchestrator only.
 
-Solution contains the selected result, not another plan document:
+For M and L, Solution contains the selected result, not another plan document:
 
 ```markdown
 ## Solution
