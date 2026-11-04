@@ -1,12 +1,13 @@
+use crate::config::names::CONTENT_FILE;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
+use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
 use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
-use crate::layout::DEFAULT_BRANCH;
 use crate::object::ObjectId;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_fs::resolved_path;
@@ -916,9 +917,9 @@ pub struct RepairLinkPlan {
 }
 
 fn former_home(target: &std::path::Path, id: FolioId) -> Option<PathBuf> {
-    let suffix = PathBuf::from("folios")
+    let suffix = PathBuf::from(FOLIOS_DIR)
         .join(id.to_string())
-        .join(crate::layout::CONTENT_FILE);
+        .join(CONTENT_FILE);
     let home = target.parent()?.parent()?.parent()?;
     (target.is_absolute() && home.join(suffix) == target).then(|| home.to_path_buf())
 }

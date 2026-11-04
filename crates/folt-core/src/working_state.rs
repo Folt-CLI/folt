@@ -1,3 +1,6 @@
+use crate::config::limits::SCAN_WINDOW;
+use crate::config::names::DEFAULT_BRANCH;
+use crate::config::names::MARKDOWN_EXTENSIONS;
 use crate::home::HomeLock;
 use crate::object::{ObjectId, ObjectKind};
 use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps, StagedBlob};
@@ -151,13 +154,17 @@ pub(crate) fn stage_references<'a>(
     selected: &Placement,
     prefix: &'a [u8],
 ) -> Result<Vec<crate::front_matter::Reference<'a>>, crate::front_matter::FrontMatterError> {
-    let prefix = &prefix[..prefix.len().min(crate::front_matter::SCAN_LIMIT + 8)];
+    let prefix = &prefix[..prefix.len().min(SCAN_WINDOW)];
     let markdown = selected
         .path
         .to_path_buf()
         .extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"));
+        .is_some_and(|ext| {
+            MARKDOWN_EXTENSIONS
+                .iter()
+                .any(|extension| ext.eq_ignore_ascii_case(extension))
+        });
     // Internal working files have no Markdown extension. Only their own named
     // front matter enables detection; copies and links use the selected path.
     let markdown = if !markdown && selected.kind == PlacementKind::Internal {
@@ -192,12 +199,14 @@ fn write_stage(
         .to_path_buf()
         .extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"));
+        .is_some_and(|ext| {
+            MARKDOWN_EXTENSIONS
+                .iter()
+                .any(|extension| ext.eq_ignore_ascii_case(extension))
+        });
     let prefix = blob
         .filter(|_| markdown || selected.kind == PlacementKind::Internal)
-        .map(|(objects, hash, _)| {
-            objects.get_prefix(hash, ObjectKind::Blob, crate::front_matter::SCAN_LIMIT + 8)
-        })
+        .map(|(objects, hash, _)| objects.get_prefix(hash, ObjectKind::Blob, SCAN_WINDOW))
         .transpose()
         .map_err(PlacementError::Store)?;
     // Internal working files have no Markdown extension. Only their own named
@@ -274,7 +283,7 @@ fn resolve_observed(
                 .filter(|internal| {
                     internal.id == row.id
                         && internal.kind == PlacementKind::Internal
-                        && internal.head == crate::layout::DEFAULT_BRANCH
+                        && internal.head == DEFAULT_BRANCH
                 })
                 .ok_or_else(|| {
                     Refusal {

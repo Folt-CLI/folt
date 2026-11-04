@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use folt_core::config::{Config, DEFAULT_LARGE_FILE_BYTES};
-use folt_core::layout::CONTENT_FILE;
+use folt_core::config::Config;
+use folt_core::config::limits::DEFAULT_LARGE_FILE_BYTES;
+use folt_core::config::names::CONTENT_FILE;
 use folt_core::object::hash_blob;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
@@ -82,7 +83,7 @@ fn directories_create_real_markers_and_deduplicate_in_both_orders() {
         let home = TempHome::new();
         let dir = home.root().join("notes");
         fs::create_dir(&dir).unwrap();
-        let marker = dir.join(register::DIRECTORY_MARKER);
+        let marker = dir.join(folt_core::config::names::MARKER_FILE);
         let paths = if marker_first {
             vec![marker.clone(), dir.clone(), dir.join(".")]
         } else {
@@ -178,7 +179,7 @@ fn file_replaced_by_directory_blocks_registration() {
     assert_eq!(blocked.summary.refused, 1);
     assert_eq!(
         blocked.entries[0].path,
-        destination.join(register::DIRECTORY_MARKER)
+        destination.join(folt_core::config::names::MARKER_FILE)
     );
     assert_eq!(
         blocked.entries[0].status,
@@ -254,7 +255,7 @@ fn directory_names_use_the_resolved_directory_for_equivalent_spellings() {
         let applied = apply_register(&home.home, &plan, false).unwrap();
         assert_eq!(applied.summary.new, 1, "{spelling}: {applied:?}");
         assert_eq!(
-            fs::read(dir.join(register::DIRECTORY_MARKER)).unwrap(),
+            fs::read(dir.join(folt_core::config::names::MARKER_FILE)).unwrap(),
             b"---\nfolio-name: \"notes\"\n---\n",
             "{spelling}"
         );
@@ -277,7 +278,7 @@ fn apply_uses_an_appearing_marker_without_clobbering_it() {
     let dir = home.root().join("notes");
     fs::create_dir(&dir).unwrap();
     let plan = plan_register(&home.home, [&dir]).unwrap();
-    let marker = dir.join(register::DIRECTORY_MARKER);
+    let marker = dir.join(folt_core::config::names::MARKER_FILE);
     fs::write(&marker, b"appeared").unwrap();
     let applied = apply_register(&home.home, &plan, false).unwrap();
     assert!(!applied.entries[0].creates_marker);
@@ -317,14 +318,14 @@ fn refusals_stop_the_entire_batch_without_creating_markers_or_registry() {
         RegisterStatus::Refused(RefusalReason::Missing)
     );
     assert_eq!(apply_register(&home.home, &plan, true).unwrap(), plan);
-    assert!(!dir.join(register::DIRECTORY_MARKER).exists());
+    assert!(!dir.join(folt_core::config::names::MARKER_FILE).exists());
     assert!(!home.path().join("registry.db").exists());
     let own = home.path().join("config.toml");
     assert_eq!(
         plan_register(&home.home, [&own]).unwrap().entries[0].status,
         RegisterStatus::Refused(RefusalReason::InsideHome)
     );
-    let marker = dir.join(register::DIRECTORY_MARKER);
+    let marker = dir.join(folt_core::config::names::MARKER_FILE);
     fs::create_dir(&marker).unwrap();
     assert_eq!(
         plan_register(&home.home, [&dir]).unwrap().entries[0].status,
@@ -372,7 +373,7 @@ fn batch_total_requires_confirmation_even_when_individual_files_do_not() {
     for path in &paths {
         fs::File::create(path)
             .unwrap()
-            .set_len(register::BATCH_TOTAL_BYTES / 2 + 1)
+            .set_len(folt_core::config::limits::BATCH_TOTAL_BYTES / 2 + 1)
             .unwrap();
     }
     let plan = plan_register(&home.home, &paths).unwrap();
@@ -384,7 +385,7 @@ fn batch_total_requires_confirmation_even_when_individual_files_do_not() {
         .write(true)
         .open(&paths[1])
         .unwrap()
-        .set_len(register::BATCH_TOTAL_BYTES / 2 - 1)
+        .set_len(folt_core::config::limits::BATCH_TOTAL_BYTES / 2 - 1)
         .unwrap();
     assert!(plan_register(&home.home, &paths).unwrap().notes.is_empty());
 }
@@ -513,9 +514,9 @@ fn assert_repointed_parent_cannot_collapse_marker_requests(links: bool, director
     use std::os::unix::fs::symlink;
 
     let markers = if directory {
-        &[register::DIRECTORY_MARKER][..]
+        &[folt_core::config::names::MARKER_FILE][..]
     } else {
-        &[register::DIRECTORY_MARKER, "__FoLiO__.Md"][..]
+        &[folt_core::config::names::MARKER_FILE, "__FoLiO__.Md"][..]
     };
     for marker in markers {
         let home = TempHome::new();
@@ -603,7 +604,7 @@ fn unchanged_parent_registers_named_marker_request() {
     use std::os::unix::fs::symlink;
 
     for links in [false, true] {
-        for marker in [register::DIRECTORY_MARKER, "__FoLiO__.Md"] {
+        for marker in [folt_core::config::names::MARKER_FILE, "__FoLiO__.Md"] {
             let home = TempHome::new();
             let a = home.root().join("a");
             fs::create_dir(&a).unwrap();
@@ -784,12 +785,12 @@ fn repointed_parent_blocks_directory_registration() {
         fs::create_dir_all(b.join("dir")).unwrap();
         if existing_marker {
             fs::write(
-                a.join("dir").join(register::DIRECTORY_MARKER),
+                a.join("dir").join(folt_core::config::names::MARKER_FILE),
                 b"original a",
             )
             .unwrap();
             fs::write(
-                b.join("dir").join(register::DIRECTORY_MARKER),
+                b.join("dir").join(folt_core::config::names::MARKER_FILE),
                 b"original b",
             )
             .unwrap();
@@ -891,7 +892,7 @@ fn symlinks_and_devices_are_refused() {
     );
     let dir = home.root().join("notes");
     fs::create_dir(&dir).unwrap();
-    symlink(&path, dir.join(register::DIRECTORY_MARKER)).unwrap();
+    symlink(&path, dir.join(folt_core::config::names::MARKER_FILE)).unwrap();
     assert_eq!(
         plan_register(&home.home, [&dir]).unwrap().entries[0].status,
         RegisterStatus::Refused(RefusalReason::Symlink)
@@ -982,7 +983,7 @@ fn apply_rechecks_disappearing_sources_before_creating_any_marker() {
         refused.entries[1].status,
         RegisterStatus::Refused(RefusalReason::Missing)
     );
-    assert!(!dir.join(register::DIRECTORY_MARKER).exists());
+    assert!(!dir.join(folt_core::config::names::MARKER_FILE).exists());
     assert!(!home.path().join("registry.db").exists());
 }
 
@@ -1510,7 +1511,7 @@ fn directory_names_use_marker_then_option_then_directory_name() {
         let home = TempHome::new();
         let dir = home.root().join("My Notes");
         fs::create_dir(&dir).unwrap();
-        let path = dir.join(register::DIRECTORY_MARKER);
+        let path = dir.join(folt_core::config::names::MARKER_FILE);
         if let Some(bytes) = marker {
             fs::write(&path, bytes).unwrap();
         }
@@ -1632,7 +1633,7 @@ fn directory_and_marker_requests_merge_names_and_refuse_override() {
     let home = TempHome::new();
     let dir = home.root().join("notes");
     fs::create_dir(&dir).unwrap();
-    let marker = dir.join(register::DIRECTORY_MARKER);
+    let marker = dir.join(folt_core::config::names::MARKER_FILE);
     for requests in [
         vec![named(&marker, "Chosen"), dir.clone().into()],
         vec![dir.clone().into(), named(&marker, "Chosen")],

@@ -9,10 +9,9 @@ use std::error::Error;
 use std::fmt;
 use std::ops::Range;
 
+use crate::config::limits::{SCAN_LIMIT, SCAN_WINDOW};
+use crate::config::names::{OWNED, OWNED_ID, OWNED_NAME, OWNED_REFERENCES};
 use crate::folio_dir::FolioId;
-
-pub const SCAN_LIMIT: usize = 64 * 1024;
-const OWNED: [&str; 3] = ["folio-id", "folio-name", "folio-references"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FrontMatterError {
@@ -143,7 +142,7 @@ pub fn locate(bytes: &[u8]) -> Result<Option<Block>> {
     let mut pos = opening.next;
     while pos < bytes.len() && pos < SCAN_LIMIT {
         // Only inspect enough bytes past the bound to finish a delimiter.
-        let current = line(bytes, pos, bytes.len().min(SCAN_LIMIT + 8));
+        let current = line(bytes, pos, bytes.len().min(SCAN_WINDOW));
         let content = &bytes[pos..current.end];
         if content == b"---" || content == b"..." {
             let mut block = Block {
@@ -428,11 +427,11 @@ fn read_scalar<'a>(bytes: &'a [u8], key: &str) -> Result<Option<Cow<'a, str>>> {
 
 /// Reads a scalar name, decoding minimal single/double quoted forms.
 pub fn read_name(bytes: &[u8]) -> Result<Option<Cow<'_, str>>> {
-    read_scalar(bytes, "folio-name")
+    read_scalar(bytes, OWNED_NAME)
 }
 /// Reads the canonical lowercase hyphenated Folio id.
 pub fn read_id(bytes: &[u8]) -> Result<Option<FolioId>> {
-    read_scalar(bytes, "folio-id")?
+    read_scalar(bytes, OWNED_ID)?
         .map(|s| FolioId::parse(&s).map_err(|_| FrontMatterError::InvalidValue))
         .transpose()
 }
@@ -694,7 +693,7 @@ pub fn read_references(bytes: &[u8]) -> Result<Vec<Reference<'_>>> {
         return Ok(Vec::new());
     };
     unresolved_key_checks(bytes, &block)?;
-    let Some(n) = node(&block, "folio-references")? else {
+    let Some(n) = node(&block, OWNED_REFERENCES)? else {
         return Ok(Vec::new());
     };
     Ok(references(bytes, n)?
@@ -838,7 +837,7 @@ fn checked_edit(bytes: &[u8], edit: Edit) -> Result<Option<Edit>> {
         .iter()
         .chain(&edit.replacement)
         .chain(&bytes[edit.range.end..])
-        .take(SCAN_LIMIT + 8)
+        .take(SCAN_WINDOW)
         .copied()
         .collect();
     locate(&prefix)?;
@@ -899,7 +898,7 @@ fn set_scalar(bytes: &[u8], key: &str, value: Option<&str>, create: bool) -> Res
         plain(value)?;
     }
     let value = value.map(|value| {
-        if key == "folio-name" {
+        if key == OWNED_NAME {
             Cow::Owned(format!("\"{value}\""))
         } else {
             Cow::Borrowed(value)
@@ -929,12 +928,12 @@ fn set_scalar(bytes: &[u8], key: &str, value: Option<&str>, create: bool) -> Res
 /// pass the plain-token safety check; full name validation remains the caller's
 /// responsibility. An existing value produces an edit even when it is equal.
 pub fn set_name(bytes: &[u8], value: Option<&str>, create_block: bool) -> Result<Option<Edit>> {
-    set_scalar(bytes, "folio-name", value, create_block)
+    set_scalar(bytes, OWNED_NAME, value, create_block)
 }
 /// Sets or removes the id, creating a missing block only when requested.
 pub fn set_id(bytes: &[u8], value: Option<FolioId>, create_block: bool) -> Result<Option<Edit>> {
     let value = value.map(|id| id.to_string());
-    set_scalar(bytes, "folio-id", value.as_deref(), create_block)
+    set_scalar(bytes, OWNED_ID, value.as_deref(), create_block)
 }
 fn quoted(value: &str) -> Result<String> {
     if value.is_empty() || value.contains(['\n', '\r', '\0']) {
@@ -994,7 +993,7 @@ pub fn set_references(
     }
     if let Some(block) = &block {
         edit_checks(bytes, block)?;
-        if let Some(n) = node(block, "folio-references")? {
+        if let Some(n) = node(block, OWNED_REFERENCES)? {
             let entries = references(bytes, n)?;
             if values.is_empty() {
                 return checked_edit(bytes, remove_references(bytes, n));
@@ -1017,7 +1016,7 @@ pub fn set_references(
     insert(
         bytes,
         block.as_ref(),
-        "folio-references",
+        OWNED_REFERENCES,
         &format!("{ending}{}", rendered.trim_end_matches(['\n', '\r'])),
         create_block,
     )
@@ -1053,7 +1052,7 @@ pub fn set_reference(
     let block = locate(bytes)?;
     if let Some(block) = &block {
         edit_checks(bytes, block)?;
-        if let Some(n) = node(block, "folio-references")? {
+        if let Some(n) = node(block, OWNED_REFERENCES)? {
             let entries = references(bytes, n)?;
             let selected = entries.iter().position(|e| e.reference.alias == alias);
             let rendered = value

@@ -82,7 +82,7 @@ mod relocation {
                         id: row.id,
                         format: registry::FolioFormat {
                             layout: crate::layout::FOLIO_LAYOUT_VERSION,
-                            algorithm: crate::layout::OBJECT_ALGORITHM.into(),
+                            algorithm: crate::config::formats::OBJECT_ALGORITHM.into(),
                         },
                     })?;
                     for index in 0..if directory { 3 } else { 1 } {
