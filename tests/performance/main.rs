@@ -1,3 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::too_many_lines
+)]
+
 use criterion::{criterion_group, criterion_main};
 
 #[allow(dead_code)]

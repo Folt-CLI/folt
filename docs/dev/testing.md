@@ -7,6 +7,10 @@ request. A bug fix adds a regression case that fails before the fix. The
 implementing agent writes the tests. The local suite must pass before anything
 is pushed.
 
+Non-test code denies Clippy’s `unwrap_used`, `expect_used`, `panic` and
+`unreachable` lints. Exceptions require `#[expect(clippy::<lint>, reason = "...")]`
+on the smallest item, explaining why the type system cannot express the invariant.
+
 On pull requests, `scripts/test-integrity <base-ref> [<head-ref>]` checks the
 diff from the merge base for removed or edited assertions and test declarations
 in Rust files, including deleted test files, multi-line assertions and all lines

@@ -202,6 +202,8 @@ pub fn sweep_new(home: &Path, _lock: &mut super::home::HomeLock) -> Result<(), F
 }
 
 /// Inspects a directory entry named by `name` under `folios/`.
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection {
     let Some(text) = name.to_str() else {
         return Inspection::NotAFolio;

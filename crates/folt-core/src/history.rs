@@ -147,7 +147,7 @@ pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, Refusal> {
         // Only the branch and content affect move permission; apply supplies
         // the new commit id once its caller-provided metadata has been encoded.
         let target = MoveTarget {
-            branch: RefName::parse(DEFAULT_BRANCH).expect("default branch is valid"),
+            branch: RefName::parse(DEFAULT_BRANCH).map_err(|_| Refusal::InvalidFacts)?,
             commit: resume.or(row.commit_id).unwrap_or(staged.hash),
             content: staged.hash,
         };
@@ -186,6 +186,8 @@ pub struct CommitMetadata {
 }
 
 /// Publishes objects, then the ref, then files, then both registry rows together.
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 pub fn apply_commit(
     plan: &CommitPlan,
     metadata: CommitMetadata,
@@ -216,7 +218,7 @@ pub fn apply_commit(
             require_observation(internal, fs)?;
         }
     }
-    let staged = row.staged.expect("judged commit has a stage");
+    let staged = row.staged.ok_or(Refusal::InvalidFacts)?;
     let commit = Commit {
         content: staged.hash,
         parents: row.commit_id.into_iter().collect(),
@@ -292,7 +294,7 @@ pub fn apply_commit(
     updated.commit_id = Some(id);
     updated.staged = None;
     let Observation::File { signature } = &facts.working.observation else {
-        unreachable!("judged file")
+        return Err(Refusal::InvalidFacts.into());
     };
     updated.base = Some(PlacementBase {
         hash: staged.hash,

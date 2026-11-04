@@ -212,6 +212,8 @@ impl ObjectStore {
         result
     }
 
+    // split in the folt-core refactor (#203)
+    #[allow(clippy::too_many_lines)]
     fn put_source<'a, F>(
         &self,
         _lock: &HomeLock,

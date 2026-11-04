@@ -80,7 +80,9 @@ pub fn gather_move<R: Borrow<RefStore>>(
     open_refs: impl FnMut(FolioId) -> Result<R, RefError>,
 ) -> Result<PlacementFacts, RulesError> {
     let mut facts = gather(std::slice::from_ref(placement), fs, open_refs)?;
-    let mut facts = facts.pop().expect("one placement was gathered");
+    let mut facts = facts
+        .pop()
+        .ok_or(RulesError::Internal("missing gathered placement"))?;
     if placement.kind != PlacementKind::Link
         && matches!(facts.observation, Observation::File { .. })
         && facts.placement_hash.is_none()
@@ -465,7 +467,11 @@ pub fn apply_convert(
         fs.sync_parent(&plan.placement.to_placement().1)?;
         match &plan.observation {
             Observation::File { signature } => Some(placement::PlacementBase {
-                hash: plan.target.as_ref().expect("copy target").content,
+                hash: plan
+                    .target
+                    .as_ref()
+                    .ok_or(RulesError::Internal("missing copy target"))?
+                    .content,
                 signature: signature.clone(),
             }),
             _ => None,
@@ -481,7 +487,7 @@ pub fn apply_convert(
                 .as_ref()
                 .map(|target| target.content)
                 .or(plan.placement_hash)
-                .expect("conversion content"),
+                .ok_or(RulesError::Internal("missing conversion content"))?,
             &plan.observation,
         )
         .map_err(|error| match error {
@@ -717,6 +723,8 @@ pub fn apply_relocate(
     apply_relocate_steps(plan, fs, registry, lock, |_, _| Ok(()))
 }
 
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 fn apply_relocate_steps(
     plan: &RelocatePlan,
     fs: &impl PlacementOps,
@@ -993,8 +1001,10 @@ pub fn rehome(
         })?;
         let home = resolved_path(&home)?;
         let current = fs.link_target(id);
-        let current_home =
-            resolved_path(&former_home(&current, id).expect("derived internal path"))?;
+        let current_home = resolved_path(&former_home(&current, id).ok_or_else(|| Refusal {
+            path: current.clone(),
+            reason: RefusalReason::MixedHomes,
+        })?)?;
         if (home != old_home && home != current_home)
             || prefix.as_ref().is_some_and(|prefix| prefix != &home)
         {
@@ -1141,6 +1151,7 @@ impl Error for Refusal {}
 
 #[derive(Debug)]
 pub enum RulesError {
+    Internal(&'static str),
     Placement(PlacementError),
     Ref(RefError),
     Registry(RegistryError),
@@ -1174,6 +1185,7 @@ impl From<Refusal> for RulesError {
 impl fmt::Display for RulesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Internal(message) => write!(f, "inconsistent placement facts: {message}"),
             Self::Placement(error) => error.fmt(f),
             Self::Ref(error) => error.fmt(f),
             Self::Registry(error) => error.fmt(f),
@@ -1185,6 +1197,7 @@ impl fmt::Display for RulesError {
 impl Error for RulesError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            Self::Internal(_) => None,
             Self::Placement(error) => Some(error),
             Self::Ref(error) => Some(error),
             Self::Registry(error) => Some(error),
@@ -1344,6 +1357,8 @@ pub(crate) mod tests {
         assert_eq!(plan.target(), &target);
     }
     #[test]
+    // split in the folt-core refactor (#203)
+    #[allow(clippy::too_many_lines)]
     fn convert_decision_table() {
         let mut copy = facts();
         copy.placement.head = "main".into();

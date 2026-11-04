@@ -245,7 +245,7 @@ pub fn plan_register(
 fn register_destination(is_directory: bool, path: &Path, resolution_succeeded: bool) -> &Path {
     if is_directory {
         if resolution_succeeded {
-            path.parent().expect("directory marker parent")
+            destination_path(path)
         } else {
             // A failed resolution leaves the request path, not a marker path.
             path
@@ -280,6 +280,8 @@ fn holder(
         .or_else(|| assigned.get(name).cloned().map(NameHolder::Path)))
 }
 
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 fn resolve_names(
     entries: &mut [RegisterEntry],
     requests: &[RegisterRequest],
@@ -349,7 +351,9 @@ fn resolve_names(
             {
                 continue;
             }
-            let name = entry.name.clone().expect("named entry");
+            let Some(name) = entry.name.clone() else {
+                continue;
+            };
             if let Some(holder) = holder(registry, &assigned, &name)? {
                 refuse_name(entry, RefusalReason::NameTaken { name, holder });
             } else {
@@ -402,7 +406,12 @@ fn resolve_names(
             continue;
         }
         if let Some(bytes) = prefixes.get(&index) {
-            let name = entry.name.as_ref().expect("resolved name");
+            let name = entry.name.as_ref().ok_or_else(|| {
+                io::Error::other(format!(
+                    "missing resolved folio-name: {}",
+                    entry.path.display()
+                ))
+            })?;
             let edit = match front_matter::set_name(bytes, Some(name.as_str()), true) {
                 Ok(Some(edit)) => edit,
                 Ok(None) => continue,
@@ -595,9 +604,11 @@ fn is_marker(path: &Path) -> bool {
 }
 
 fn destination_path(path: &Path) -> &Path {
-    if is_marker(path) {
+    if is_marker(path)
+        && let Some(parent) = path.parent()
+    {
         // Marker spelling may change during replan; its directory must not.
-        path.parent().expect("directory marker parent")
+        parent
     } else {
         path
     }
@@ -797,6 +808,8 @@ fn apply_with_hook(
     apply_locked(home, plan, confirm_large, &lock, hook)
 }
 
+// split in the folt-core refactor (#203)
+#[allow(clippy::too_many_lines)]
 fn apply_locked(
     home: &Home,
     plan: &RegisterPlan,
@@ -890,7 +903,9 @@ fn apply_locked(
                     NameWrite::Insert(edit)
                     | NameWrite::InsertBlock(edit)
                     | NameWrite::Replace { edit, .. } => edit,
-                    NameWrite::None => unreachable!(),
+                    NameWrite::None => {
+                        return Err(io::Error::other("missing planned folio-name edit").into());
+                    }
                 };
                 if edit.as_ref() != Some(planned_edit) {
                     refuse_name(&mut current.entries[index], RefusalReason::FileChanged);
@@ -996,7 +1011,9 @@ fn apply_locked(
                 },
                 internal,
                 copy,
-                entry.name.clone().expect("new entry has a name"),
+                entry.name.clone().ok_or_else(|| {
+                    io::Error::other(format!("missing new folio-name: {}", entry.path.display()))
+                })?,
             ));
         }
         if rows.is_empty() {
