@@ -31,6 +31,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # The planner also fetches the exact event base SHA after checkout.
           fetch-depth: 0
+      - name: Check test integrity
+        if: github.event_name == 'pull_request'
+        run: |
+          bash scripts/test-integrity-test.sh
+          bash scripts/test-integrity origin/${{ github.base_ref }}
       - name: Decide whether to skip the build
         id: plan
         env:

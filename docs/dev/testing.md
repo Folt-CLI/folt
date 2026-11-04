@@ -11,6 +11,21 @@ Non-test code denies Clippy’s `unwrap_used`, `expect_used`, `panic` and
 `unreachable` lints. Exceptions require `#[expect(clippy::<lint>, reason = "...")]`
 on the smallest item, explaining why the type system cannot express the invariant.
 
+On pull requests, `scripts/test-integrity <base-ref> [<head-ref>]` checks the
+diff from the merge base for removed or edited assertions and test declarations
+in Rust files, including deleted test files, multi-line assertions and all lines
+of `#[should_panic(...)]` attributes. Multi-line attributes between `#[test]`
+and its function preserve the test declaration context. Pure
+additions, new files and non-Rust changes pass. Identical lines moved to another
+Rust file pass only when the added line is in test context: a path containing
+`/tests/` or ending in `tests.rs` or `_test.rs`, or after the first `#[cfg(test)]`
+line in the head file. Each added line excuses only one removed line.
+Intentional changes require a Git commit trailer `Test-change: <non-empty reason>`
+in at least one Git commit in the PR; the script prints the affected lines and
+the reason. This is a text heuristic: reworded assertions can slip past, and a
+string containing parentheses or brackets can confuse the multi-line counts.
+Run its offline tests with `bash scripts/test-integrity-test.sh`.
+
 ## Test tickets
 
 The Test issue type is for a ticket whose whole outcome is adding test cases, such as
@@ -172,6 +187,13 @@ mod common;
 
 The allowance lets different suites use different helpers under Clippy's
 `-D warnings`. Validation-specific setup lives in `validation/support.rs`.
+
+Use `common::expected_path` whenever an expected message or plan text contains a
+path the test created under a temporary directory. The helper canonicalizes the
+existing parent and keeps the final component's on-disk spelling without
+following a final symbolic link, matching placement path resolution across
+Linux, macOS and Windows. Paths taken from values returned by the code, such as
+`plan.entries[n].path`, already carry its spelling and stay unchanged.
 
 To add a regression test, declare a module in `regression/main.rs`, record the
 bug it covers, and keep the smallest reproducer. To add a data case, create a
