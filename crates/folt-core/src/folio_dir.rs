@@ -8,9 +8,11 @@ use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use crate::layout::{
-    CONTENT_FILE, FOLIO_LAYOUT_VERSION, LayoutSupport, LayoutVersion, OBJECT_ALGORITHM,
+use crate::config::formats::OBJECT_ALGORITHM;
+use crate::config::names::{
+    BLOBS_DIR, CONTENT_FILE, FOLIOS_DIR, NEW_DIR, REFS_DIR, TEMP_PREFIX_COPY,
 };
+use crate::layout::{FOLIO_LAYOUT_VERSION, LayoutSupport, LayoutVersion};
 use crate::registry::{FolioFormat, FolioRow};
 
 /// A canonical, randomly generated Folio identifier.
@@ -115,9 +117,9 @@ pub fn create_folio(
     spec: FolioSpec,
     durability: Durability,
 ) -> Result<FolioDir, FolioDirError> {
-    let folios = home.join("folios");
+    let folios = home.join(FOLIOS_DIR);
     ensure_directory(&folios)?;
-    let staging = folios.join(".new");
+    let staging = folios.join(NEW_DIR);
     ensure_directory(&staging)?;
     let id = FolioId::generate();
     let temporary = staging.join(id.to_string());
@@ -150,8 +152,8 @@ fn build_and_publish(
     }
     // Windows cannot rename the staging directory while its content file is open.
     drop(file);
-    ensure_directory(&temporary.join("blobs"))?;
-    ensure_directory(&temporary.join("refs"))?;
+    ensure_directory(&temporary.join(BLOBS_DIR))?;
+    ensure_directory(&temporary.join(REFS_DIR))?;
     if durability == Durability::DataAndDirectories {
         crate::fs::sync_directory(temporary).map_err(|source| io_error(temporary, source))?;
     }
@@ -178,7 +180,7 @@ fn build_and_publish(
 /// Removes all crash leftovers beneath the staging directory with exclusive
 /// access to the home lock guard.
 pub fn sweep_new(home: &Path, _lock: &mut super::home::HomeLock) -> Result<(), FolioDirError> {
-    let staging = home.join("folios").join(".new");
+    let staging = home.join(FOLIOS_DIR).join(NEW_DIR);
     match fs::read_dir(&staging) {
         Ok(entries) => {
             for entry in entries {
@@ -219,7 +221,7 @@ pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection 
             message: "registry row id does not match Folio directory name".into(),
         }]);
     }
-    let path = home.join("folios").join(name);
+    let path = home.join(FOLIOS_DIR).join(name);
     let mut problems = Vec::new();
     let mut fixes = Vec::new();
     let metadata = match fs::symlink_metadata(&path) {
@@ -229,7 +231,7 @@ pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection 
     if !metadata.file_type().is_dir() {
         return Inspection::NotAFolio;
     }
-    let required = [(CONTENT_FILE, false), ("blobs", true), ("refs", true)];
+    let required = [(CONTENT_FILE, false), (BLOBS_DIR, true), (REFS_DIR, true)];
     for (entry, directory) in required {
         let child = path.join(entry);
         match fs::symlink_metadata(&child) {
@@ -244,10 +246,10 @@ pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection 
                 })
             }
             Ok(_) => {}
-            Err(e) if e.kind() == io::ErrorKind::NotFound && entry == "blobs" => {
+            Err(e) if e.kind() == io::ErrorKind::NotFound && entry == BLOBS_DIR => {
                 fixes.push(Fix::CreateBlobs)
             }
-            Err(e) if e.kind() == io::ErrorKind::NotFound && entry == "refs" => {
+            Err(e) if e.kind() == io::ErrorKind::NotFound && entry == REFS_DIR => {
                 fixes.push(Fix::CreateRefs)
             }
             Err(e) => problems.push(problem(OsStr::new(entry), e)),
@@ -255,7 +257,7 @@ pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection 
     }
     if let Err(error) = crate::refs::inspect_refs(&path) {
         problems.push(Problem {
-            entry: "refs".into(),
+            entry: REFS_DIR.into(),
             message: error.to_string(),
         });
     }
@@ -288,6 +290,7 @@ pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection 
             }
             Err(error) => {
                 return Inspection::Damaged(vec![Problem {
+                    // This labels a format problem, not a file name.
                     entry: "format".into(),
                     message: error.to_string(),
                 }]);
@@ -313,13 +316,13 @@ pub fn validate(home: &Path, row: &FolioRow) -> Result<FolioDir, FolioDirError> 
         Inspection::Valid(directory) => Ok(directory),
         Inspection::Newer { found, supported } => Err(FolioDirError::Newer { found, supported }),
         _ => Err(FolioDirError::InvalidDirectory(
-            home.join("folios").join(row.id.to_string()),
+            home.join(FOLIOS_DIR).join(row.id.to_string()),
         )),
     }
 }
 
 fn copy_temporary_name(name: &str) -> bool {
-    let Some(rest) = name.strip_prefix(".folt-copy-") else {
+    let Some(rest) = name.strip_prefix(TEMP_PREFIX_COPY) else {
         return false;
     };
     let Some((pid, counter)) = rest.split_once('-') else {

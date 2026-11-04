@@ -5,6 +5,7 @@ use std::fmt;
 use std::fs;
 use std::io;
 
+use crate::config::limits::PRUNE_CONFIRM_MIN;
 use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
 use crate::object::ObjectId;
@@ -224,7 +225,7 @@ pub fn judge(facts: &PruneFacts) -> Option<String> {
 /// Requires at least five drops AND strictly more than half the scoped rows.
 /// Division avoids overflow when comparing counts.
 pub fn needs_confirmation(dropped: usize, in_scope: usize) -> bool {
-    dropped >= 5 && dropped > in_scope / 2
+    dropped >= PRUNE_CONFIRM_MIN && dropped > in_scope / 2
 }
 
 impl PrunePlan {

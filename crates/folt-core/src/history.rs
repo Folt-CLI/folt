@@ -2,9 +2,9 @@ use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
+use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
 use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
-use crate::layout::DEFAULT_BRANCH;
 use crate::object::{
     Author, Commit, CommitTime, ObjectError, ObjectId, ObjectKind, Tag, hash_blob,
 };
@@ -359,7 +359,7 @@ pub fn create_branch(
         .ok_or(RegistryError::FolioMissing(id))?;
     let directory =
         crate::folio_dir::validate(registry.home_path(), &row).map_err(|error| StoreError::Io {
-            path: registry.home_path().join("folios").join(id.to_string()),
+            path: registry.home_path().join(FOLIOS_DIR).join(id.to_string()),
             source: std::io::Error::other(error),
         })?;
     let objects = ObjectStore::open(&directory, &row.format)?;
@@ -836,9 +836,10 @@ mod tests {
 
     #[test]
     fn branch_sync_failure_leaves_cached_rows_untouched_and_harmless() {
+        use crate::config::formats::OBJECT_ALGORITHM;
         use crate::folio_dir::{Durability, FolioSpec, create_folio};
         use crate::home::Home;
-        use crate::layout::{FOLIO_LAYOUT_VERSION, OBJECT_ALGORITHM};
+        use crate::layout::FOLIO_LAYOUT_VERSION;
         use crate::registry::{FolioFormat, NewFolio};
 
         let root = std::env::temp_dir().join(format!("folt-delete-{}", FolioId::generate()));

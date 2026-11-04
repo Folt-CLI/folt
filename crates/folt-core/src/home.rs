@@ -9,11 +9,12 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::config::formats::{APPLICATION_ID, SQLITE_HEADER};
+use crate::config::names::{
+    ENV_FOLT_HOME, HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR,
+};
 use crate::layout::{HOME_FORMAT_VERSION, LayoutSupport, LayoutVersion};
 use crate::registry::{Registry, RegistryError};
-
-const APPLICATION_ID: u32 = 0x464f_4c54;
-const SQLITE_HEADER: &[u8; 16] = b"SQLite format 3\0";
 
 /// A resolved Folt home directory.
 ///
@@ -34,7 +35,7 @@ impl Home {
     /// The platform home directory may change behavior on Windows, and redirected
     /// Windows profiles are not handled.
     pub fn locate() -> Result<PathBuf, HomeError> {
-        let folt_home = std::env::var_os("FOLT_HOME");
+        let folt_home = std::env::var_os(ENV_FOLT_HOME);
         let platform_home = std::env::home_dir();
         resolve_home(folt_home, platform_home)
     }
@@ -69,7 +70,7 @@ impl Home {
         if let Some(text) = registry.format_version()? {
             let version =
                 LayoutVersion::from_str(&text).map_err(|_| HomeError::InvalidFormatVersion {
-                    path: path.join("registry.db"),
+                    path: path.join(REGISTRY_FILE),
                     found: text,
                 })?;
             match version.support_as_home_format() {
@@ -87,9 +88,9 @@ impl Home {
                     });
                 }
             }
-        } else if path.join("registry.db").exists() {
+        } else if path.join(REGISTRY_FILE).exists() {
             return Err(HomeError::MissingFormatVersion {
-                path: path.join("registry.db"),
+                path: path.join(REGISTRY_FILE),
             });
         }
 
@@ -126,7 +127,7 @@ impl Home {
     // split in the folt-core refactor (#203)
     #[allow(clippy::too_many_lines)]
     fn acquire_lock(&self, nonblocking: bool) -> Result<HomeLock, HomeError> {
-        let lock_path = self.path.join("lock");
+        let lock_path = self.path.join(LOCK_FILE);
         match fs::metadata(&lock_path) {
             Ok(metadata) if metadata.is_file() => {}
             Ok(_) => return Err(HomeError::NotRegularFile { path: lock_path }),
@@ -180,7 +181,7 @@ impl Home {
             });
         }
 
-        let temporary_directory = self.path.join("tmp");
+        let temporary_directory = self.path.join(TMP_DIR);
         match fs::symlink_metadata(&temporary_directory) {
             Ok(metadata) if metadata.is_dir() => {}
             Ok(_) => {
@@ -389,7 +390,7 @@ pub fn resolve_home(
     }
 
     platform_home
-        .map(|path| path.join(".folt"))
+        .map(|path| path.join(HOME_DIR_NAME))
         .ok_or(HomeError::NoHomeDirectory)
 }
 
@@ -404,15 +405,16 @@ fn recognize_home(path: &Path) -> Result<(), HomeError> {
             path: path.to_path_buf(),
             source,
         })?;
-        if !matches!(
-            entry.file_name().to_str(),
-            Some("lock" | "tmp" | "folios" | "registry.db" | "format" | "config.toml")
-        ) {
+        if !entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| HOME_ENTRIES.contains(&name))
+        {
             allowed = false;
             break;
         }
     }
-    if allowed || has_folt_application_id(&path.join("registry.db")) {
+    if allowed || has_folt_application_id(&path.join(REGISTRY_FILE)) {
         Ok(())
     } else {
         Err(HomeError::NotAHome {
@@ -425,6 +427,11 @@ pub(crate) fn is_regular_file(path: &Path) -> io::Result<bool> {
     Ok(fs::metadata(path)?.is_file())
 }
 
+/// SQLite header prefix length needed for the application id, in bytes.
+const SQLITE_HEADER_LEN: usize = 72;
+/// Application id byte offset in the SQLite header.
+const APPLICATION_ID_OFFSET: usize = 68;
+
 fn has_folt_application_id(path: &Path) -> bool {
     if !is_regular_file(path).unwrap_or(false) {
         return false;
@@ -432,11 +439,16 @@ fn has_folt_application_id(path: &Path) -> bool {
     let Ok(mut file) = File::open(path) else {
         return false;
     };
-    let mut header = [0; 72];
+    let mut header = [0; SQLITE_HEADER_LEN];
     if file.read_exact(&mut header).is_err() || &header[..16] != SQLITE_HEADER {
         return false;
     }
-    u32::from_be_bytes([header[68], header[69], header[70], header[71]]) == APPLICATION_ID
+    u32::from_be_bytes([
+        header[APPLICATION_ID_OFFSET],
+        header[APPLICATION_ID_OFFSET + 1],
+        header[APPLICATION_ID_OFFSET + 2],
+        header[APPLICATION_ID_OFFSET + 3],
+    ]) == APPLICATION_ID
 }
 
 /// Errors that can occur while resolving or opening a Folt home.
@@ -494,7 +506,14 @@ fn may_be_in_use(error: &io::Error) -> bool {
 
     #[cfg(windows)]
     {
-        matches!(error.raw_os_error(), Some(32 | 33))
+        /// Windows sharing violation error code (dimensionless).
+        const ERROR_SHARING_VIOLATION: i32 = 32;
+        /// Windows lock violation error code (dimensionless).
+        const ERROR_LOCK_VIOLATION: i32 = 33;
+        matches!(
+            error.raw_os_error(),
+            Some(ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION)
+        )
     }
     #[cfg(not(windows))]
     {

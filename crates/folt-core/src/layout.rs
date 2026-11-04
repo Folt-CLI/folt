@@ -16,15 +16,6 @@ pub const FOLIO_LAYOUT_VERSION: LayoutVersion = LayoutVersion {
     patch: 0,
 };
 
-/// The fixed default branch for Folios.
-pub const DEFAULT_BRANCH: &str = "main";
-
-/// The working content file for the default branch and target of link placements.
-pub const CONTENT_FILE: &str = "folio.main";
-
-/// Object identifier algorithm used by Folios created by this build.
-pub const OBJECT_ALGORITHM: &str = "sha256";
-
 /// A canonical semantic layout version.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct LayoutVersion {

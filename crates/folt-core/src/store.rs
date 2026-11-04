@@ -5,12 +5,15 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::config::limits::{
+    COMPRESSION_PROBE_MIN_SIZE, COMPRESSION_SAMPLE_SIZE, COMPRESSION_SAMPLES, STREAM_BUFFER_SIZE,
+};
+use crate::config::names::{BLOB_EXTENSION, BLOBS_DIR, TEMP_PREFIX_INPUT, TEMP_PREFIX_OBJECT};
 use crate::folio_dir::{self, FolioDir};
 use crate::home::{HomeLock, is_regular_file};
 use crate::layout::LayoutVersion;
 use crate::object::{
     self, ObjectError, ObjectHasher, ObjectId, ObjectKind, ObjectReader, ObjectWriter,
-    STREAM_BUFFER_SIZE,
 };
 use crate::registry::FolioFormat;
 
@@ -37,7 +40,7 @@ impl ObjectStore {
             }
         })?;
         Ok(Self {
-            root: folio.path().join("blobs"),
+            root: folio.path().join(BLOBS_DIR),
             format: format.clone(),
         })
     }
@@ -45,7 +48,7 @@ impl ObjectStore {
         self.format.clone()
     }
     fn path(&self, id: ObjectId) -> PathBuf {
-        self.root.join(format!("{id}.blob"))
+        self.root.join(format!("{id}{BLOB_EXTENSION}"))
     }
     pub fn contains(&self, id: ObjectId) -> Result<bool, StoreError> {
         match fs::metadata(self.path(id)) {
@@ -154,7 +157,7 @@ impl ObjectStore {
     ) -> Result<ObjectId, StoreError> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let spool = self.root.join(format!(
-            ".input.{}.{}",
+            "{TEMP_PREFIX_INPUT}{}.{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
@@ -258,7 +261,7 @@ impl ObjectStore {
             Err(source) => return Err(StoreError::Io { path: dest, source }),
         }
         let mut input = fresh()?;
-        let mut head = [0; 8];
+        let mut head = [0; MAGIC_SNIFF_BYTES];
         let n = input.read(&mut head).map_err(|source| StoreError::Io {
             path: source_path.into(),
             source,
@@ -272,7 +275,7 @@ impl ObjectStore {
                 source,
             })?;
         let temp = self.root.join(format!(
-            ".object.{}.{}",
+            "{TEMP_PREFIX_OBJECT}{}.{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
@@ -434,7 +437,7 @@ impl ObjectStore {
             })?;
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if name.starts_with(".input.") || name.starts_with(".object.") {
+            if name.starts_with(TEMP_PREFIX_INPUT) || name.starts_with(TEMP_PREFIX_OBJECT) {
                 fs::remove_file(entry.path()).map_err(|source| StoreError::Io {
                     path: entry.path(),
                     source,
@@ -450,16 +453,16 @@ fn compression_probe_is_worthwhile(
     length: u64,
     path: &Path,
 ) -> Result<bool, StoreError> {
-    if length as usize <= object::COMPRESSION_PROBE_MIN_SIZE {
+    if length as usize <= COMPRESSION_PROBE_MIN_SIZE {
         return Ok(true);
     }
-    let sample_size = object::COMPRESSION_SAMPLE_SIZE.min((length / 3) as usize);
+    let sample_size = COMPRESSION_SAMPLE_SIZE.min((length / COMPRESSION_SAMPLES as u64) as usize);
     let starts = [
         0,
         (length - sample_size as u64) / 2,
         length - sample_size as u64,
     ];
-    let mut samples = Vec::with_capacity(3);
+    let mut samples = Vec::with_capacity(COMPRESSION_SAMPLES);
     for start in starts {
         file.seek(SeekFrom::Start(start))
             .map_err(|source| StoreError::Io {
@@ -477,6 +480,9 @@ fn compression_probe_is_worthwhile(
     object::compression_samples_are_worthwhile([&samples[0], &samples[1], &samples[2]])
         .map_err(StoreError::Object)
 }
+
+/// Prefix length in bytes read to sniff compressed magic.
+const MAGIC_SNIFF_BYTES: usize = 8;
 
 #[derive(Debug)]
 pub enum StoreError {

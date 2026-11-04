@@ -1,8 +1,9 @@
 use std::fs;
 
+use folt_core::config::limits::SCAN_LIMIT;
 use folt_core::folio_dir::FolioId;
 use folt_core::folio_name::FolioName;
-use folt_core::front_matter::{FrontMatterError, Reference, SCAN_LIMIT};
+use folt_core::front_matter::{FrontMatterError, Reference};
 use folt_core::history;
 use folt_core::object::{ObjectKind, ObjectWriter, hash_blob};
 use folt_core::placement::PlacementKind;

@@ -3,10 +3,13 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::config::limits::STREAM_BUFFER_SIZE;
+use crate::config::names::{
+    CONTENT_FILE, FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE, TEMP_TAG_NAME,
+};
 use crate::folio_dir::FolioId;
 use crate::home::Home;
-use crate::layout::CONTENT_FILE;
-use crate::object::{ObjectHasher, ObjectId, ObjectKind, STREAM_BUFFER_SIZE};
+use crate::object::{ObjectHasher, ObjectId, ObjectKind};
 use crate::placement::{
     Observation, Placement, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
     Written,
@@ -16,7 +19,7 @@ use crate::store::ObjectStore;
 /// Returns the working file path for a Folio's internal placement.
 pub fn internal_path(home: &Home, id: FolioId) -> PathBuf {
     home.path()
-        .join("folios")
+        .join(FOLIOS_DIR)
         .join(id.to_string())
         .join(CONTENT_FILE)
 }
@@ -42,8 +45,8 @@ impl<'a> PlacementFs<'a> {
     /// Runs only when a link is explicitly requested; a copy never calls it.
     pub fn probe_link(&self, path: &Path) -> Result<(), PlacementError> {
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let probe = temporary_path(parent, "folt-link-probe");
-        create_symlink(&self.home.path().join("folios"), &probe)
+        let probe = temporary_path(parent, TEMP_TAG_LINK_PROBE);
+        create_symlink(&self.home.path().join(FOLIOS_DIR), &probe)
             .map_err(|source| symlink_failure(path, source))?;
         fs::remove_file(&probe).map_err(|source| failure(&probe, source))
     }
@@ -120,7 +123,7 @@ impl<'a> PlacementFs<'a> {
         expected: Option<&Observation>,
     ) -> Result<Written, PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
-        let temporary = temporary_path(parent, "folt-copy");
+        let temporary = temporary_path(parent, TEMP_TAG_COPY);
         write_copy(&temporary, objects, content)?;
         // Defer destination errors so a changed observation is reported as such.
         let prepare = if replace {
@@ -310,7 +313,7 @@ impl PlacementOps for PlacementFs<'_> {
         expected: &Observation,
     ) -> Result<Written, PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
-        let temporary = temporary_path(parent, "folt-convert");
+        let temporary = temporary_path(parent, TEMP_TAG_CONVERT);
         let mut prepared = false;
         let result = (|| {
             match (placement.kind, to_kind, expected) {
@@ -522,20 +525,32 @@ fn hash_file(path: &Path) -> Result<ObjectId, PlacementError> {
     Ok(hasher.finish())
 }
 
+/// Nanoseconds per second (nanoseconds).
+#[cfg(unix)]
+const NANOS_PER_SECOND: i128 = 1_000_000_000;
+/// Windows-to-Unix epoch offset in FILETIME ticks.
+#[cfg(windows)]
+const WINDOWS_TO_UNIX_EPOCH_TICKS: i128 = 116_444_736_000_000_000;
+/// Nanoseconds per FILETIME tick (nanoseconds).
+#[cfg(windows)]
+const NANOS_PER_TICK: i128 = 100;
+/// Windows privilege-not-held error code (dimensionless).
+const ERROR_PRIVILEGE_NOT_HELD: i32 = 1314;
+
 pub(crate) fn signature(metadata: &fs::Metadata) -> Signature {
     #[cfg(unix)]
     use std::os::unix::fs::MetadataExt;
     #[cfg(unix)]
     let (mtime, ctime, inode) = (
-        Some(metadata.mtime() as i128 * 1_000_000_000 + metadata.mtime_nsec() as i128),
-        Some(metadata.ctime() as i128 * 1_000_000_000 + metadata.ctime_nsec() as i128),
+        Some(metadata.mtime() as i128 * NANOS_PER_SECOND + metadata.mtime_nsec() as i128),
+        Some(metadata.ctime() as i128 * NANOS_PER_SECOND + metadata.ctime_nsec() as i128),
         Some(metadata.ino()),
     );
     #[cfg(windows)]
     let (mtime, ctime, inode) = {
         use std::os::windows::fs::MetadataExt;
         // FILETIME uses 100 ns ticks since 1601; registry timestamps use Unix ns.
-        let unix_ns = |ticks| (i128::from(ticks) - 116_444_736_000_000_000) * 100;
+        let unix_ns = |ticks| (i128::from(ticks) - WINDOWS_TO_UNIX_EPOCH_TICKS) * NANOS_PER_TICK;
         (
             Some(unix_ns(metadata.last_write_time())),
             Some(unix_ns(metadata.creation_time())),
@@ -575,7 +590,7 @@ pub(crate) fn atomic_rewrite(
     };
     let metadata = check()?;
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = temporary_path(parent, "folt-name");
+    let temporary = temporary_path(parent, TEMP_TAG_NAME);
     let mut output = create_rewrite_temp(&temporary, &metadata.permissions())?;
     let result = (|| {
         output.write_all(bytes)?;
@@ -713,7 +728,7 @@ fn hard_links_unsupported(error: &io::Error) -> bool {
     }
     #[cfg(windows)]
     {
-        error.raw_os_error() == Some(1314)
+        error.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD)
     }
     #[cfg(not(windows))]
     {
@@ -725,7 +740,7 @@ fn symlink_failure(path: &Path, source: io::Error) -> PlacementError {
     let unavailable = source.kind() == io::ErrorKind::Unsupported
         || cfg!(windows)
             && (source.kind() == io::ErrorKind::PermissionDenied
-                || source.raw_os_error() == Some(1314));
+                || source.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD));
     if unavailable {
         PlacementError::LinkUnavailable {
             path: path.to_path_buf(),

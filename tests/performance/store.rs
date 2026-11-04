@@ -1,8 +1,9 @@
 use std::{fs, hint::black_box, io};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
+use folt_core::config::formats::OBJECT_ALGORITHM;
 use folt_core::folio_dir::{Durability, FolioSpec, create_folio};
-use folt_core::layout::{FOLIO_LAYOUT_VERSION, OBJECT_ALGORITHM};
+use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::object::{ObjectKind, hash_blob};
 use folt_core::registry::FolioFormat;
 use folt_core::store::ObjectStore;

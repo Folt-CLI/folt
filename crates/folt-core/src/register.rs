@@ -10,6 +10,7 @@
 //! A crash before the transaction can leave names in files and orphan directories.
 //! A fresh plan reads those names on retry; discovery/repair owns the orphans,
 //! and retry creates new Folios rather than adopting them.
+use crate::config::limits::SCAN_WINDOW;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -17,23 +18,22 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
+use crate::config::formats::OBJECT_ALGORITHM;
+use crate::config::limits::{BATCH_TOTAL_BYTES, SUMMARY_LARGEST};
+use crate::config::names::{DEFAULT_BRANCH, MARKDOWN_EXTENSIONS, MARKER_FILE};
 use crate::config::{Config, ConfigError};
 use crate::folio_dir::FolioId;
 use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
 use crate::folio_name::{FolioName, FolioNameError, StemError};
 use crate::front_matter::{self, Edit, FrontMatterError};
 use crate::home::{Home, HomeError, HomeLock};
-use crate::layout::{FOLIO_LAYOUT_VERSION, OBJECT_ALGORITHM};
+use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
 use crate::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use crate::placement_fs::PlacementFs;
 use crate::registry::{
     self, FolioFormat, NewFolio, NewPlacement, PlacementPath, Registry, RegistryError,
 };
-
-pub const DIRECTORY_MARKER: &str = "__folio__.md";
-/// Batches above 256 MiB require confirmation, independently of the file limit.
-pub const BATCH_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
 
 /// One path and its optional explicit name.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -265,7 +265,11 @@ fn refuse_name(entry: &mut RegisterEntry, reason: RefusalReason) {
 fn markdown(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
+        .is_some_and(|ext| {
+            MARKDOWN_EXTENSIONS
+                .iter()
+                .any(|extension| ext.eq_ignore_ascii_case(extension))
+        })
 }
 
 fn holder(
@@ -303,10 +307,8 @@ fn resolve_names(
         let existing = if markdown(&entry.path) {
             let mut bytes = Vec::new();
             if !entry.creates_marker {
-                let read = File::open(&entry.path).and_then(|file| {
-                    file.take((front_matter::SCAN_LIMIT + 8) as u64)
-                        .read_to_end(&mut bytes)
-                });
+                let read = File::open(&entry.path)
+                    .and_then(|file| file.take(SCAN_WINDOW as u64).read_to_end(&mut bytes));
                 if let Err(error) = read {
                     refuse_name(entry, io_refusal(&error));
                     continue;
@@ -478,7 +480,7 @@ fn inspect_entry(
         return Ok(entry);
     }
     for ancestor in path.ancestors().skip(1) {
-        let marker = ancestor.join(DIRECTORY_MARKER);
+        let marker = ancestor.join(MARKER_FILE);
         if marker != path
             && let Ok(key) = PlacementPath::resolve(&marker)
             && registry.placement_at(&key)?.is_some()
@@ -558,7 +560,7 @@ fn report(
     summary
         .largest
         .sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    summary.largest.truncate(10);
+    summary.largest.truncate(SUMMARY_LARGEST);
     let notes = if summary.total_bytes > BATCH_TOTAL_BYTES {
         vec![RegisterNote::NeedsConfirmation {
             size: summary.total_bytes,
@@ -600,7 +602,7 @@ impl fmt::Display for RegisterPlan {
 
 fn is_marker(path: &Path) -> bool {
     path.file_name()
-        .is_some_and(|name| name.eq_ignore_ascii_case(DIRECTORY_MARKER))
+        .is_some_and(|name| name.eq_ignore_ascii_case(MARKER_FILE))
 }
 
 fn destination_path(path: &Path) -> &Path {
@@ -879,8 +881,7 @@ fn apply_locked(
                 let metadata = fs::metadata(&entry.path)?;
                 if &crate::placement_fs::signature(&metadata) != expected
                     || entry.prefix.as_ref().is_some_and(|prefix| {
-                        content.get(..content.len().min(front_matter::SCAN_LIMIT + 8))
-                            != Some(prefix.as_slice())
+                        content.get(..content.len().min(SCAN_WINDOW)) != Some(prefix.as_slice())
                     })
                 {
                     refuse_name(&mut current.entries[index], RefusalReason::FileChanged);
@@ -989,7 +990,7 @@ fn apply_locked(
                 let placement = crate::placement::Placement {
                     path: row.path.to_path_buf(),
                     kind: row.kind,
-                    head: "main".into(),
+                    head: DEFAULT_BRANCH.into(),
                     commit_id: None,
                     base: None,
                 };
@@ -1155,6 +1156,7 @@ from_error!(crate::placement::PlacementError, Placement);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::names::CONTENT_FILE;
 
     #[test]
     fn directory_resolution_failure_keeps_root_destination() {
@@ -1214,7 +1216,7 @@ mod tests {
                 fs::write(path, bytes).unwrap();
             }
             let directory = fixture.dir("directory");
-            let marker = directory.join(DIRECTORY_MARKER);
+            let marker = directory.join(MARKER_FILE);
             let plan = plan_register(&fixture.home, [&paths[0], &paths[1], &directory]).unwrap();
             let mut reached = false;
             let error = apply_with_hook(&fixture.home, &plan, false, |step| {
@@ -1389,14 +1391,14 @@ mod tests {
         assert_eq!(plan.summary.needs_confirmation, 0);
         let blocked = apply_register(&fixture.home, &plan, false).unwrap();
         assert_eq!(blocked.summary.needs_confirmation, 1);
-        assert!(!directory.join(DIRECTORY_MARKER).exists());
+        assert!(!directory.join(MARKER_FILE).exists());
         assert_eq!(fs::read(&path).unwrap(), b"body");
         assert_eq!(fixture.folio_count(), 0);
         // Replan because restoring the original bytes changes the signature.
         let retry = plan_register(&fixture.home, [&directory, &path]).unwrap();
         let confirmed = apply_register(&fixture.home, &retry, true).unwrap();
         assert_eq!(confirmed.summary.refused, 0);
-        assert!(directory.join(DIRECTORY_MARKER).exists());
+        assert!(directory.join(MARKER_FILE).exists());
         assert_eq!(fixture.folio_count(), 2);
     }
 
@@ -1505,14 +1507,14 @@ mod tests {
             }
             other => panic!("expected the published Folio sync error, got {other:?}"),
         }
-        assert!(!directory.join(DIRECTORY_MARKER).exists());
+        assert!(!directory.join(MARKER_FILE).exists());
         assert_eq!(fixture.folio_count(), 0);
         assert_eq!(fs::read_dir(folios.join(".new")).unwrap().count(), 0);
         let registry = Registry::open_existing(&fixture.home).unwrap();
         assert!(registry.folios().unwrap().is_empty());
         assert!(
             registry
-                .placement_at(&PlacementPath::resolve(directory.join(DIRECTORY_MARKER)).unwrap())
+                .placement_at(&PlacementPath::resolve(directory.join(MARKER_FILE)).unwrap())
                 .unwrap()
                 .is_none()
         );
@@ -1524,7 +1526,7 @@ mod tests {
             let fixture = Fixture::new();
             let new = fixture.dir("new");
             let existing = fixture.dir("existing");
-            let marker = existing.join(DIRECTORY_MARKER);
+            let marker = existing.join(MARKER_FILE);
             fs::write(&marker, b"keep").unwrap();
             let plan = plan_register(&fixture.home, [&new, &existing]).unwrap();
             let result = apply_with_hook(&fixture.home, &plan, false, |step| {
@@ -1537,7 +1539,7 @@ mod tests {
                 }
             });
             assert!(result.is_err());
-            assert!(!new.join(DIRECTORY_MARKER).exists());
+            assert!(!new.join(MARKER_FILE).exists());
             assert_eq!(fs::read(&marker).unwrap(), b"keep");
             assert_eq!(fixture.folio_count(), 0);
             let registry = Registry::open_existing(&fixture.home).unwrap();
@@ -1557,7 +1559,7 @@ mod tests {
     fn marker_that_appears_during_apply_is_used_and_preserved_on_failure() {
         let fixture = Fixture::new();
         let dir = fixture.dir("directory");
-        let marker = dir.join(DIRECTORY_MARKER);
+        let marker = dir.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&dir]).unwrap();
         assert!(
             apply_with_hook(&fixture.home, &plan, false, |step| {
@@ -1580,7 +1582,7 @@ mod tests {
     fn replaced_owned_marker_is_never_removed() {
         let fixture = Fixture::new();
         let dir = fixture.dir("directory");
-        let marker = dir.join(DIRECTORY_MARKER);
+        let marker = dir.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&dir]).unwrap();
         assert!(
             apply_with_hook(&fixture.home, &plan, false, |step| {
@@ -1644,7 +1646,7 @@ mod tests {
         .unwrap();
         let first = fixture.dir("first");
         let second = fixture.dir("second");
-        let marker = second.join(DIRECTORY_MARKER);
+        let marker = second.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
         let result = apply_with_hook(&fixture.home, &plan, false, |step| {
             if matches!(step, Step::Markers) {
@@ -1654,7 +1656,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(result.summary.needs_confirmation, 1);
-        assert!(!first.join(DIRECTORY_MARKER).exists());
+        assert!(!first.join(MARKER_FILE).exists());
         assert_eq!(fs::read(marker).unwrap(), b"large");
         assert!(
             Registry::open_existing(&fixture.home)
@@ -1672,7 +1674,7 @@ mod tests {
             let owned = fixture.dir("owned");
             let appeared = fixture.dir("appeared");
             let marker = appeared.join("__FOLIO__.MD");
-            let lowercase = appeared.join(DIRECTORY_MARKER);
+            let lowercase = appeared.join(MARKER_FILE);
             let plan = plan_register(&fixture.home, [&owned, &appeared]).unwrap();
             let mut reached_transaction = false;
             let result = apply_with_hook(&fixture.home, &plan, false, |step| {
@@ -1716,7 +1718,7 @@ mod tests {
             );
             if fail_transaction {
                 assert!(result.is_err());
-                assert!(!owned.join(DIRECTORY_MARKER).exists());
+                assert!(!owned.join(MARKER_FILE).exists());
                 assert_eq!(fixture.folio_count(), 0);
                 assert!(
                     Registry::open_existing(&fixture.home)
@@ -1745,7 +1747,7 @@ mod tests {
                             .path()
                             .join("folios")
                             .join(row.id.to_string())
-                            .join(crate::layout::CONTENT_FILE)
+                            .join(CONTENT_FILE)
                     )
                     .unwrap(),
                     b"---\nfolio-name: appeared\n---\neditor content"
@@ -1858,8 +1860,8 @@ mod tests {
         let mut probed = Vec::new();
         let result = apply_links_with_hook(&fixture.home, &plan, false, |step| {
             if let LinkStep::Probe(path) = step {
-                assert!(!first.join(DIRECTORY_MARKER).exists());
-                assert!(!second.join(DIRECTORY_MARKER).exists());
+                assert!(!first.join(MARKER_FILE).exists());
+                assert!(!second.join(MARKER_FILE).exists());
                 assert!(!fixture.home.path().join("folios").exists());
                 assert!(!fixture.home.path().join("registry.db").exists());
                 assert!(matches!(
@@ -1882,7 +1884,7 @@ mod tests {
                 .contains("probe unavailable")
         );
         assert_eq!(probed.len(), 2);
-        assert!(!first.join(DIRECTORY_MARKER).exists());
+        assert!(!first.join(MARKER_FILE).exists());
         assert!(!fixture.home.path().join("registry.db").exists());
     }
 
@@ -1898,7 +1900,7 @@ mod tests {
         .unwrap();
         assert_eq!(result.registration.summary.refused, 1);
         assert!(result.paths.is_empty());
-        assert!(!directory.join(DIRECTORY_MARKER).exists());
+        assert!(!directory.join(MARKER_FILE).exists());
         assert!(!fixture.home.path().join("registry.db").exists());
     }
 
@@ -1912,7 +1914,7 @@ mod tests {
             apply_links_with_hook(&fixture.home, &plan, false, |_| Ok(()))
         });
         assert!(result.is_err());
-        assert!(!directory.join(DIRECTORY_MARKER).exists());
+        assert!(!directory.join(MARKER_FILE).exists());
         assert_eq!(fixture.folio_count(), 0);
         assert!(
             Registry::open_existing(&fixture.home)

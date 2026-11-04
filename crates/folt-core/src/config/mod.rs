@@ -1,3 +1,10 @@
+//! Fixed names, limits and format facts, plus the existing configuration loader.
+//! Constants do not introduce runtime settings or environment overrides.
+
+pub mod formats;
+pub mod limits;
+pub mod names;
+
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -6,11 +13,10 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
+use crate::config::limits::DEFAULT_LARGE_FILE_BYTES;
+use crate::config::names::{ANONYMOUS_AUTHOR, CONFIG_FILE};
 use crate::home::Home;
 use crate::object::{Author, ObjectError};
-
-/// Default registration confirmation threshold: 64 MiB.
-pub const DEFAULT_LARGE_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Settings read from the Folt home's `config.toml`.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -28,7 +34,7 @@ impl Config {
 
     /// Loads settings, using defaults only when the file is missing.
     pub fn load(home: &Home) -> Result<Self, ConfigError> {
-        let path = home.path().join("config.toml");
+        let path = home.path().join(CONFIG_FILE);
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(source) if source.kind() == io::ErrorKind::NotFound => {
@@ -68,7 +74,7 @@ impl Config {
 
     fn validated_author(&self) -> Result<Author, ObjectError> {
         let author = Author::new(
-            self.username.as_deref().unwrap_or("anonymous"),
+            self.username.as_deref().unwrap_or(ANONYMOUS_AUTHOR),
             self.email.as_deref(),
         )?;
         if self.username.is_some() {

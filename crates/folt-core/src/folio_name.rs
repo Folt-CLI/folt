@@ -3,6 +3,8 @@ use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
 
+use crate::config::limits::{FOLIO_NAME_MAX, HEX_ID_LEN};
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FolioName(String);
 
@@ -23,11 +25,11 @@ impl FolioName {
         }
         let slug = slug.trim_matches(['.', '-']);
         // Slugging produces only ASCII, so the byte limit is a character boundary.
-        let slug = slug[..slug.len().min(64)].trim_end_matches(['.', '-']);
+        let slug = slug[..slug.len().min(FOLIO_NAME_MAX)].trim_end_matches(['.', '-']);
         if slug.is_empty() {
             return Err(StemError::Empty);
         }
-        if slug.len() == 64 && slug.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if slug.len() == HEX_ID_LEN && slug.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(StemError::HexDigest);
         }
         Ok(Self(slug.into()))
@@ -36,13 +38,13 @@ impl FolioName {
     /// Appends a numeric suffix, shortening the base to keep the 64-byte limit.
     pub fn with_suffix(&self, n: u32) -> Self {
         let suffix = format!("_{n}");
-        let base = &self.0[..self.0.len().min(64 - suffix.len())];
+        let base = &self.0[..self.0.len().min(FOLIO_NAME_MAX - suffix.len())];
         let base = base.trim_end_matches(['.', '-']);
         Self(format!("{base}{suffix}"))
     }
 
     pub fn parse(value: &str) -> Result<Self, FolioNameError> {
-        if !(1..=64).contains(&value.len()) {
+        if !(1..=FOLIO_NAME_MAX).contains(&value.len()) {
             return Err(FolioNameError::Length);
         }
         if !value
@@ -54,7 +56,7 @@ impl FolioName {
         if value.starts_with(['.', '-']) || value.ends_with(['.', '-']) {
             return Err(FolioNameError::Edge);
         }
-        if value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if value.len() == HEX_ID_LEN && value.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(FolioNameError::HexDigest);
         }
         Ok(Self(value.into()))

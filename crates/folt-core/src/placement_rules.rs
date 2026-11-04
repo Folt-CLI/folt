@@ -1,12 +1,13 @@
+use crate::config::names::CONTENT_FILE;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
+use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
 use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
-use crate::layout::DEFAULT_BRANCH;
 use crate::object::ObjectId;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_fs::resolved_path;
@@ -916,9 +917,9 @@ pub struct RepairLinkPlan {
 }
 
 fn former_home(target: &std::path::Path, id: FolioId) -> Option<PathBuf> {
-    let suffix = PathBuf::from("folios")
+    let suffix = PathBuf::from(FOLIOS_DIR)
         .join(id.to_string())
-        .join(crate::layout::CONTENT_FILE);
+        .join(CONTENT_FILE);
     let home = target.parent()?.parent()?.parent()?;
     (target.is_absolute() && home.join(suffix) == target).then(|| home.to_path_buf())
 }
@@ -1209,6 +1210,7 @@ impl Error for RulesError {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::config::formats::OBJECT_ALGORITHM;
     use crate::object::hash_blob;
     use crate::placement::{PlacementBase, Signature};
     use crate::registry::PlacementPath;
@@ -1640,7 +1642,7 @@ pub(crate) mod tests {
                         id: row.id,
                         format: registry::FolioFormat {
                             layout: crate::layout::FOLIO_LAYOUT_VERSION,
-                            algorithm: crate::layout::OBJECT_ALGORITHM.into(),
+                            algorithm: OBJECT_ALGORITHM.into(),
                         },
                     })?;
                     for index in 0..if directory { 3 } else { 1 } {

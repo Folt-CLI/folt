@@ -5,18 +5,25 @@ use std::str::FromStr;
 
 use sha2::{Digest, Sha256};
 
+use crate::config::limits::{
+    COMPRESSION_PROBE_MIN_SAVING_PERCENT, COMPRESSION_PROBE_MIN_SIZE, COMPRESSION_SAMPLE_SIZE,
+    COMPRESSION_SAMPLES, FRAME_SLACK, HEX_ID_LEN, MAX_ZSTD_WINDOW_LOG, ZSTD_LEVEL,
+};
+use crate::config::names::ANONYMOUS_AUTHOR;
+
+/// Minimum commit time in Unix seconds (year 0000).
+const COMMIT_TIME_MIN_SECONDS: i64 = -62_167_219_200;
+/// Maximum commit time in Unix seconds (year 9999).
+const COMMIT_TIME_MAX_SECONDS: i64 = 253_402_300_799;
+/// Canonical commit time length in ASCII bytes.
+const COMMIT_TIME_TEXT_LEN: usize = 20;
+/// Frame header capacity estimate in bytes.
+const FRAME_HEADER_ESTIMATE: usize = 22;
+/// Maximum frame header bytes read before the body; distinct from FRAME_SLACK's body-limit allowance.
+const FRAME_HEADER_MAX: usize = 128;
+
 const UNCOMPRESSED: u8 = 0x00;
 const ZSTD: u8 = 0x01;
-const MAX_ZSTD_WINDOW_LOG: u32 = 23;
-// Bounds streaming object memory use independently of object size.
-// Measured streaming buffer size.
-pub const STREAM_BUFFER_SIZE: usize = 1024 * 1024;
-// Small objects avoid the overhead of probing.
-pub(crate) const COMPRESSION_PROBE_MIN_SIZE: usize = 4 * 1024;
-// Three bounded samples keep the probe cheap for large objects.
-pub(crate) const COMPRESSION_SAMPLE_SIZE: usize = 64 * 1024;
-// Require at least ten percent sampled savings before full compression.
-pub(crate) const COMPRESSION_PROBE_MIN_SAVING_PERCENT: usize = 10;
 // These body prefixes identify formats that are already compressed.
 const ALREADY_COMPRESSED_MAGIC: &[&[u8]] = &[
     b"\x1f\x8b",           // gzip
@@ -56,7 +63,7 @@ impl fmt::Display for ObjectId {
 impl FromStr for ObjectId {
     type Err = ObjectError;
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value.len() != 64
+        if value.len() != HEX_ID_LEN
             || !value
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -121,7 +128,7 @@ impl<W: Write> ObjectWriter<W> {
         let hasher = ObjectHasher::new(kind, length);
         if compressed {
             output.write_all(&[ZSTD]).map_err(ObjectError::Io)?;
-            let mut encoder = zstd::Encoder::new(output, 3).map_err(ObjectError::Io)?;
+            let mut encoder = zstd::Encoder::new(output, ZSTD_LEVEL).map_err(ObjectError::Io)?;
             encoder.write_all(&header).map_err(ObjectError::Io)?;
             Ok(Self {
                 output: None,
@@ -287,7 +294,7 @@ fn read_stored_header<R: Read + 'static>(
         value => return Err(ObjectError::UnknownCodec(value)),
     };
     let mut header = Vec::new();
-    for _ in 0..128 {
+    for _ in 0..FRAME_HEADER_MAX {
         let mut byte = [0];
         if reader.read(&mut byte).map_err(ObjectError::Io)? == 0 {
             break;
@@ -346,7 +353,7 @@ pub fn hash_blob(body: &[u8]) -> ObjectId {
 }
 
 pub fn encode(kind: ObjectKind, body: &[u8]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(kind.as_bytes().len() + 22 + body.len());
+    let mut bytes = Vec::with_capacity(kind.as_bytes().len() + FRAME_HEADER_ESTIMATE + body.len());
     bytes.extend_from_slice(kind.as_bytes());
     bytes.push(b' ');
     bytes.extend_from_slice(body.len().to_string().as_bytes());
@@ -402,7 +409,7 @@ pub fn compress(framed: &[u8]) -> Result<Vec<u8>, ObjectError> {
         return store_uncompressed(framed);
     }
 
-    let mut encoder = zstd::Encoder::new(Vec::new(), 3).map_err(ObjectError::Io)?;
+    let mut encoder = zstd::Encoder::new(Vec::new(), ZSTD_LEVEL).map_err(ObjectError::Io)?;
     encoder.write_all(framed).map_err(ObjectError::Io)?;
     let compressed = encoder.finish().map_err(ObjectError::Io)?;
     if compressed.len() < framed.len() {
@@ -429,7 +436,7 @@ pub(crate) fn already_compressed(bytes: &[u8]) -> bool {
 }
 
 pub(crate) fn compression_probe_is_worthwhile(framed: &[u8]) -> Result<bool, ObjectError> {
-    let sample_size = COMPRESSION_SAMPLE_SIZE.min(framed.len() / 3);
+    let sample_size = COMPRESSION_SAMPLE_SIZE.min(framed.len() / COMPRESSION_SAMPLES);
     let starts = [
         0,
         (framed.len() - sample_size) / 2,
@@ -438,7 +445,9 @@ pub(crate) fn compression_probe_is_worthwhile(framed: &[u8]) -> Result<bool, Obj
     compression_samples_are_worthwhile(starts.map(|start| &framed[start..start + sample_size]))
 }
 
-pub(crate) fn compression_samples_are_worthwhile(samples: [&[u8]; 3]) -> Result<bool, ObjectError> {
+pub(crate) fn compression_samples_are_worthwhile(
+    samples: [&[u8]; COMPRESSION_SAMPLES],
+) -> Result<bool, ObjectError> {
     let mut sample_bytes = 0;
     let mut compressed_bytes = 0;
     for sample in samples {
@@ -453,7 +462,7 @@ pub fn open_stored(stored: &[u8], expected: ObjectId, limit: u64) -> Result<Vec<
     let (&codec, payload) = stored.split_first().ok_or(ObjectError::InvalidFrame)?;
     let framed = match codec {
         UNCOMPRESSED => {
-            if payload.len() as u64 > limit.saturating_add(128) {
+            if payload.len() as u64 > limit.saturating_add(FRAME_SLACK) {
                 return Err(ObjectError::LimitExceeded);
             }
             payload.to_vec()
@@ -466,10 +475,10 @@ pub fn open_stored(stored: &[u8], expected: ObjectId, limit: u64) -> Result<Vec<
                 .map_err(ObjectError::Io)?;
             let mut output = Vec::new();
             decoder
-                .take(limit.saturating_add(128).saturating_add(1))
+                .take(limit.saturating_add(FRAME_SLACK).saturating_add(1))
                 .read_to_end(&mut output)
                 .map_err(ObjectError::Io)?;
-            if output.len() as u64 > limit.saturating_add(128) {
+            if output.len() as u64 > limit.saturating_add(FRAME_SLACK) {
                 return Err(ObjectError::LimitExceeded);
             }
             output
@@ -523,7 +532,7 @@ impl Author {
 
     pub fn anonymous() -> Self {
         Self {
-            username: "anonymous".into(),
+            username: ANONYMOUS_AUTHOR.into(),
             email: None,
         }
     }
@@ -566,7 +575,7 @@ pub struct CommitTime(i64);
 impl CommitTime {
     pub fn from_unix_seconds(seconds: i64) -> Result<Self, ObjectError> {
         // These bounds keep both the arithmetic and the four-digit year canonical.
-        if !(-62_167_219_200..=253_402_300_799).contains(&seconds) {
+        if !(COMMIT_TIME_MIN_SECONDS..=COMMIT_TIME_MAX_SECONDS).contains(&seconds) {
             return Err(ObjectError::InvalidObject);
         }
         Ok(Self(seconds))
@@ -607,7 +616,7 @@ impl fmt::Display for CommitTime {
 impl FromStr for CommitTime {
     type Err = ObjectError;
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value.len() != 20 || !value.is_ascii() {
+        if value.len() != COMMIT_TIME_TEXT_LEN || !value.is_ascii() {
             return Err(ObjectError::InvalidObject);
         }
         let number = |range: std::ops::Range<usize>| -> Result<i64, ObjectError> {

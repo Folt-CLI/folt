@@ -3,22 +3,22 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction};
 
+use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
+use crate::config::limits::BUSY_TIMEOUT;
+use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE, REGISTRY_FILE, RENAME_PENDING_PREFIX};
 use crate::folio_dir::FolioId;
 use crate::folio_name::FolioName;
 use crate::home::{Home, HomeLock, is_regular_file};
-use crate::layout::{DEFAULT_BRANCH, HOME_FORMAT_VERSION, LayoutVersion};
+use crate::layout::{HOME_FORMAT_VERSION, LayoutVersion};
 use crate::object::ObjectId;
 pub use crate::placement::PlacementBase;
 use crate::placement::{PlacementKind, Signature, StagedBlob};
 
-const SCHEMA_VERSION: i64 = 3;
-const APPLICATION_ID: i64 = 0x464f_4c54;
-const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
-const MARKER: &str = "__folio__.md";
+/// SQLite unique constraint extended result code (dimensionless).
+const SQLITE_CONSTRAINT_UNIQUE: i32 = 2067;
 
 /// Use the same name grammar for planning and reference-cache rebuilds.
 pub(crate) fn reference_name(
@@ -120,7 +120,7 @@ pub struct PlacementPath(Vec<u8>);
 
 impl PlacementPath {
     /// Resolves a path to an absolute key without following its final component.
-    /// A Folio directory resolves to its `__folio__.md` record.
+    /// A Folio directory resolves to its marker record.
     pub fn resolve(path: impl AsRef<Path>) -> Result<Self, RegistryError> {
         resolve_path(path.as_ref(), true).map(Self)
     }
@@ -196,7 +196,7 @@ fn resolve_path(input: &Path, append_marker: bool) -> Result<Vec<u8>, RegistryEr
     };
     let metadata = fs::symlink_metadata(&absolute);
     let candidate = match metadata {
-        Ok(metadata) if metadata.is_dir() && append_marker => absolute.join(MARKER),
+        Ok(metadata) if metadata.is_dir() && append_marker => absolute.join(MARKER_FILE),
         _ => absolute,
     };
     let parent = candidate
@@ -225,7 +225,7 @@ impl Registry {
 
     /// Opens or creates the registry while the caller holds the home lock.
     pub fn open_or_create(home: &Home, _lock: &HomeLock) -> Result<Self, RegistryError> {
-        let path = home.path().join("registry.db");
+        let path = home.path().join(REGISTRY_FILE);
         match is_regular_file(&path) {
             Ok(true) => {}
             Ok(false) => return Err(RegistryError::NotRegularFile(path)),
@@ -242,10 +242,10 @@ impl Registry {
                 supported: SCHEMA_VERSION,
             });
         }
-        if version != 0 && app != APPLICATION_ID {
+        if version != 0 && app != i64::from(APPLICATION_ID) {
             return Err(RegistryError::ForeignDatabase(path));
         }
-        if version == 1 {
+        if version == OUTDATED_SCHEMA {
             // This refusal must be removed before the first release, when migrations are required.
             return Err(RegistryError::OutdatedSchema {
                 found: version,
@@ -269,7 +269,7 @@ impl Registry {
                 "INSERT INTO folt_metadata(key,value) VALUES ('format_version',?1)",
                 [HOME_FORMAT_VERSION.to_string()],
             )?;
-            tx.pragma_update(None, "application_id", APPLICATION_ID)?;
+            tx.pragma_update(None, "application_id", i64::from(APPLICATION_ID))?;
             tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
             tx.commit()?;
         }
@@ -282,7 +282,7 @@ impl Registry {
 
     /// Opens an existing registry read-only. A missing registry is an empty view.
     pub fn open_existing(home: &Home) -> Result<Self, RegistryError> {
-        let path = home.path().join("registry.db");
+        let path = home.path().join(REGISTRY_FILE);
         let connection = match is_regular_file(&path) {
             Ok(true) => {
                 let connection =
@@ -596,7 +596,7 @@ impl RegistryTransaction<'_> {
         query_folio_name(&self.tx, id)?;
         self.tx.execute(
             "INSERT INTO folt_metadata(key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            rusqlite::params![format!("rename-pending:{id}"), format!("{old}\n{new}")],
+            rusqlite::params![format!("{RENAME_PENDING_PREFIX}{id}"), format!("{old}\n{new}")],
         )?;
         Ok(())
     }
@@ -604,7 +604,7 @@ impl RegistryTransaction<'_> {
     pub fn clear_pending_rename(&mut self, id: FolioId) -> Result<(), RegistryError> {
         self.tx.execute(
             "DELETE FROM folt_metadata WHERE key=?1",
-            [format!("rename-pending:{id}")],
+            [format!("{RENAME_PENDING_PREFIX}{id}")],
         )?;
         Ok(())
     }
@@ -736,7 +736,9 @@ impl RegistryTransaction<'_> {
                 rusqlite::params![id.as_bytes().as_slice(), name.as_str()],
             )
             .map_err(|error| match error {
-                rusqlite::Error::SqliteFailure(ref code, _) if code.extended_code == 2067 => {
+                rusqlite::Error::SqliteFailure(ref code, _)
+                    if code.extended_code == SQLITE_CONSTRAINT_UNIQUE =>
+                {
                     RegistryError::NameTaken(name.clone())
                 }
                 other => RegistryError::Sqlite(other),
@@ -1013,7 +1015,7 @@ fn query_pending_rename(
     let value: Option<String> = connection
         .query_row(
             "SELECT value FROM folt_metadata WHERE key=?1",
-            [format!("rename-pending:{id}")],
+            [format!("{RENAME_PENDING_PREFIX}{id}")],
             |row| row.get(0),
         )
         .optional()?;
@@ -1063,10 +1065,10 @@ fn check_schema(connection: &Connection, path: &Path) -> Result<(), RegistryErro
             supported: SCHEMA_VERSION,
         });
     }
-    if app != APPLICATION_ID {
+    if app != i64::from(APPLICATION_ID) {
         return Err(RegistryError::ForeignDatabase(path.to_path_buf()));
     }
-    if version == 1 {
+    if version == OUTDATED_SCHEMA {
         return Err(RegistryError::OutdatedSchema {
             found: version,
             required: SCHEMA_VERSION,

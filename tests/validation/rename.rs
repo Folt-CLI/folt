@@ -1127,7 +1127,7 @@ fn replacement_exceeding_internal_markdown_scan_bound_refuses_in_planning() {
     let home = TempHome::new();
     let mut lock = home.lock();
     let mut bytes = b"---\nfolio-name: old\n#".to_vec();
-    bytes.resize(front_matter::SCAN_LIMIT - 2, b'x');
+    bytes.resize(folt_core::config::limits::SCAN_LIMIT - 2, b'x');
     bytes.extend_from_slice(b"\n---\nbody\n");
     let mut folio = setup(&home, &mut lock, &bytes);
     let row = folio.internal();
