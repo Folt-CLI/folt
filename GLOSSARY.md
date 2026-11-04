@@ -83,7 +83,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Storage and identity
 - **Definition:** The Folt home is the directory holding the registry, Folio directories, configuration, lock and temporary files. It defaults to `.folt` in the OS home directory; `FOLT_HOME` overrides that path.
-- **Code:** `crates/folt-core/src/home.rs:26` (`Home`); `crates/folt-core/src/home.rs:380` (`resolve_home`)
+- **Code:** `crates/folt-core/src/home.rs:27` (`Home`); `crates/folt-core/src/home.rs:379` (`resolve_home`)
 - **Related:** [registry](#registry), [Folio directory](#folio-directory), [home lock](#home-lock).
 - **Not:** The OS home directory or a workspace marker; portability and multi-user rules remain open in [#17](https://github.com/Folt-CLI/folt/issues/17).
 - **Status:** decided
@@ -552,7 +552,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Code structure
 - **Definition:** The typed runtime settings of Folt (for example `large_file_bytes`), with defaults and optional environment overrides read through Environment.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/config/settings.rs:9` (`Settings`)
 - **Related:** none.
 - **Not:** Compile-time constants, which live in `config::names`, `config::limits` and `config::formats`.
 - **Status:** decided
@@ -561,7 +561,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Code structure
 - **Definition:** The only reader of the process environment, the OS home directory and the current directory; every other module receives values from it.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/config/env.rs:15` (`Environment`)
 - **Related:** [home](#home).
 - **Not:** The Folt home.
 - **Status:** decided

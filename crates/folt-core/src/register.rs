@@ -18,14 +18,16 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
+use crate::config::env::Environment;
 use crate::config::formats::OBJECT_ALGORITHM;
 use crate::config::limits::{BATCH_TOTAL_BYTES, SUMMARY_LARGEST};
 use crate::config::names::{DEFAULT_BRANCH, MARKDOWN_EXTENSIONS, MARKER_FILE};
-use crate::config::{Config, ConfigError};
+use crate::config::settings::Settings;
 use crate::folio_dir::FolioId;
 use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
 use crate::folio_name::{FolioName, FolioNameError, StemError};
 use crate::front_matter::{self, Edit, FrontMatterError};
+use crate::home::config_file::ConfigError;
 use crate::home::{Home, HomeError, HomeLock};
 use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
@@ -187,7 +189,7 @@ pub fn plan_register(
     home: &Home,
     paths: impl IntoIterator<Item = impl Into<RegisterRequest>>,
 ) -> Result<RegisterPlan, RegisterError> {
-    let config = Config::load(home)?;
+    let settings = Settings::load(home)?;
     let registry = Registry::open_existing(home)?;
     let home_path = fs::canonicalize(home.path())?;
     let mut entries: Vec<RegisterEntry> = Vec::new();
@@ -200,7 +202,7 @@ pub fn plan_register(
         let absolute = if request.path.is_absolute() {
             request.path.clone()
         } else {
-            std::env::current_dir()?.join(&request.path)
+            Environment::current_dir()?.join(&request.path)
         };
         request.path = absolute.clone();
         replay.push(request.clone());
@@ -228,13 +230,13 @@ pub fn plan_register(
                 RegisterStatus::Refused(RefusalReason::ConflictingNames)
             ) {
                 entries[index] =
-                    inspect_entry(&home_path, &registry, &config, &previous.path, path)?;
+                    inspect_entry(&home_path, &registry, &settings, &previous.path, path)?;
             }
             continue;
         }
         seen.insert(path.clone(), entries.len());
         entries.push(inspect_entry(
-            &home_path, &registry, &config, &absolute, path,
+            &home_path, &registry, &settings, &absolute, path,
         )?);
         requests.push(request);
     }
@@ -451,7 +453,7 @@ fn resolve_names(
 fn inspect_entry(
     home: &Path,
     registry: &Registry,
-    config: &Config,
+    settings: &Settings,
     input: &Path,
     path: PathBuf,
 ) -> Result<RegisterEntry, RegisterError> {
@@ -519,7 +521,7 @@ fn inspect_entry(
     }
     entry.signature = Some(crate::placement_fs::signature(&metadata));
     entry.size = metadata.len();
-    if entry.size >= config.large_file_bytes() {
+    if entry.size >= settings.large_file_bytes() {
         entry.status = RegisterStatus::NeedsConfirmation { size: entry.size };
     }
     Ok(entry)
@@ -823,7 +825,7 @@ fn apply_locked(
     if blocked(&current, confirm_large) {
         return Ok(current);
     }
-    let large_file_bytes = Config::load(home)?.large_file_bytes();
+    let large_file_bytes = Settings::load(home)?.large_file_bytes();
     let mut markers = Vec::new();
     let mut directories = Vec::new();
     let mut rewritten = Vec::new();

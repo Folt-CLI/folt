@@ -1,4 +1,4 @@
-use folt_core::config::Config;
+use folt_core::config::settings::Settings;
 use folt_core::home::{Home, HomeError};
 
 use crate::common::TempHome;
@@ -47,14 +47,14 @@ fn writable_by_others_is_refused() {
 #[test]
 fn reads_config_from_private_home() {
     let home = TempHome::new();
-    assert_eq!(Config::load(&home.home).unwrap(), Config::default());
+    assert_eq!(Settings::load(&home.home).unwrap(), Settings::default());
     std::fs::write(
         home.path().join("config.toml"),
         "username = 'Alice'\nemail = 'a@example.test'\n",
     )
     .unwrap();
     assert_eq!(
-        Config::load(&home.home)
+        Settings::load(&home.home)
             .unwrap()
             .author()
             .unwrap()

@@ -11,6 +11,11 @@ Non-test code denies Clippy’s `unwrap_used`, `expect_used`, `panic` and
 `unreachable` lints. Exceptions require `#[expect(clippy::<lint>, reason = "...")]`
 on the smallest item, explaining why the type system cannot express the invariant.
 
+Reading the process environment, the OS home directory or the current directory
+is denied outside `crates/folt-core/src/config/env.rs` by Clippy `disallowed_methods`
+(configured in `clippy.toml`). Code and tests get these values from `Environment`,
+and tests build an `Environment` value instead of changing the process environment.
+
 On pull requests, `scripts/test-integrity <base-ref> [<head-ref>]` checks the
 diff from the merge base for removed or edited assertions and test declarations
 in Rust files, including deleted test files, multi-line assertions and all lines
