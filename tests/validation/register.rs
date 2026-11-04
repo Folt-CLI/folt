@@ -10,6 +10,7 @@ use folt_core::placement_rules::{self, Behind};
 use folt_core::refs::RefStore;
 use folt_core::register::{self, RefusalReason, RegisterStatus, apply_register, plan_register};
 use folt_core::registry::{PlacementPath, Registry};
+use folt_core::test_support::expected_path;
 
 use crate::common::TempHome;
 
@@ -434,7 +435,7 @@ fn repointed_parent_blocks_file_registration() {
             reason.to_string(),
             format!(
                 "{}: destination changed since the plan",
-                crate::common::expected_path(&destination).display()
+                expected_path(&destination).display()
             )
         );
         assert_eq!(fs::read(&plan.entries[0].path).unwrap(), b"original a");
@@ -820,7 +821,7 @@ fn repointed_parent_blocks_directory_registration() {
             reason.to_string(),
             format!(
                 "{}: destination changed since the plan",
-                crate::common::expected_path(&destination).display()
+                expected_path(&destination).display()
             )
         );
         if existing_marker {

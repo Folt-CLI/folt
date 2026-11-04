@@ -1426,10 +1426,12 @@ impl Error for RegistryError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
 
     #[test]
     fn schema_three_indexes_names_and_rejects_invalid_stored_names() {
-        let path = std::env::temp_dir().join(format!("folt-name-{}", uuid::Uuid::new_v4()));
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().join("home");
         let home = Home::open_or_create(path.clone()).unwrap();
         let lock = home.try_lock().unwrap();
         let registry = Registry::open_or_create(&home, &lock).unwrap();
@@ -1472,7 +1474,6 @@ mod tests {
         );
         drop(registry);
         drop(lock);
-        fs::remove_dir_all(path).unwrap();
     }
 
     #[test]

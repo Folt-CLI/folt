@@ -1207,46 +1207,11 @@ impl Error for RulesError {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
     use crate::object::hash_blob;
-    use crate::placement::{PlacementBase, Signature};
-    use crate::registry::PlacementPath;
 
-    pub(crate) fn facts() -> PlacementFacts {
-        let hash = hash_blob(b"base");
-        let signature = Signature {
-            size: 4,
-            mtime: None,
-            ctime: None,
-            inode: None,
-        };
-        PlacementFacts {
-            placement: registry::Placement {
-                path: PlacementPath::resolve(std::env::temp_dir().join("folt-unit-facts")).unwrap(),
-                id: FolioId::from_bytes([1; 16]),
-                kind: PlacementKind::Copy,
-                head: "topic".into(),
-                commit_id: Some(hash),
-                base: Some(PlacementBase {
-                    hash,
-                    signature: signature.clone(),
-                }),
-                staged: None,
-            },
-            observation: Observation::File { signature },
-            placement_hash: Some(hash),
-            tip: Some(hash),
-        }
-    }
-
-    pub(crate) fn target() -> MoveTarget {
-        MoveTarget {
-            branch: RefName::parse("topic").unwrap(),
-            commit: hash_blob(b"commit"),
-            content: hash_blob(b"incoming"),
-        }
-    }
+    use crate::test_support::{RelocateFixture, facts, target};
 
     #[test]
     fn status_compares_all_history_states() {
@@ -1609,95 +1574,6 @@ pub(crate) mod tests {
         );
     }
 
-    struct MoveFixture {
-        root: PathBuf,
-        home: crate::home::Home,
-        row: registry::Placement,
-    }
-
-    impl MoveFixture {
-        fn new(directory: bool) -> (Self, HomeLock, Registry) {
-            use std::sync::atomic::{AtomicU64, Ordering};
-            static NEXT: AtomicU64 = AtomicU64::new(0);
-            let root = std::env::temp_dir().join(format!(
-                "folt-move-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
-            ));
-            let home = crate::home::Home::open_or_create(root.join("home")).unwrap();
-            let root = std::fs::canonicalize(root).unwrap();
-            let lock = home.try_lock().unwrap();
-            let mut registry = Registry::open_or_create(&home, &lock).unwrap();
-            let mut row = facts().placement;
-            row.path = registry::PlacementPath::resolve(root.join("source")).unwrap();
-            let fs = crate::placement_fs::PlacementFs::new(&home);
-            if directory {
-                std::fs::create_dir(row.path.to_path_buf()).unwrap();
-            }
-            registry
-                .write(&lock, |tx| {
-                    tx.add_folio(&registry::NewFolio {
-                        id: row.id,
-                        format: registry::FolioFormat {
-                            layout: crate::layout::FOLIO_LAYOUT_VERSION,
-                            algorithm: crate::layout::OBJECT_ALGORITHM.into(),
-                        },
-                    })?;
-                    for index in 0..if directory { 3 } else { 1 } {
-                        let mut child = row.clone();
-                        if directory {
-                            child.path = registry::PlacementPath::resolve(
-                                row.path.to_path_buf().join(format!("file-{index}")),
-                            )?;
-                        }
-                        std::fs::write(child.path.to_path_buf(), b"edited content").unwrap();
-                        child.staged = Some(placement::StagedBlob {
-                            hash: hash_blob(b"stage"),
-                            size: 5,
-                        });
-                        tx.insert_placement(&child)?;
-                        if !directory {
-                            row = child;
-                        }
-                    }
-                    Ok(())
-                })
-                .unwrap();
-            assert_eq!(
-                fs.read(row.id, &row.to_placement().1).unwrap() == Observation::Directory,
-                directory
-            );
-            (Self { root, home, row }, lock, registry)
-        }
-
-        fn facts(&self) -> PlacementFacts {
-            let fs = crate::placement_fs::PlacementFs::new(&self.home);
-            let observation = fs.read(self.row.id, &self.row.to_placement().1).unwrap();
-            let placement_hash = matches!(observation, Observation::File { .. })
-                .then(|| fs.hash_placement(&self.row.to_placement().1).unwrap());
-            PlacementFacts {
-                placement: self.row.clone(),
-                observation,
-                placement_hash,
-                tip: None,
-            }
-        }
-
-        fn plan(&self, registry: &Registry) -> RelocatePlan {
-            let fs = crate::placement_fs::PlacementFs::new(&self.home);
-            let to =
-                registry::PlacementPath::resolve_directory(self.root.join("destination")).unwrap();
-            let target = gather_relocate_target(&self.row, &to, &fs, registry).unwrap();
-            judge_relocate(&self.facts(), &target).unwrap()
-        }
-    }
-
-    impl Drop for MoveFixture {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.root);
-        }
-    }
-
     fn assert_move_rows(plan: &RelocatePlan, registry: &Registry, old: bool, new: bool) {
         for (source, destination) in &plan.target.rows {
             assert_eq!(
@@ -1714,7 +1590,7 @@ pub(crate) mod tests {
     #[test]
     fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
         for crash in [RelocateStep::Inserted, RelocateStep::Renamed] {
-            let (fixture, lock, mut registry) = MoveFixture::new(false);
+            let (fixture, lock, mut registry) = RelocateFixture::new(false);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             assert!(
@@ -1753,7 +1629,7 @@ pub(crate) mod tests {
                 assert_eq!(row.staged, plan.target.rows[0].0.staged);
             }
         }
-        let (fixture, lock, mut registry) = MoveFixture::new(true);
+        let (fixture, lock, mut registry) = RelocateFixture::new(true);
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let rows = registry.all_placements().unwrap();
         for row in &rows {
@@ -1779,7 +1655,7 @@ pub(crate) mod tests {
     #[test]
     fn prune_preserves_missing_parents_after_directory_move_interruptions() {
         for crash in [RelocateStep::Inserted, RelocateStep::Renamed] {
-            let (fixture, lock, mut registry) = MoveFixture::new(true);
+            let (fixture, lock, mut registry) = RelocateFixture::new(true);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             assert!(
@@ -1825,7 +1701,7 @@ pub(crate) mod tests {
                 RelocateStep::Renamed,
                 RelocateStep::Deleted,
             ] {
-                let (fixture, lock, mut registry) = MoveFixture::new(directory);
+                let (fixture, lock, mut registry) = RelocateFixture::new(directory);
                 let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
                 let plan = fixture.plan(&registry);
                 assert_eq!(plan.target.rows.len(), if directory { 3 } else { 1 });
@@ -1883,7 +1759,7 @@ pub(crate) mod tests {
     fn rename_failure_rolls_back_new_rows_and_preserves_racing_destinations() {
         for directory in [false, true] {
             for target_directory in [false, true] {
-                let (fixture, lock, mut registry) = MoveFixture::new(directory);
+                let (fixture, lock, mut registry) = RelocateFixture::new(directory);
                 let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
                 let plan = fixture.plan(&registry);
                 let destination = plan.target.path.to_path_buf();
@@ -1912,7 +1788,7 @@ pub(crate) mod tests {
     #[cfg(unix)]
     #[test]
     fn rename_race_preserves_a_new_link() {
-        let (fixture, lock, mut registry) = MoveFixture::new(false);
+        let (fixture, lock, mut registry) = RelocateFixture::new(false);
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         let result = apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
@@ -1930,7 +1806,7 @@ pub(crate) mod tests {
 
     #[test]
     fn pending_rows_are_cleaned_when_retry_destination_is_occupied() {
-        let (fixture, lock, mut registry) = MoveFixture::new(true);
+        let (fixture, lock, mut registry) = RelocateFixture::new(true);
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         assert!(
@@ -1949,7 +1825,7 @@ pub(crate) mod tests {
     #[test]
     fn directory_registry_transactions_are_all_or_nothing() {
         for insert in [false, true] {
-            let (fixture, lock, mut registry) = MoveFixture::new(true);
+            let (fixture, lock, mut registry) = RelocateFixture::new(true);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             let (old, new) = &plan.target.rows[1];
@@ -1965,7 +1841,7 @@ pub(crate) mod tests {
     #[test]
     fn remove_crash_leaves_only_an_unregistered_file() {
         for delete_file in [false, true] {
-            let (fixture, lock, mut registry) = MoveFixture::new(false);
+            let (fixture, lock, mut registry) = RelocateFixture::new(false);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = judge_remove(&fixture.facts(), delete_file, true).unwrap();
             assert!(
@@ -1989,7 +1865,7 @@ pub(crate) mod tests {
             RelocateStep::Renamed,
             RelocateStep::Deleted,
         ] {
-            let (mut fixture, lock, mut registry) = MoveFixture::new(false);
+            let (mut fixture, lock, mut registry) = RelocateFixture::new(false);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let target = fs.link_target(fixture.row.id);
             std::fs::create_dir_all(target.parent().unwrap()).unwrap();
@@ -2039,7 +1915,7 @@ pub(crate) mod tests {
     #[test]
     fn relative_link_normalization_preserves_registry_failure_windows() {
         for insert in [true, false] {
-            let (mut fixture, lock, mut registry) = MoveFixture::new(false);
+            let (mut fixture, lock, mut registry) = RelocateFixture::new(false);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             if let Err(error) = fs.probe_link(&fixture.row.path.to_path_buf()) {
                 eprintln!("skipping relative link failure windows: {error}");
@@ -2107,7 +1983,7 @@ pub(crate) mod tests {
     #[test]
     fn pending_copy_requires_every_field_to_match() {
         for field in 0..5 {
-            let (fixture, lock, mut registry) = MoveFixture::new(false);
+            let (fixture, lock, mut registry) = RelocateFixture::new(false);
             let plan = fixture.plan(&registry);
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let mut other = plan.target.rows[0].1.clone();
@@ -2147,7 +2023,7 @@ pub(crate) mod tests {
 
     #[test]
     fn directory_plan_refuses_inside_source_and_unrelated_destination_rows() {
-        let (fixture, lock, mut registry) = MoveFixture::new(true);
+        let (fixture, lock, mut registry) = RelocateFixture::new(true);
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let path =
             registry::PlacementPath::resolve(fixture.row.path.to_path_buf().join("child")).unwrap();
@@ -2178,7 +2054,7 @@ pub(crate) mod tests {
     }
     #[test]
     fn a_registered_copy_replaced_by_a_directory_is_refused() {
-        let (fixture, _lock, registry) = MoveFixture::new(false);
+        let (fixture, _lock, registry) = RelocateFixture::new(false);
         std::fs::remove_file(fixture.row.path.to_path_buf()).unwrap();
         std::fs::create_dir(fixture.row.path.to_path_buf()).unwrap();
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
