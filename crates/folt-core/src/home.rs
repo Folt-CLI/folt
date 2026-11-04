@@ -9,12 +9,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, SQLITE_HEADER};
-use crate::config::names::{
-    ENV_FOLT_HOME, HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR,
-};
+use crate::config::names::{HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR};
 use crate::layout::{HOME_FORMAT_VERSION, LayoutSupport, LayoutVersion};
 use crate::registry::{Registry, RegistryError};
+
+pub mod config_file;
 
 /// A resolved Folt home directory.
 ///
@@ -35,9 +36,7 @@ impl Home {
     /// The platform home directory may change behavior on Windows, and redirected
     /// Windows profiles are not handled.
     pub fn locate() -> Result<PathBuf, HomeError> {
-        let folt_home = std::env::var_os(ENV_FOLT_HOME);
-        let platform_home = std::env::home_dir();
-        resolve_home(folt_home, platform_home)
+        resolve_home(&Environment::capture())
     }
 
     /// Opens or creates a home directory and validates its contents and format.
@@ -376,20 +375,23 @@ impl fmt::Display for HomeWarning {
     }
 }
 
-/// Resolves the home from an override and platform home directory.
-pub fn resolve_home(
-    folt_home: Option<OsString>,
-    platform_home: Option<PathBuf>,
-) -> Result<PathBuf, HomeError> {
-    if let Some(value) = folt_home.filter(|value| !value.is_empty()) {
-        let path = PathBuf::from(&value);
+/// Resolves the home from an Environment.
+pub fn resolve_home(environment: &Environment) -> Result<PathBuf, HomeError> {
+    if let Some(value) = environment
+        .folt_home
+        .as_ref()
+        .filter(|value| !value.is_empty())
+    {
+        let path = PathBuf::from(value);
         if !path.is_absolute() {
-            return Err(HomeError::InvalidFoltHome(value));
+            return Err(HomeError::InvalidFoltHome(value.clone()));
         }
         return Ok(path);
     }
 
-    platform_home
+    environment
+        .platform_home
+        .as_ref()
         .map(|path| path.join(HOME_DIR_NAME))
         .ok_or(HomeError::NoHomeDirectory)
 }
@@ -612,5 +614,55 @@ impl Error for HomeError {
 impl From<RegistryError> for HomeError {
     fn from(error: RegistryError) -> Self {
         Self::Registry(error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn override_that_is_absolute_wins() {
+        let folt_home = std::env::temp_dir().join("folt-home");
+        for platform_home in [None, Some(std::env::temp_dir().join("platform-home"))] {
+            let environment = Environment {
+                folt_home: Some(folt_home.clone().into_os_string()),
+                platform_home,
+            };
+            assert_eq!(resolve_home(&environment).unwrap(), folt_home);
+        }
+    }
+
+    #[test]
+    fn empty_override_uses_the_platform_home() {
+        let platform_home = std::env::temp_dir().join("platform-home");
+        let environment = Environment {
+            folt_home: Some("".into()),
+            platform_home: Some(platform_home.clone()),
+        };
+        assert_eq!(
+            resolve_home(&environment).unwrap(),
+            platform_home.join(HOME_DIR_NAME)
+        );
+    }
+
+    #[test]
+    fn relative_override_is_refused() {
+        let environment = Environment {
+            folt_home: Some("relative".into()),
+            platform_home: Some(std::env::temp_dir().join("platform-home")),
+        };
+        assert!(matches!(
+            resolve_home(&environment),
+            Err(HomeError::InvalidFoltHome(_))
+        ));
+    }
+
+    #[test]
+    fn missing_override_and_platform_home_is_refused() {
+        assert!(matches!(
+            resolve_home(&Environment::default()),
+            Err(HomeError::NoHomeDirectory)
+        ));
     }
 }

@@ -1,6 +1,8 @@
 //! Canonical path spelling for expected test output.
 use std::path::{Path, PathBuf};
 
+use crate::config::env::Environment;
+
 /// Must be used whenever an expected message or plan text contains a path the
 /// test created under a temporary directory.
 #[warn(clippy::unwrap_used)]
@@ -12,7 +14,7 @@ pub fn expected_path(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir().unwrap().join(path)
+        Environment::current_dir().unwrap().join(path)
     };
     let parent = std::fs::canonicalize(absolute.parent().unwrap()).unwrap();
     let name = absolute.file_name().unwrap();

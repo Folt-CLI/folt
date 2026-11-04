@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction};
 
+use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
 use crate::config::limits::BUSY_TIMEOUT;
 use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE, REGISTRY_FILE, RENAME_PENDING_PREFIX};
@@ -192,7 +193,7 @@ fn resolve_path(input: &Path, append_marker: bool) -> Result<Vec<u8>, RegistryEr
     let absolute = if input.is_absolute() {
         input.to_path_buf()
     } else {
-        std::env::current_dir()?.join(input)
+        Environment::current_dir()?.join(input)
     };
     let metadata = fs::symlink_metadata(&absolute);
     let candidate = match metadata {

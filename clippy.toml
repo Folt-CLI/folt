@@ -2,3 +2,12 @@ allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
 too-many-lines-threshold = 100
+
+disallowed-methods = [
+    { path = "std::env::var", reason = "read the process environment only through config::env::Environment" },
+    { path = "std::env::var_os", reason = "read the process environment only through config::env::Environment" },
+    { path = "std::env::vars", reason = "read the process environment only through config::env::Environment" },
+    { path = "std::env::vars_os", reason = "read the process environment only through config::env::Environment" },
+    { path = "std::env::home_dir", reason = "read the OS home directory only through config::env::Environment" },
+    { path = "std::env::current_dir", reason = "read the current directory only through config::env::Environment" },
+]

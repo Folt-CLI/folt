@@ -1,9 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use folt_core::config::Config;
 use folt_core::config::limits::DEFAULT_LARGE_FILE_BYTES;
 use folt_core::config::names::CONTENT_FILE;
+use folt_core::config::settings::Settings;
 use folt_core::object::hash_blob;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
@@ -337,7 +337,7 @@ fn refusals_stop_the_entire_batch_without_creating_markers_or_registry() {
 fn configuration_confirmation_and_changed_files_are_rechecked() {
     let home = TempHome::new();
     assert_eq!(
-        Config::load(&home.home).unwrap().large_file_bytes(),
+        Settings::load(&home.home).unwrap().large_file_bytes(),
         DEFAULT_LARGE_FILE_BYTES
     );
     fs::write(home.path().join("config.toml"), "large_file_bytes = 4\n").unwrap();
