@@ -178,8 +178,11 @@ under `cfg(test)` and under the `test-support` Cargo feature, which the `tests/`
 crate enables. Only `expected_path` is public; the other fixtures are test-only.
 Temporary storage is unique and removed on drop.
 
-To add a unit test, put a small `#[test]` function in a `#[cfg(test)] mod tests`
-next to the pure function. Prefer tables of meaningful boundary cases. Add a
+To add a unit test, declare `#[cfg(test)] mod tests;` in the module it tests and
+put a small `#[test]` function in `<module>/tests.rs`, where `use super::*;` keeps
+private items reachable. A module with more than about 300 test lines uses
+`<module>/tests/` with one file per topic. Do not write an inline
+`mod tests { ... }` block. Prefer tables of meaningful boundary cases. Add a
 validation test to the relevant `tests/validation/<module>.rs`, or declare a new
 module in `main.rs`. Each test creates its own `common::TempHome` and passes its
 lock to operations that write. The home is private on Unix and removed on drop.
