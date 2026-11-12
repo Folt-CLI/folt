@@ -52,9 +52,9 @@ pub struct Signature {
     pub inode: Option<u64>,
 }
 
-/// The in-memory placement record. Persistence is handled by the caller.
+/// The in-memory placement record (`PlacementSpec`). Persistence is handled by the caller.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Placement {
+pub struct PlacementSpec {
     pub path: PathBuf,
     pub kind: PlacementKind,
     pub head: String,
@@ -104,7 +104,7 @@ pub struct StagedBlob {
 }
 
 /// Whether the caller must hash content before classifying drift.
-pub fn needs_hash(placement: &Placement, observation: &Observation) -> bool {
+pub fn needs_hash(placement: &PlacementSpec, observation: &Observation) -> bool {
     placement.kind != PlacementKind::Link
         && matches!(observation, Observation::File { signature }
             if placement.base.as_ref().is_none_or(|base| base.signature.size == signature.size))
@@ -112,7 +112,7 @@ pub fn needs_hash(placement: &Placement, observation: &Observation) -> bool {
 
 /// Classifies a placement using facts and hashes supplied by the caller.
 pub fn classify(
-    placement: &Placement,
+    placement: &PlacementSpec,
     observation: &Observation,
     placement_hash: Option<ObjectId>,
 ) -> Drift {
@@ -152,7 +152,7 @@ pub trait PlacementOps {
     fn create(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
     ) -> Result<Written, PlacementError>;
@@ -161,7 +161,7 @@ pub trait PlacementOps {
     fn read(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
     ) -> Result<Observation, PlacementError>;
 
     /// Refreshes a placement; copies read the supplied commit content blob.
@@ -169,20 +169,20 @@ pub trait PlacementOps {
     fn refresh(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
         expected: Option<&Observation>,
     ) -> Result<Written, PlacementError>;
 
     /// Syncs the parent directory before recording a previously published conversion.
-    fn sync_parent(&self, placement: &Placement) -> Result<(), PlacementError>;
+    fn sync_parent(&self, placement: &PlacementSpec) -> Result<(), PlacementError>;
 
     /// Replaces an existing entry with the requested kind after rechecking its facts.
     fn convert(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         to_kind: PlacementKind,
         objects: &ObjectStore,
         content: ObjectId,
@@ -194,14 +194,14 @@ pub trait PlacementOps {
     fn normalize_link(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
     ) -> Result<(), PlacementError>;
 
     /// Moves an entry without replacing an existing destination.
     fn relocate(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         to: &std::path::Path,
         expected: &Observation,
     ) -> Result<Written, PlacementError>;
@@ -210,17 +210,17 @@ pub trait PlacementOps {
     fn unlink(
         &self,
         id: crate::id::FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         expected: &Observation,
     ) -> Result<(), PlacementError>;
 
     /// Hashes a placement file without retaining its contents.
-    fn hash_placement(&self, placement: &Placement) -> Result<ObjectId, PlacementError>;
+    fn hash_placement(&self, placement: &PlacementSpec) -> Result<ObjectId, PlacementError>;
 
     /// Uses supplied facts to detect drift, requesting hashes when needed.
     fn detect_drift(
         &self,
-        placement: &Placement,
+        placement: &PlacementSpec,
         observation: &Observation,
         placement_hash: Option<ObjectId>,
     ) -> Result<Drift, PlacementError> {

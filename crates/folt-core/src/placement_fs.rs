@@ -12,8 +12,8 @@ use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{ObjectHasher, ObjectKind};
 use crate::placement::{
-    Observation, Placement, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
-    Written,
+    Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, PlacementSpec,
+    Signature, Written,
 };
 use crate::store::ObjectStore;
 
@@ -55,7 +55,7 @@ impl<'a> PlacementFs<'a> {
     fn refresh_link(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         expected: Option<&Observation>,
     ) -> Result<Written, PlacementError> {
         let target = self.link_target(id);
@@ -66,7 +66,7 @@ impl<'a> PlacementFs<'a> {
     fn rewrite_link(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         expected: Option<&Observation>,
     ) -> Result<Written, PlacementError> {
         let target = self.link_target(id);
@@ -99,7 +99,7 @@ impl<'a> PlacementFs<'a> {
     fn relocate_with_rename(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         to: &Path,
         expected: &Observation,
         rename: impl FnOnce(&Path, &Path) -> io::Result<()>,
@@ -117,7 +117,7 @@ impl<'a> PlacementFs<'a> {
     fn copy_content(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
         replace: bool,
@@ -209,7 +209,7 @@ impl PlacementOps for PlacementFs<'_> {
     fn create(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
     ) -> Result<Written, PlacementError> {
@@ -227,7 +227,7 @@ impl PlacementOps for PlacementFs<'_> {
         }
     }
 
-    fn read(&self, id: FolioId, placement: &Placement) -> Result<Observation, PlacementError> {
+    fn read(&self, id: FolioId, placement: &PlacementSpec) -> Result<Observation, PlacementError> {
         let target = self.link_target(id);
         let metadata = match fs::symlink_metadata(&placement.path) {
             Ok(metadata) => metadata,
@@ -274,7 +274,7 @@ impl PlacementOps for PlacementFs<'_> {
     fn refresh(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
         expected: Option<&Observation>,
@@ -287,7 +287,7 @@ impl PlacementOps for PlacementFs<'_> {
         }
     }
 
-    fn normalize_link(&self, id: FolioId, placement: &Placement) -> Result<(), PlacementError> {
+    fn normalize_link(&self, id: FolioId, placement: &PlacementSpec) -> Result<(), PlacementError> {
         if self.read(id, placement)? != Observation::IntactLink {
             return Ok(());
         }
@@ -299,7 +299,7 @@ impl PlacementOps for PlacementFs<'_> {
         Ok(())
     }
 
-    fn sync_parent(&self, placement: &Placement) -> Result<(), PlacementError> {
+    fn sync_parent(&self, placement: &PlacementSpec) -> Result<(), PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
         crate::fs::sync_directory(parent).map_err(|error| failure(parent, error))
     }
@@ -307,7 +307,7 @@ impl PlacementOps for PlacementFs<'_> {
     fn convert(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         to_kind: PlacementKind,
         objects: &ObjectStore,
         content: ObjectId,
@@ -383,7 +383,7 @@ impl PlacementOps for PlacementFs<'_> {
     fn relocate(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         to: &Path,
         expected: &Observation,
     ) -> Result<Written, PlacementError> {
@@ -393,7 +393,7 @@ impl PlacementOps for PlacementFs<'_> {
     fn unlink(
         &self,
         id: FolioId,
-        placement: &Placement,
+        placement: &PlacementSpec,
         expected: &Observation,
     ) -> Result<(), PlacementError> {
         if self.read(id, placement)? != *expected {
@@ -407,7 +407,7 @@ impl PlacementOps for PlacementFs<'_> {
         }
     }
 
-    fn hash_placement(&self, placement: &Placement) -> Result<ObjectId, PlacementError> {
+    fn hash_placement(&self, placement: &PlacementSpec) -> Result<ObjectId, PlacementError> {
         hash_file(&placement.path)
     }
 }

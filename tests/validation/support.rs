@@ -44,7 +44,7 @@ impl TestFolio {
         let mut registry = Registry::open_or_create(&home.home, lock).unwrap();
         let mut internal = registry::internal_placement(&home.home, folio.id()).unwrap();
         let fs = PlacementFs::new(&home.home);
-        let temporary = folt_core::placement::Placement {
+        let temporary = folt_core::placement::PlacementSpec {
             path: internal.path.to_path_buf(),
             kind: PlacementKind::Internal,
             head: "main".into(),
@@ -115,7 +115,7 @@ impl TestFolio {
             .objects
             .put(lock, ObjectKind::Blob, b"initial")
             .unwrap();
-        let placement = folt_core::placement::Placement {
+        let placement = folt_core::placement::PlacementSpec {
             path: path.clone(),
             kind: PlacementKind::Copy,
             head: "main".into(),

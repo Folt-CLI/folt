@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::home::Home;
 #[cfg(test)]
-use crate::placement::{Placement, PlacementKind};
+use crate::placement::{PlacementKind, PlacementSpec};
 
 /// Owns a unique temporary directory and removes it on drop.
 pub(crate) struct TempDir {
@@ -62,14 +62,14 @@ impl TempHome {
 
 #[cfg(test)]
 impl TempHome {
-    pub(crate) fn source(&self, directory: bool) -> Placement {
+    pub(crate) fn source(&self, directory: bool) -> PlacementSpec {
         let path = self.root.join("source");
         if directory {
             fs::create_dir(&path).unwrap();
         } else {
             fs::write(&path, b"source").unwrap();
         }
-        Placement {
+        PlacementSpec {
             path,
             kind: PlacementKind::Copy,
             head: "main".into(),

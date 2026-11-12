@@ -58,10 +58,10 @@ pub struct Placement {
 
 impl Placement {
     /// Converts a registry row to filesystem facts while retaining its Folio id.
-    pub fn to_placement(&self) -> (FolioId, crate::placement::Placement) {
+    pub fn to_placement(&self) -> (FolioId, crate::placement::PlacementSpec) {
         (
             self.id,
-            crate::placement::Placement {
+            crate::placement::PlacementSpec {
                 path: self.path.to_path_buf(),
                 kind: self.kind,
                 head: self.head.clone(),
