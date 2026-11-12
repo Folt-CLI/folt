@@ -109,7 +109,7 @@ fn changed_after_refresh_blocks_without_writing_and_restores_earlier_files() {
     .unwrap();
     assert_eq!(
         result.entries[1].status,
-        RegisterStatus::Refused(RefusalReason::FileChanged)
+        RegisterStatus::Refused(RegisterRefusalReason::FileChanged)
     );
     assert_eq!(fs::read(first).unwrap(), b"first body");
     assert_eq!(fs::read(second).unwrap(), b"user edit");
@@ -148,7 +148,7 @@ fn missing_refreshed_marker_signature_blocks_and_rolls_back_earlier_files() {
     if let Ok(blocked) = result {
         assert_eq!(
             blocked.entries[1].status,
-            RegisterStatus::Refused(RefusalReason::FileChanged)
+            RegisterStatus::Refused(RegisterRefusalReason::FileChanged)
         );
     }
     assert_eq!(folios_started, 1);
