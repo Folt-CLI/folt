@@ -1,11 +1,12 @@
 use super::*;
+use crate::config::env::Environment;
 use crate::test_support::TempDir;
 
 #[test]
 fn schema_three_indexes_names_and_rejects_invalid_stored_names() {
     let directory = TempDir::new().unwrap();
     let path = directory.path().join("home");
-    let home = Home::open_or_create(path.clone()).unwrap();
+    let home = Home::open_or_create(path.clone(), &Environment::default()).unwrap();
     let lock = home.try_lock().unwrap();
     let registry = Registry::open_or_create(&home, &lock).unwrap();
     let connection = registry.connection.as_ref().unwrap();

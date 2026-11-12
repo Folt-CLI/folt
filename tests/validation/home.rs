@@ -1,3 +1,4 @@
+use folt_core::config::env::Environment;
 use folt_core::config::settings::Settings;
 use folt_core::home::{Home, HomeError};
 
@@ -28,7 +29,8 @@ fn lock_is_exclusive() {
 fn dropping_guard_releases_lock() {
     let home = TempHome::new();
     drop(home.lock());
-    let reopened = Home::open_or_create(home.path().to_path_buf()).unwrap();
+    let reopened =
+        Home::open_or_create(home.path().to_path_buf(), &Environment::default()).unwrap();
     assert!(reopened.try_lock().is_ok());
 }
 
@@ -39,7 +41,7 @@ fn writable_by_others_is_refused() {
     let home = TempHome::new();
     std::fs::set_permissions(home.path(), std::fs::Permissions::from_mode(0o722)).unwrap();
     assert!(matches!(
-        Home::open_or_create(home.path().to_path_buf()),
+        Home::open_or_create(home.path().to_path_buf(), &Environment::default()),
         Err(HomeError::WritableByOthers { .. })
     ));
 }
@@ -61,4 +63,20 @@ fn reads_config_from_private_home() {
             .to_string(),
         "Alice <a@example.test>"
     );
+}
+
+#[test]
+fn environment_override_changes_large_file_threshold() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("home");
+    let environment = Environment {
+        large_file_bytes: Some("4".into()),
+        ..Environment::default()
+    };
+    let home = Home::open_or_create(path.clone(), &environment).unwrap();
+    assert_eq!(Settings::load(&home).unwrap().large_file_bytes, 4);
+    std::fs::write(path.join("config.toml"), "large_file_bytes = 9\n").unwrap();
+    assert_eq!(Settings::load(&home).unwrap().large_file_bytes, 4);
+    let home = Home::open_or_create(path, &Environment::default()).unwrap();
+    assert_eq!(Settings::load(&home).unwrap().large_file_bytes, 9);
 }

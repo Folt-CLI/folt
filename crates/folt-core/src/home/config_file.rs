@@ -3,11 +3,11 @@
 use std::{error::Error, fmt, fs, io, path::PathBuf};
 
 use crate::config::names::{ANONYMOUS_AUTHOR, CONFIG_FILE};
-use crate::config::settings::Settings;
+use crate::config::settings::{FileSettings, Settings, SettingsError};
 use crate::home::Home;
 use crate::object::{Author, ObjectError};
 
-impl Settings {
+impl FileSettings {
     /// Loads settings, using defaults only when the file is missing.
     pub fn load(home: &Home) -> Result<Self, ConfigError> {
         let path = home.path().join(CONFIG_FILE);
@@ -37,6 +37,16 @@ impl Settings {
             path: path.clone(),
             source,
         })?;
+        Ok(settings)
+    }
+}
+
+impl Settings {
+    /// Loads and resolves settings, then validates the configured author.
+    pub fn load(home: &Home) -> Result<Self, ConfigError> {
+        let file = FileSettings::load(home)?;
+        let settings = Self::resolve(home.environment(), file).map_err(ConfigError::Settings)?;
+        let path = home.path().join(CONFIG_FILE);
         settings
             .validated_author()
             .map_err(|source| ConfigError::Invalid { path, source })?;
@@ -80,6 +90,7 @@ pub enum ConfigError {
         source: ObjectError,
     },
     Author(ObjectError),
+    Settings(SettingsError),
 }
 
 impl fmt::Display for ConfigError {
@@ -109,6 +120,7 @@ impl fmt::Display for ConfigError {
                     path.display()
                 )
             }
+            Self::Settings(source) => fmt::Display::fmt(source, formatter),
             Self::Author(source) => write!(formatter, "invalid config author: {source}"),
         }
     }
@@ -120,6 +132,7 @@ impl Error for ConfigError {
             Self::Read { source, .. } => Some(source),
             Self::Parse { source, .. } => Some(source),
             Self::Invalid { source, .. } | Self::Author(source) => Some(source),
+            Self::Settings(source) => Some(source),
             Self::NotAFile { .. } => None,
         }
     }

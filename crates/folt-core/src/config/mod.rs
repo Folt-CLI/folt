@@ -1,5 +1,6 @@
 //! Fixed names, limits and format facts, plus the typed `Settings` and the
-//! `Environment` reader. Constants do not introduce runtime settings or environment overrides.
+//! `Environment` reader. Constants provide defaults; `Settings` overrides exactly three of them
+//! from the `Environment`.
 
 pub mod env;
 pub mod formats;

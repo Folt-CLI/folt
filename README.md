@@ -54,6 +54,19 @@ cargo run -p folt-cli
 
 Running the binary currently prints `folt` followed by its package version.
 
+## Environment variables
+
+`folt-core` reads these variables once when a Folt home is opened; a value that is not a valid number is refused with an error naming the variable.
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `FOLT_HOME` | Location of the Folt home | `~/.folt` |
+| `FOLT_LARGE_FILE_BYTES` | Overrides `large_file_bytes` in `config.toml`: files at or above this size need confirmation | 67108864 (64 MiB) |
+| `FOLT_BATCH_TOTAL_BYTES` | A registration batch above this total needs confirmation | 268435456 (256 MiB) |
+| `FOLT_BUSY_TIMEOUT_MS` | Milliseconds the registry waits on a busy database, 0 to 2147483647 | 5000 |
+
+An environment variable wins over `config.toml`, which wins over the default.
+
 ## Not decided yet
 
 The [pending decisions](docs/dev/stack.md#pending-decisions) include:

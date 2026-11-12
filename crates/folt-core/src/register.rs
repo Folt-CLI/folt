@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::env::Environment;
 use crate::config::formats::OBJECT_ALGORITHM;
-use crate::config::limits::{BATCH_TOTAL_BYTES, SUMMARY_LARGEST};
+use crate::config::limits::SUMMARY_LARGEST;
 use crate::config::names::{DEFAULT_BRANCH, MARKDOWN_EXTENSIONS, MARKER_FILE};
 use crate::config::settings::Settings;
 use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
@@ -241,7 +241,12 @@ pub fn plan_register(
         requests.push(request);
     }
     resolve_names(&mut entries, &requests, &registry)?;
-    Ok(report(entries, replay, destinations))
+    Ok(report(
+        entries,
+        replay,
+        destinations,
+        settings.batch_total_bytes,
+    ))
 }
 
 fn register_destination(is_directory: bool, path: &Path, resolution_succeeded: bool) -> &Path {
@@ -521,7 +526,7 @@ fn inspect_entry(
     }
     entry.signature = Some(crate::placement_fs::signature(&metadata));
     entry.size = metadata.len();
-    if entry.size >= settings.large_file_bytes() {
+    if entry.size >= settings.large_file_bytes {
         entry.status = RegisterStatus::NeedsConfirmation { size: entry.size };
     }
     Ok(entry)
@@ -539,6 +544,7 @@ fn report(
     entries: Vec<RegisterEntry>,
     requests: Vec<RegisterRequest>,
     destinations: Vec<PathBuf>,
+    batch_total_bytes: u64,
 ) -> RegisterPlan {
     let mut summary = RegisterSummary::default();
     for entry in &entries {
@@ -563,7 +569,7 @@ fn report(
         .largest
         .sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     summary.largest.truncate(SUMMARY_LARGEST);
-    let notes = if summary.total_bytes > BATCH_TOTAL_BYTES {
+    let notes = if summary.total_bytes > batch_total_bytes {
         vec![RegisterNote::NeedsConfirmation {
             size: summary.total_bytes,
         }]
@@ -622,7 +628,11 @@ fn destination(entry: &RegisterEntry) -> &Path {
     destination_path(&entry.path)
 }
 
-fn block_changed(previous: &RegisterPlan, mut current: RegisterPlan) -> RegisterPlan {
+fn block_changed(
+    previous: &RegisterPlan,
+    mut current: RegisterPlan,
+    batch_total_bytes: u64,
+) -> RegisterPlan {
     let mut previous_by_destination = HashMap::<_, Vec<_>>::new();
     for entry in &previous.entries {
         previous_by_destination
@@ -670,7 +680,12 @@ fn block_changed(previous: &RegisterPlan, mut current: RegisterPlan) -> Register
             refuse_name(entry, RefusalReason::FileChanged);
         }
     }
-    report(current.entries, current.requests, current.destinations)
+    report(
+        current.entries,
+        current.requests,
+        current.destinations,
+        batch_total_bytes,
+    )
 }
 
 fn blocked(plan: &RegisterPlan, confirm_large: bool) -> bool {
@@ -729,7 +744,12 @@ fn apply_links_with_hook(
     mut hook: impl FnMut(LinkStep<'_>) -> Result<(), RegisterError>,
 ) -> Result<RegisterLinkOutcome, RegisterError> {
     let lock = home.lock()?;
-    let current = block_changed(plan, plan_register(home, plan.requests.clone())?);
+    let settings = Settings::load(home)?;
+    let current = block_changed(
+        plan,
+        plan_register(home, plan.requests.clone())?,
+        settings.batch_total_bytes,
+    );
     if blocked(&current, confirm_large) {
         return Ok(RegisterLinkOutcome {
             registration: current,
@@ -821,11 +841,15 @@ fn apply_locked(
     lock: &HomeLock,
     mut hook: impl FnMut(Step<'_>) -> Result<(), RegistryError>,
 ) -> Result<RegisterPlan, RegisterError> {
-    let mut current = block_changed(plan, plan_register(home, plan.requests.clone())?);
+    let settings = Settings::load(home)?;
+    let mut current = block_changed(
+        plan,
+        plan_register(home, plan.requests.clone())?,
+        settings.batch_total_bytes,
+    );
     if blocked(&current, confirm_large) {
         return Ok(current);
     }
-    let large_file_bytes = Settings::load(home)?.large_file_bytes();
     let mut markers = Vec::new();
     let mut directories = Vec::new();
     let mut rewritten = Vec::new();
@@ -856,7 +880,7 @@ fn apply_locked(
         // An appearing marker must be checked for type, readability and size.
         let mut refreshed = plan_register(home, plan.requests.clone())?;
         hook(Step::Refreshed(&mut refreshed))?;
-        current = block_changed(&current, refreshed);
+        current = block_changed(&current, refreshed, settings.batch_total_bytes);
         if blocked(&current, confirm_large) {
             return Ok(false);
         }
@@ -875,6 +899,7 @@ fn apply_locked(
                         current.entries.clone(),
                         current.requests.clone(),
                         current.destinations.clone(),
+                        settings.batch_total_bytes,
                     );
                     return Ok(false);
                 }
@@ -891,6 +916,7 @@ fn apply_locked(
                         current.entries.clone(),
                         current.requests.clone(),
                         current.destinations.clone(),
+                        settings.batch_total_bytes,
                     );
                     return Ok(false);
                 }
@@ -916,6 +942,7 @@ fn apply_locked(
                         current.entries.clone(),
                         current.requests.clone(),
                         current.destinations.clone(),
+                        settings.batch_total_bytes,
                     );
                     return Ok(false);
                 }
@@ -927,6 +954,7 @@ fn apply_locked(
                         current.entries.clone(),
                         current.requests.clone(),
                         current.destinations.clone(),
+                        settings.batch_total_bytes,
                     );
                     return Ok(false);
                 };
@@ -950,6 +978,7 @@ fn apply_locked(
                             current.entries.clone(),
                             current.requests.clone(),
                             current.destinations.clone(),
+                            settings.batch_total_bytes,
                         );
                         return Ok(false);
                     }
@@ -960,7 +989,7 @@ fn apply_locked(
             // A file may grow even after the metadata recheck. Confirmation
             // also covers the bytes actually captured, before publishing them.
             current.entries[index].size = content.len() as u64;
-            if content.len() as u64 >= large_file_bytes {
+            if content.len() as u64 >= settings.large_file_bytes {
                 current.entries[index].status = RegisterStatus::NeedsConfirmation {
                     size: content.len() as u64,
                 };
@@ -969,6 +998,7 @@ fn apply_locked(
                 current.entries.clone(),
                 current.requests.clone(),
                 current.destinations.clone(),
+                settings.batch_total_bytes,
             );
             if blocked(&current, confirm_large) {
                 return Ok(false);

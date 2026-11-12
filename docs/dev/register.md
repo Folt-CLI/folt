@@ -48,8 +48,9 @@ directory Folio are refused.
 
 The optional `large_file_bytes` integer in the home's `config.toml` defaults to
 64 MiB (`config::limits::DEFAULT_LARGE_FILE_BYTES`). Files at or above it require
-confirmation. A batch total above 256 MiB (`config::limits::BATCH_TOTAL_BYTES`) adds
-one batch confirmation note. Both checks must pass, or `confirm_large` must be
+confirmation. A batch total above 256 MiB (`config::limits::DEFAULT_BATCH_TOTAL_BYTES`) adds
+one batch confirmation note. `FOLT_LARGE_FILE_BYTES` and `FOLT_BATCH_TOTAL_BYTES`
+override these thresholds. Both checks must pass, or `confirm_large` must be
 true. These are policy defaults, intended to bound unexpected memory and disk
 use: `create_folio` still receives a `Vec<u8>`, and registration stores another
 copy of the content. Interactive prompts and advice to prefer links belong to

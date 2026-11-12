@@ -24,6 +24,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [Epic](#epic)
 - [explicit key](#explicit-key)
 - [facts](#facts)
+- [FileSettings](#filesettings)
 - [Folio](#folio)
 - [Folio directory](#folio-directory)
 - [Folio format](#folio-format)
@@ -552,9 +553,18 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Code structure
 - **Definition:** The typed runtime settings of Folt (for example `large_file_bytes`), with defaults and optional environment overrides read through Environment.
-- **Code:** `crates/folt-core/src/config/settings.rs:9` (`Settings`)
+- **Code:** `crates/folt-core/src/config/settings.rs:26` (`Settings`)
 - **Related:** none.
 - **Not:** Compile-time constants, which live in `config::names`, `config::limits` and `config::formats`.
+- **Status:** decided
+
+### FileSettings
+
+- **Layer:** Code structure
+- **Definition:** The values read from the Folt home's `config.toml`, before the Environment and the defaults are applied; `Settings::resolve` turns it into Settings.
+- **Code:** `crates/folt-core/src/config/settings.rs:17` (`FileSettings`)
+- **Related:** [Settings](#settings), [Environment](#environment), [home](#home).
+- **Not:** The resolved Settings, or the `config.toml` file itself.
 - **Status:** decided
 
 ### Environment

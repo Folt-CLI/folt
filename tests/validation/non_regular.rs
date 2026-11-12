@@ -1,3 +1,4 @@
+use folt_core::config::env::Environment;
 use std::fs;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::Path;
@@ -43,7 +44,7 @@ fn fifo_registry_with_unrelated_file_is_not_a_home() {
         mkfifo(&directory.path().join("registry.db"));
         fs::write(directory.path().join("notes.txt"), b"notes").unwrap();
         assert!(matches!(
-            Home::open_or_create(directory.path().to_path_buf()),
+            Home::open_or_create(directory.path().to_path_buf(), &Environment::default()),
             Err(HomeError::NotAHome { .. })
         ));
     });
@@ -55,7 +56,7 @@ fn fifo_registry_with_only_allowed_names_is_refused() {
         let directory = private_home();
         mkfifo(&directory.path().join("registry.db"));
         assert!(matches!(
-            Home::open_or_create(directory.path().to_path_buf()),
+            Home::open_or_create(directory.path().to_path_buf(), &Environment::default()),
             Err(HomeError::Registry(RegistryError::NotRegularFile(_)))
         ));
     });
@@ -71,7 +72,7 @@ fn symlink_to_fifo_registry_with_unrelated_file_is_not_a_home() {
         symlink(&fifo, directory.path().join("registry.db")).unwrap();
         fs::write(directory.path().join("notes.txt"), b"notes").unwrap();
         assert!(matches!(
-            Home::open_or_create(directory.path().to_path_buf()),
+            Home::open_or_create(directory.path().to_path_buf(), &Environment::default()),
             Err(HomeError::NotAHome { .. })
         ));
     });
@@ -86,7 +87,7 @@ fn symlink_to_fifo_registry_with_only_allowed_names_is_refused() {
         let directory = private_home();
         symlink(&fifo, directory.path().join("registry.db")).unwrap();
         assert!(matches!(
-            Home::open_or_create(directory.path().to_path_buf()),
+            Home::open_or_create(directory.path().to_path_buf(), &Environment::default()),
             Err(HomeError::Registry(RegistryError::NotRegularFile(_)))
         ));
     });
@@ -100,7 +101,7 @@ fn fifo_lock_is_refused() {
         let path = home.path().join("lock");
         fs::remove_file(&path).unwrap();
         mkfifo(&path);
-        assert!(Home::open_or_create(home.path().to_path_buf()).is_ok());
+        assert!(Home::open_or_create(home.path().to_path_buf(), &Environment::default()).is_ok());
         assert!(matches!(
             home.home.try_lock(),
             Err(HomeError::NotRegularFile { .. })

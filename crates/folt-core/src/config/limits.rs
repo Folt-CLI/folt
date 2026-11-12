@@ -57,8 +57,8 @@ pub(crate) const FRAME_SLACK: u64 = 128;
 /// Default registration confirmation threshold in bytes.
 pub const DEFAULT_LARGE_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
-/// Batch confirmation threshold in bytes (strictly exceeded).
-pub const BATCH_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
+/// Default batch confirmation threshold in bytes (strictly exceeded).
+pub const DEFAULT_BATCH_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Maximum number of largest entries in a registration summary.
 pub(crate) const SUMMARY_LARGEST: usize = 10;
@@ -66,5 +66,5 @@ pub(crate) const SUMMARY_LARGEST: usize = 10;
 /// Minimum drops requiring confirmation, also strictly more than half the scoped rows.
 pub(crate) const PRUNE_CONFIRM_MIN: usize = 5;
 
-/// SQLite busy timeout in seconds.
-pub(crate) const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+/// Default SQLite busy timeout in seconds.
+pub(crate) const DEFAULT_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);

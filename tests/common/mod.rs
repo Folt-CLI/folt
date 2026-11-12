@@ -1,3 +1,4 @@
+use folt_core::config::env::Environment;
 use std::path::{Path, PathBuf};
 
 use folt_core::home::{Home, HomeLock};
@@ -11,7 +12,8 @@ pub struct TempHome {
 impl TempHome {
     pub fn new() -> Self {
         let directory = tempfile::tempdir().unwrap();
-        let home = Home::open_or_create(directory.path().join("home")).unwrap();
+        let home =
+            Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
         Self { home, directory }
     }
 

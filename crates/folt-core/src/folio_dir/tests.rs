@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::env::Environment;
 use crate::home::Home;
 use crate::test_support::TempDir;
 
@@ -6,7 +7,7 @@ use crate::test_support::TempDir;
 fn publishes_staged_folios_with_both_durability_modes() {
     let directory = TempDir::new().unwrap();
     let path = directory.path().join("home");
-    let home = Home::open_or_create(path.clone()).unwrap();
+    let home = Home::open_or_create(path.clone(), &Environment::default()).unwrap();
     let lock = home.try_lock().unwrap();
 
     for durability in [Durability::None, Durability::DataAndDirectories] {
