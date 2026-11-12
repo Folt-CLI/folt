@@ -479,7 +479,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Operations
 - **Definition:** A domain decision that a requested operation is not allowed under the observed [facts](#facts). Placement rules represent it as a path plus a reason; history and registration have their own refusal types.
-- **Code:** `crates/folt-core/src/placement_rules.rs:1099` (`Refusal`); `crates/folt-core/src/placement_rules.rs:1074` (`RefusalReason`); `crates/folt-core/src/history.rs:600` (`Refusal`); `crates/folt-core/src/register.rs:86` (`RegisterRefusalReason`)
+- **Code:** `crates/folt-core/src/placement_rules.rs:1100` (`Refusal`); `crates/folt-core/src/placement_rules.rs:1075` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`Refusal`); `crates/folt-core/src/register.rs:86` (`RegisterRefusalReason`)
 - **Related:** [plan and apply](#plan-and-apply), [placement](#placement), [register](#register).
 - **Not:** One shared error type: qualify the module for each refusal; the rename of the two `Refusal` types is open (plan ticket G6 of [#203](https://github.com/Folt-CLI/folt/issues/203)).
 - **Status:** decided
