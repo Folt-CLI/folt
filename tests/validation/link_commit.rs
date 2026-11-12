@@ -1,13 +1,15 @@
 use folt_core::checkout::{self, CheckoutStores};
-use folt_core::folio_dir::FolioId;
 use folt_core::history::{self, HistoryStores};
-use folt_core::object::{Commit, ObjectId};
+use folt_core::id::FolioId;
+use folt_core::id::ObjectId;
+use folt_core::object::Commit;
 use folt_core::placement::{
     Observation, Placement, PlacementError, PlacementKind, PlacementOps, Written,
 };
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_rules::{self, RefusalReason, RulesError};
-use folt_core::refs::{Expect, Kind, RefName};
+use folt_core::ref_name::{RefKind, RefName};
+use folt_core::refs::Expect;
 use folt_core::registry::{NewPlacement, PlacementPath};
 use folt_core::store::ObjectStore;
 use folt_core::working_state::{self, Edit, Staged};
@@ -431,7 +433,7 @@ fn resumes_commit_through_link_and_rechecks_selected_link() {
         .refs
         .update(
             &mut lock,
-            Kind::Branch,
+            RefKind::Branch,
             &RefName::parse("main").unwrap(),
             published,
             Expect::Absent,

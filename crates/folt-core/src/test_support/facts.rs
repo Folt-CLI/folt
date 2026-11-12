@@ -1,10 +1,10 @@
 //! Placement facts and targets for decision tests.
 
-use crate::folio_dir::FolioId;
+use crate::id::FolioId;
 use crate::object::hash_blob;
 use crate::placement::{Observation, PlacementBase, PlacementKind, Signature};
 use crate::placement_rules::{MoveTarget, PlacementFacts};
-use crate::refs::RefName;
+use crate::ref_name::RefName;
 use crate::registry::{self, PlacementPath};
 
 pub(crate) fn facts() -> PlacementFacts {

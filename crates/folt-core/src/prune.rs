@@ -6,9 +6,9 @@ use std::fs;
 use std::io;
 
 use crate::config::limits::PRUNE_CONFIRM_MIN;
-use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
-use crate::object::ObjectId;
+use crate::id::FolioId;
+use crate::id::ObjectId;
 use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
 use crate::registry::{Placement, PlacementPath, PlacementPrefix, Registry, RegistryError};
 

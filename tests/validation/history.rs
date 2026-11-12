@@ -2,7 +2,8 @@ use folt_core::history::{self, HistoryStores};
 use folt_core::object::{Commit, Tag};
 use folt_core::placement::PlacementOps;
 use folt_core::placement_fs::PlacementFs;
-use folt_core::refs::{Expect, Kind, RefName};
+use folt_core::ref_name::{RefKind, RefName};
+use folt_core::refs::Expect;
 use folt_core::working_state;
 
 use crate::common::TempHome;
@@ -20,7 +21,7 @@ fn commit_publishes_content_ref_and_working_base() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         Some(second)
     );
@@ -68,7 +69,7 @@ fn resumes_commit_published_before_registry_update() {
         .refs
         .update(
             &mut lock,
-            Kind::Branch,
+            RefKind::Branch,
             &RefName::parse("main").unwrap(),
             published,
             Expect::Absent,
@@ -123,7 +124,10 @@ fn reset_moves_tip_and_restores_working_content() {
     .unwrap();
     let plan = history::judge_reset(&facts, false).unwrap();
     history::apply_reset(&plan, &fs, &stores, &mut folio.registry, &mut lock).unwrap();
-    assert_eq!(folio.refs.read(Kind::Branch, &main).unwrap(), Some(first));
+    assert_eq!(
+        folio.refs.read(RefKind::Branch, &main).unwrap(),
+        Some(first)
+    );
     let row = folio.internal();
     assert_eq!(row.commit_id, Some(first));
     assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), b"first");
@@ -158,7 +162,7 @@ fn deletes_unused_branch_but_keeps_main_with_internal_placement() {
         &mut lock,
     )
     .unwrap();
-    assert_eq!(folio.refs.read(Kind::Branch, &topic).unwrap(), None);
+    assert_eq!(folio.refs.read(RefKind::Branch, &topic).unwrap(), None);
     assert!(matches!(
         history::delete_branch(
             folio.folio.id(),
@@ -197,8 +201,8 @@ fn lightweight_and_annotated_tags_round_trip() {
     let tagged =
         history::create_tag(&name, commit, Some(&annotation), &folio.stores(), &mut lock).unwrap();
     assert_eq!(folio.objects.get_tag(tagged, 16384).unwrap(), annotation);
-    assert_eq!(folio.refs.read(Kind::Tag, &name).unwrap(), Some(tagged));
+    assert_eq!(folio.refs.read(RefKind::Tag, &name).unwrap(), Some(tagged));
     history::delete_tag(&light, commit, &folio.refs, &mut lock).unwrap();
-    assert_eq!(folio.refs.read(Kind::Tag, &light).unwrap(), None);
-    assert_eq!(folio.refs.read(Kind::Tag, &name).unwrap(), Some(tagged));
+    assert_eq!(folio.refs.read(RefKind::Tag, &light).unwrap(), None);
+    assert_eq!(folio.refs.read(RefKind::Tag, &name).unwrap(), Some(tagged));
 }

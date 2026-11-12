@@ -1,14 +1,16 @@
 use std::fs;
 
-use folt_core::folio_dir::FolioId;
 use folt_core::folio_name::FolioName;
 use folt_core::front_matter;
 use folt_core::history::{self, HistoryStores};
 use folt_core::home::HomeLock;
-use folt_core::object::{Commit, ObjectId, hash_blob};
+use folt_core::id::FolioId;
+use folt_core::id::ObjectId;
+use folt_core::object::{Commit, hash_blob};
 use folt_core::placement::{PlacementKind, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
-use folt_core::refs::{Expect, Kind, RefName};
+use folt_core::ref_name::{RefKind, RefName};
+use folt_core::refs::Expect;
 use folt_core::registry::{NewFolio, NewPlacement, Placement, PlacementPath, RegistryError};
 use folt_core::rename::{self, RenameError};
 use folt_core::working_state;
@@ -109,7 +111,7 @@ fn assert_completed(folio: &TestFolio, before: ObjectId, after: ObjectId) {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         Some(after)
     );
@@ -141,7 +143,7 @@ fn renames_only_main_internal_and_creates_one_commit() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("feature").unwrap())
+            .read(RefKind::Branch, &RefName::parse("feature").unwrap())
             .unwrap(),
         Some(before)
     );
@@ -373,7 +375,7 @@ fn resumes_each_partial_rename_with_exactly_one_main_commit() {
                 .refs
                 .update(
                     &mut lock,
-                    Kind::Branch,
+                    RefKind::Branch,
                     &RefName::parse("main").unwrap(),
                     commit,
                     Expect::Is(before),
@@ -572,7 +574,7 @@ fn destination_with_old_internal_name_without_pending_record_is_unknown() {
     let before = folio.internal();
     let tip = folio
         .refs
-        .read(Kind::Branch, &RefName::parse("main").unwrap())
+        .read(RefKind::Branch, &RefName::parse("main").unwrap())
         .unwrap();
     assert!(matches!(
         run(&home, &mut folio, &mut lock),
@@ -587,7 +589,7 @@ fn destination_with_old_internal_name_without_pending_record_is_unknown() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         tip
     );
@@ -655,7 +657,7 @@ fn different_pending_rename_refuses_and_removal_clears_record() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         before.commit_id
     );
@@ -715,7 +717,7 @@ fn apply_records_pending_rename_before_file_rewrite_failure() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         row.commit_id
     );
@@ -772,7 +774,7 @@ fn malformed_committed_front_matter_refuses_before_registry_write() {
             .refs
             .update(
                 &mut lock,
-                Kind::Branch,
+                RefKind::Branch,
                 &RefName::parse("main").unwrap(),
                 commit,
                 Expect::Is(row.commit_id.unwrap()),
@@ -804,7 +806,7 @@ fn malformed_committed_front_matter_refuses_before_registry_write() {
         assert_eq!(
             folio
                 .refs
-                .read(Kind::Branch, &RefName::parse("main").unwrap())
+                .read(RefKind::Branch, &RefName::parse("main").unwrap())
                 .unwrap(),
             Some(commit)
         );
@@ -820,7 +822,7 @@ fn conflicting_base_name_refuses_in_planning_without_changes() {
     let row = folio.internal();
     let fs = PlacementFs::new(&home.home);
     let observation = fs.read(row.id, &row.to_placement().1).unwrap();
-    let branches = folio.refs.list(Kind::Branch).unwrap();
+    let branches = folio.refs.list(RefKind::Branch).unwrap();
     let references = folio.registry.references(row.id, "main").unwrap();
     for _ in 0..2 {
         let error = rename::plan_rename(
@@ -850,7 +852,7 @@ fn conflicting_base_name_refuses_in_planning_without_changes() {
         assert_eq!(folio.internal(), row);
         assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), bytes);
         assert_eq!(fs.read(row.id, &row.to_placement().1).unwrap(), observation);
-        assert_eq!(folio.refs.list(Kind::Branch).unwrap(), branches);
+        assert_eq!(folio.refs.list(RefKind::Branch).unwrap(), branches);
         assert_eq!(
             folio.registry.references(row.id, "main").unwrap(),
             references
@@ -887,7 +889,7 @@ fn conflicting_base_name_on_retry_remains_unknown() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         row.commit_id
     );
@@ -911,7 +913,7 @@ fn destination_already_in_base_updates_registry_without_stage_or_commit() {
     assert_eq!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("main").unwrap())
+            .read(RefKind::Branch, &RefName::parse("main").unwrap())
             .unwrap(),
         before.commit_id
     );
@@ -971,7 +973,7 @@ fn install_committed_bytes(
         .refs
         .update(
             lock,
-            Kind::Branch,
+            RefKind::Branch,
             &RefName::parse("main").unwrap(),
             commit,
             Expect::Is(row.commit_id.unwrap()),
@@ -1038,7 +1040,7 @@ fn malformed_references_refuse_in_planning_without_changes_including_retries() {
             let fs = PlacementFs::new(&home.home);
             let before = std::fs::read(row.path.to_path_buf()).unwrap();
             let observation = fs.read(id, &row.to_placement().1).unwrap();
-            let branches = folio.refs.list(Kind::Branch).unwrap();
+            let branches = folio.refs.list(RefKind::Branch).unwrap();
             let references = folio.registry.references(id, "main").unwrap();
             let mut previous = None;
             for _ in 0..2 {
@@ -1074,7 +1076,7 @@ fn malformed_references_refuse_in_planning_without_changes_including_retries() {
                 assert_eq!(folio.internal(), row);
                 assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), before);
                 assert_eq!(fs.read(id, &row.to_placement().1).unwrap(), observation);
-                assert_eq!(folio.refs.list(Kind::Branch).unwrap(), branches);
+                assert_eq!(folio.refs.list(RefKind::Branch).unwrap(), branches);
                 assert_eq!(folio.registry.references(id, "main").unwrap(), references);
             }
         }
@@ -1155,7 +1157,7 @@ fn replacement_exceeding_internal_markdown_scan_bound_refuses_in_planning() {
         assert_eq!(
             folio
                 .refs
-                .read(Kind::Branch, &RefName::parse("main").unwrap())
+                .read(RefKind::Branch, &RefName::parse("main").unwrap())
                 .unwrap(),
             row.commit_id
         );

@@ -155,14 +155,14 @@ fn branch_sync_failure_leaves_cached_rows_untouched_and_harmless() {
                 .to_string()
                 .contains("injected directory sync failure")
         );
-        assert_eq!(refs.read(Kind::Branch, &topic).unwrap(), None);
+        assert_eq!(refs.read(RefKind::Branch, &topic).unwrap(), None);
         assert_eq!(registry.references(folio.id(), "topic").unwrap().len(), 1);
         registry
             .write(&lock, |tx| {
                 tx.remove_folio(target, &mut |parent, branch| {
                     assert_eq!(parent, folio.id());
                     Ok(refs
-                        .read(Kind::Branch, &RefName::parse(branch).unwrap())
+                        .read(RefKind::Branch, &RefName::parse(branch).unwrap())
                         .unwrap()
                         .is_some())
                 })

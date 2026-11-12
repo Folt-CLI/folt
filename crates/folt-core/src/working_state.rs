@@ -2,12 +2,14 @@ use crate::config::limits::SCAN_WINDOW;
 use crate::config::names::DEFAULT_BRANCH;
 use crate::config::names::MARKDOWN_EXTENSIONS;
 use crate::home::HomeLock;
-use crate::object::{ObjectId, ObjectKind};
+use crate::id::ObjectId;
+use crate::object::ObjectKind;
 use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps, StagedBlob};
 use crate::placement_rules::{
     Behind, PlacementFacts, Refusal, RefusalReason, RulesError, needs_hash,
 };
-use crate::refs::{Kind, RefName, RefStore};
+use crate::ref_name::{RefKind, RefName};
+use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry, RegistryError};
 use crate::store::ObjectStore;
 
@@ -45,7 +47,10 @@ pub fn gather(
     } else {
         None
     };
-    let tip = refs.read(Kind::Branch, &RefName::parse(&row.head)?)?;
+    let tip = refs.read(
+        RefKind::Branch,
+        &RefName::parse(&row.head).map_err(RefError::from)?,
+    )?;
     Ok(PlacementFacts {
         placement: row.clone(),
         observation,
@@ -227,7 +232,7 @@ fn write_stage(
         .transpose()
         .map_err(|error| RegistryError::References(error.to_string()))?;
     let live_branches = blob
-        .map(|(_, _, refs)| refs.list(Kind::Branch))
+        .map(|(_, _, refs)| refs.list(RefKind::Branch))
         .transpose()?;
     registry.write(lock, |tx| {
         if tx.placement_at(&row.path)?.as_ref() != Some(row) {

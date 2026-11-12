@@ -10,11 +10,11 @@ use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
 use crate::config::limits::BUSY_TIMEOUT;
 use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE, REGISTRY_FILE, RENAME_PENDING_PREFIX};
-use crate::folio_dir::FolioId;
 use crate::folio_name::FolioName;
 use crate::home::{Home, HomeLock, is_regular_file};
+use crate::id::FolioId;
+use crate::id::ObjectId;
 use crate::layout::{HOME_FORMAT_VERSION, LayoutVersion};
-use crate::object::ObjectId;
 pub use crate::placement::PlacementBase;
 use crate::placement::{PlacementKind, Signature, StagedBlob};
 
