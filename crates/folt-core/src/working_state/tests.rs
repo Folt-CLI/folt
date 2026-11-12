@@ -53,7 +53,7 @@ fn working_target_decision_table() {
             matches!(resolve_observed(&row, &observation, internal), Err(RulesError::Refused(ref refusal)) if refusal.reason == reason)
         );
     }
-    internal.id = crate::folio_dir::FolioId::from_bytes([2; 16]);
+    internal.id = crate::id::FolioId::from_bytes([2; 16]);
     assert!(
         matches!(resolve_observed(&row, &Observation::IntactLink, Some(internal)), Err(RulesError::Refused(ref refusal)) if refusal.reason == RefusalReason::MissingInternal)
     );

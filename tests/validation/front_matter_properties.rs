@@ -1,10 +1,10 @@
 use std::cell::Cell;
 
-use folt_core::folio_dir::FolioId;
 use folt_core::front_matter::{
     Block, Edit, FrontMatterError, Reference, apply_edit, locate, read_id, read_name,
     read_references, set_id, set_name, set_reference, set_references,
 };
+use folt_core::id::FolioId;
 use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestRunner};
 

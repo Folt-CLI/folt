@@ -7,9 +7,10 @@ use sha2::{Digest, Sha256};
 
 use crate::config::limits::{
     COMPRESSION_PROBE_MIN_SAVING_PERCENT, COMPRESSION_PROBE_MIN_SIZE, COMPRESSION_SAMPLE_SIZE,
-    COMPRESSION_SAMPLES, FRAME_SLACK, HEX_ID_LEN, MAX_ZSTD_WINDOW_LOG, ZSTD_LEVEL,
+    COMPRESSION_SAMPLES, FRAME_SLACK, MAX_ZSTD_WINDOW_LOG, ZSTD_LEVEL,
 };
 use crate::config::names::ANONYMOUS_AUTHOR;
+use crate::id::{InvalidObjectId, ObjectId};
 
 /// Minimum commit time in Unix seconds (year 0000).
 const COMMIT_TIME_MIN_SECONDS: i64 = -62_167_219_200;
@@ -37,53 +38,6 @@ const ALREADY_COMPRESSED_MAGIC: &[&[u8]] = &[
     b"GIF87a",
     b"GIF89a",
 ];
-
-/// The SHA-256 name of an object.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ObjectId([u8; 32]);
-
-impl ObjectId {
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        Self(bytes)
-    }
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
-
-impl fmt::Display for ObjectId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for byte in self.0 {
-            write!(f, "{byte:02x}")?;
-        }
-        Ok(())
-    }
-}
-
-impl FromStr for ObjectId {
-    type Err = ObjectError;
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value.len() != HEX_ID_LEN
-            || !value
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        {
-            return Err(ObjectError::InvalidHash);
-        }
-        let mut bytes = [0; 32];
-        for (index, chunk) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
-            let digit = |b: u8| {
-                if b.is_ascii_digit() {
-                    b - b'0'
-                } else {
-                    b - b'a' + 10
-                }
-            };
-            bytes[index] = digit(chunk[0]) * 16 + digit(chunk[1]);
-        }
-        Ok(Self(bytes))
-    }
-}
 
 /// The kind prefix in a canonical object encoding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -338,7 +292,7 @@ impl ObjectHasher {
         self.hasher.update(bytes);
     }
     pub fn finish(self) -> ObjectId {
-        ObjectId(self.hasher.finalize().into())
+        ObjectId::from_bytes(self.hasher.finalize().into())
     }
 }
 
@@ -752,7 +706,7 @@ pub struct Tag {
 
 impl Tag {
     pub fn encode_body(&self) -> Result<Vec<u8>, ObjectError> {
-        crate::refs::RefName::parse(&self.name).map_err(|_| ObjectError::InvalidObject)?;
+        crate::ref_name::RefName::parse(&self.name).map_err(|_| ObjectError::InvalidObject)?;
         validate_value(&self.message)?;
         Ok(format!(
             "target {}\nname {}\ntagger {}\ntime {}\nmessage {}\n",
@@ -843,3 +797,9 @@ impl Error for ObjectError {
 
 #[cfg(test)]
 mod tests;
+
+impl From<InvalidObjectId> for ObjectError {
+    fn from(_: InvalidObjectId) -> Self {
+        Self::InvalidHash
+    }
+}

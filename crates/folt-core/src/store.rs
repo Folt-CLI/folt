@@ -11,10 +11,9 @@ use crate::config::limits::{
 use crate::config::names::{BLOB_EXTENSION, BLOBS_DIR, TEMP_PREFIX_INPUT, TEMP_PREFIX_OBJECT};
 use crate::folio_dir::{self, FolioDir};
 use crate::home::{HomeLock, is_regular_file};
+use crate::id::ObjectId;
 use crate::layout::LayoutVersion;
-use crate::object::{
-    self, ObjectError, ObjectHasher, ObjectId, ObjectKind, ObjectReader, ObjectWriter,
-};
+use crate::object::{self, ObjectError, ObjectHasher, ObjectKind, ObjectReader, ObjectWriter};
 use crate::registry::FolioFormat;
 
 trait ReadSeek: Read + Seek {}

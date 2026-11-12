@@ -3,16 +3,16 @@ use std::fmt;
 use std::path::PathBuf;
 
 use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
-use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
-use crate::object::{
-    Author, Commit, CommitTime, ObjectError, ObjectId, ObjectKind, Tag, hash_blob,
-};
+use crate::id::FolioId;
+use crate::id::ObjectId;
+use crate::object::{Author, Commit, CommitTime, ObjectError, ObjectKind, Tag, hash_blob};
 use crate::placement::{
     Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
 };
 use crate::placement_rules::{self, MovePlan, MoveTarget, PlacementFacts, RulesError};
-use crate::refs::{Expect, Kind, RefError, RefName, RefStore};
+use crate::ref_name::{RefKind, RefName};
+use crate::refs::{Expect, RefError, RefStore};
 use crate::registry::{Placement, Registry, RegistryError};
 use crate::store::{ObjectStore, StoreError};
 use crate::working_state::{self, Edit};
@@ -252,9 +252,9 @@ pub fn apply_commit(
         objects.put_commit(lock, &commit)?
     };
     objects.sync_blobs()?;
-    let name = RefName::parse(&row.head)?;
+    let name = RefName::parse(&row.head).map_err(RefError::from)?;
     let expect = row.commit_id.map_or(Expect::Absent, Expect::Is);
-    match refs.update(lock, Kind::Branch, &name, id, expect) {
+    match refs.update(lock, RefKind::Branch, &name, id, expect) {
         Ok(()) => {}
         Err(RefError::Stale { actual }) => {
             facts.working.tip = actual;
@@ -347,7 +347,7 @@ pub fn create_branch(
     registry: &mut Registry,
     lock: &mut HomeLock,
 ) -> Result<(), HistoryError> {
-    if let Some(actual) = refs.read(Kind::Branch, name)? {
+    if let Some(actual) = refs.read(RefKind::Branch, name)? {
         return Err(crate::refs::RefError::Stale {
             actual: Some(actual),
         }
@@ -377,7 +377,7 @@ pub fn create_branch(
     if registry.placements_of_head(id, name.as_str())?.is_empty() {
         registry.write(lock, |tx| tx.delete_branch_references(id, name.as_str()))?;
     }
-    refs.update(lock, Kind::Branch, name, commit, Expect::Absent)?;
+    refs.update(lock, RefKind::Branch, name, commit, Expect::Absent)?;
     refs.sync_refs()?;
     Ok(())
 }
@@ -404,7 +404,7 @@ pub fn gather_reset(
         object_limit,
     } = *stores;
     let old = refs
-        .read(Kind::Branch, branch)?
+        .read(RefKind::Branch, branch)?
         .ok_or(Refusal::MissingBranch)?;
     let target = objects.get_commit(commit, object_limit)?;
     require_blob(objects, target.content)?;
@@ -485,7 +485,7 @@ pub fn apply_reset(
     objects.sync_blobs()?;
     refs.update(
         lock,
-        Kind::Branch,
+        RefKind::Branch,
         &facts.target.branch,
         facts.target.commit,
         Expect::Is(facts.old),
@@ -520,7 +520,7 @@ pub fn delete_branch(
     lock: &mut HomeLock,
 ) -> Result<(), HistoryError> {
     judge_delete_branch(&registry.placements_of_head(id, name.as_str())?)?;
-    refs.delete(lock, Kind::Branch, name, Expect::Is(old))?;
+    refs.delete(lock, RefKind::Branch, name, Expect::Is(old))?;
     refs.sync_refs()?;
     Ok(())
 }
@@ -540,7 +540,7 @@ pub fn create_tag(
         }
         tag.encode_body()?;
     }
-    if refs.read(Kind::Tag, name)?.is_some() {
+    if refs.read(RefKind::Tag, name)?.is_some() {
         return Err(Refusal::TagExists.into());
     }
     let actual = objects.kind_of(commit)?;
@@ -552,7 +552,7 @@ pub fn create_tag(
         None => commit,
     };
     objects.sync_blobs()?;
-    refs.update(lock, Kind::Tag, name, target, Expect::Absent)?;
+    refs.update(lock, RefKind::Tag, name, target, Expect::Absent)?;
     refs.sync_refs()?;
     Ok(target)
 }
@@ -563,7 +563,7 @@ pub fn delete_tag(
     refs: &RefStore,
     lock: &mut HomeLock,
 ) -> Result<(), HistoryError> {
-    refs.delete(lock, Kind::Tag, name, Expect::Is(old))?;
+    refs.delete(lock, RefKind::Tag, name, Expect::Is(old))?;
     refs.sync_refs()?;
     Ok(())
 }
@@ -584,7 +584,10 @@ fn gather_file(
         placement: row.clone(),
         observation,
         placement_hash,
-        tip: refs.read(Kind::Branch, &RefName::parse(&row.head)?)?,
+        tip: refs.read(
+            RefKind::Branch,
+            &RefName::parse(&row.head).map_err(RefError::from)?,
+        )?,
     })
 }
 

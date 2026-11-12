@@ -1,15 +1,15 @@
 use std::fs;
 
 use folt_core::config::limits::SCAN_LIMIT;
-use folt_core::folio_dir::FolioId;
 use folt_core::folio_name::FolioName;
 use folt_core::front_matter::{FrontMatterError, Reference};
 use folt_core::history;
+use folt_core::id::FolioId;
 use folt_core::object::{ObjectKind, ObjectWriter, hash_blob};
 use folt_core::placement::PlacementKind;
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_rules::RulesError;
-use folt_core::refs::{Kind, RefName};
+use folt_core::ref_name::{RefKind, RefName};
 use folt_core::register::{apply_register, plan_register};
 use folt_core::registry::{
     FolioRow, NewFolio, NewPlacement, Placement, PlacementPath, ReferenceRow, Registry,
@@ -534,7 +534,10 @@ fn deleting_branch_keeps_rows_until_dead_referrers_are_purged() {
         )
         .is_err()
     );
-    assert_eq!(folio.refs.read(Kind::Branch, &topic).unwrap(), Some(commit));
+    assert_eq!(
+        folio.refs.read(RefKind::Branch, &topic).unwrap(),
+        Some(commit)
+    );
     assert_eq!(
         folio
             .registry
@@ -549,7 +552,7 @@ fn deleting_branch_keeps_rows_until_dead_referrers_are_purged() {
                 assert_eq!(parent, folio.folio.id());
                 Ok(folio
                     .refs
-                    .read(Kind::Branch, &RefName::parse(branch).unwrap())
+                    .read(RefKind::Branch, &RefName::parse(branch).unwrap())
                     .unwrap()
                     .is_some())
             })
@@ -567,7 +570,7 @@ fn deleting_branch_keeps_rows_until_dead_referrers_are_purged() {
         &mut lock,
     )
     .unwrap();
-    assert_eq!(folio.refs.read(Kind::Branch, &topic).unwrap(), None);
+    assert_eq!(folio.refs.read(RefKind::Branch, &topic).unwrap(), None);
     assert_eq!(
         folio
             .registry
@@ -581,7 +584,7 @@ fn deleting_branch_keeps_rows_until_dead_referrers_are_purged() {
             tx.remove_folio(target, &mut |_, branch| {
                 Ok(folio
                     .refs
-                    .read(Kind::Branch, &RefName::parse(branch).unwrap())
+                    .read(RefKind::Branch, &RefName::parse(branch).unwrap())
                     .unwrap()
                     .is_some())
             })
@@ -1017,7 +1020,7 @@ fn placement_without_ref_keeps_referrer_live_and_dead_name_rows_are_purged() {
     assert!(
         folio
             .refs
-            .read(Kind::Branch, &RefName::parse("staged-only").unwrap())
+            .read(RefKind::Branch, &RefName::parse("staged-only").unwrap())
             .unwrap()
             .is_none()
     );
@@ -1269,7 +1272,7 @@ fn create_branch_keeps_staged_before_ref_edges_on_failure_and_success() {
             );
         }
         assert_eq!(folio.registry.references(parent, "topic").unwrap(), rows);
-        assert_eq!(folio.refs.read(Kind::Branch, &topic).unwrap(), None);
+        assert_eq!(folio.refs.read(RefKind::Branch, &topic).unwrap(), None);
         let error = folio
             .registry
             .write(&lock, |tx| tx.remove_folio(target, &mut |_, _| Ok(false)))
@@ -1287,7 +1290,10 @@ fn create_branch_keeps_staged_before_ref_edges_on_failure_and_success() {
         &mut lock,
     )
     .unwrap();
-    assert_eq!(folio.refs.read(Kind::Branch, &topic).unwrap(), Some(commit));
+    assert_eq!(
+        folio.refs.read(RefKind::Branch, &topic).unwrap(),
+        Some(commit)
+    );
     assert_eq!(folio.registry.references(parent, "topic").unwrap(), rows);
     assert!(
         folio

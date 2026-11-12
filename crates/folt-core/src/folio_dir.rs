@@ -6,50 +6,14 @@ use std::io::{self, Write};
 #[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use uuid::Uuid;
 
 use crate::config::formats::OBJECT_ALGORITHM;
 use crate::config::names::{
     BLOBS_DIR, CONTENT_FILE, FOLIOS_DIR, NEW_DIR, REFS_DIR, TEMP_PREFIX_COPY,
 };
+use crate::id::FolioId;
 use crate::layout::{FOLIO_LAYOUT_VERSION, LayoutSupport, LayoutVersion};
 use crate::registry::{FolioFormat, FolioRow};
-
-/// A canonical, randomly generated Folio identifier.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct FolioId(Uuid);
-
-impl FolioId {
-    /// Generates a version 4 identifier.
-    pub fn generate() -> Self {
-        Self(Uuid::new_v4())
-    }
-
-    /// Parses only the lowercase hyphenated representation.
-    pub fn parse(value: &str) -> Result<Self, FolioDirError> {
-        let id = Uuid::try_parse(value).map_err(|_| FolioDirError::InvalidId(value.into()))?;
-        if id.hyphenated().to_string() != value {
-            return Err(FolioDirError::InvalidId(value.into()));
-        }
-        Ok(Self(id))
-    }
-
-    /// Returns the 16 bytes used by the registry.
-    pub fn as_bytes(&self) -> &[u8; 16] {
-        self.0.as_bytes()
-    }
-
-    /// Constructs an identifier from registry bytes.
-    pub fn from_bytes(bytes: [u8; 16]) -> Self {
-        Self(Uuid::from_bytes(bytes))
-    }
-}
-
-impl fmt::Display for FolioId {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.hyphenated().fmt(formatter)
-    }
-}
 
 /// Content used to create a Folio directory.
 pub struct FolioSpec {
@@ -427,7 +391,6 @@ impl Error for FormatError {}
 /// Errors returned by Folio directory operations.
 #[derive(Debug)]
 pub enum FolioDirError {
-    InvalidId(String),
     AlreadyExists(PathBuf),
     InvalidDirectory(PathBuf),
     Newer {
@@ -442,7 +405,6 @@ pub enum FolioDirError {
 impl fmt::Display for FolioDirError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidId(value) => write!(f, "invalid Folio id: {value}"),
             Self::AlreadyExists(path) => write!(f, "Folio already exists: {}", path.display()),
             Self::InvalidDirectory(path) => {
                 write!(f, "invalid Folio directory: {}", path.display())

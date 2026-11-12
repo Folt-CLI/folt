@@ -3,110 +3,17 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::config::limits::{
-    HEX_ID_LEN, PIN_COMMIT_OFFSET, PIN_NAME_LEN, REF_FILE_MAX_BYTES, REF_NAME_MAX, UUID_TEXT_LEN,
-};
+use crate::config::limits::REF_FILE_MAX_BYTES;
 use crate::config::names::{HEADS_DIR, PINS_DIR, REFS_DIR, TAGS_DIR, TEMP_PREFIX_REF};
-use crate::folio_dir::{self, FolioDir, FolioId, FormatError};
+use crate::folio_dir::{self, FolioDir, FormatError};
 use crate::home::HomeLock;
-use crate::object::{ObjectId, ObjectKind};
+use crate::id::ObjectId;
+use crate::object::ObjectKind;
+use crate::ref_name::{LowerRefError, RefKind, RefName};
 use crate::registry::FolioFormat;
 use crate::store::{ObjectStore, StoreError};
-
-/// A portable ref name. Retention names are constructed with `pin_name`.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct RefName(String);
-
-impl RefName {
-    pub fn parse(value: &str) -> Result<Self, RefError> {
-        if value.is_empty()
-            || value.len() > REF_NAME_MAX
-            || value.contains("..")
-            || (value.len() == HEX_ID_LEN && value.bytes().all(|b| b.is_ascii_hexdigit()))
-            || !value
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-/".contains(&b))
-            || value.split('/').any(|part| {
-                part.is_empty()
-                    || part.starts_with(['.', '-'])
-                    || part.ends_with('.')
-                    || part.ends_with(".lock")
-                    || device_name(part)
-            })
-        {
-            return Err(RefError::InvalidName(value.into()));
-        }
-        Ok(Self(value.into()))
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-    pub fn pin_parts(&self) -> Result<(FolioId, ObjectId), RefError> {
-        parse_pin(&self.0)
-    }
-}
-impl FromStr for RefName {
-    type Err = RefError;
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::parse(value)
-    }
-}
-impl fmt::Display for RefName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-fn device_name(part: &str) -> bool {
-    let stem = part.split('.').next().unwrap_or(part);
-    matches!(stem, "con" | "prn" | "aux" | "nul")
-        || (stem.len() == 4
-            && (stem.starts_with("com") || stem.starts_with("lpt"))
-            && matches!(stem.as_bytes()[3], b'1'..=b'9'))
-}
-
-/// The fixed retention filename is 101 bytes, independently of the user name limit.
-pub fn pin_name(parent: FolioId, commit: ObjectId) -> RefName {
-    RefName(format!("{parent}-{commit}"))
-}
-/// Splits a canonical retention filename into its parent Folio and commit.
-pub fn parse_pin(value: &str) -> Result<(FolioId, ObjectId), RefError> {
-    if value.len() != PIN_NAME_LEN || value.as_bytes()[UUID_TEXT_LEN] != b'-' || !value.is_ascii() {
-        return Err(RefError::InvalidName(value.into()));
-    }
-    let parent =
-        FolioId::parse(&value[..UUID_TEXT_LEN]).map_err(|_| RefError::InvalidName(value.into()))?;
-    let commit = value[PIN_COMMIT_OFFSET..]
-        .parse()
-        .map_err(|_| RefError::InvalidName(value.into()))?;
-    Ok((parent, commit))
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Kind {
-    Branch,
-    Tag,
-    Pin,
-}
-impl Kind {
-    fn directory(self) -> &'static str {
-        match self {
-            Self::Branch => HEADS_DIR,
-            Self::Tag => TAGS_DIR,
-            Self::Pin => PINS_DIR,
-        }
-    }
-    fn name(self, value: &str) -> Result<RefName, RefError> {
-        if self == Self::Pin {
-            parse_pin(value)?;
-            Ok(RefName(value.into()))
-        } else {
-            RefName::parse(value)
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Expect {
@@ -141,7 +48,7 @@ impl RefStore {
             objects: ObjectStore::open(folio, format).map_err(RefError::Store)?,
         })
     }
-    fn path(&self, kind: Kind, name: &RefName) -> Result<PathBuf, RefError> {
+    fn path(&self, kind: RefKind, name: &RefName) -> Result<PathBuf, RefError> {
         kind.name(name.as_str())?;
         let mut path = self.root.clone();
         check_directory(&path)?;
@@ -167,22 +74,22 @@ impl RefStore {
         }
         Ok(path)
     }
-    pub fn read(&self, kind: Kind, name: &RefName) -> Result<Option<ObjectId>, RefError> {
+    pub fn read(&self, kind: RefKind, name: &RefName) -> Result<Option<ObjectId>, RefError> {
         let path = self.path(kind, name)?;
-        read_value(&path, kind, name)
+        Ok(read_value(&path, kind, name)?)
     }
     /// Updates a ref with exclusive access to the home lock guard.
     pub fn update(
         &self,
         _lock: &mut HomeLock,
-        kind: Kind,
+        kind: RefKind,
         name: &RefName,
         new: ObjectId,
         expect: Expect,
     ) -> Result<(), RefError> {
         let path = self.path(kind, name)?;
         expect.check(read_value(&path, kind, name)?)?;
-        if kind == Kind::Pin && name.pin_parts()?.1 != new {
+        if kind == RefKind::Pin && name.pin_parts()?.1 != new {
             return Err(RefError::InvalidRef(path));
         }
         let actual = self.objects.kind_of(new).map_err(|error| match error {
@@ -191,16 +98,16 @@ impl RefStore {
             }
             error => RefError::Store(error),
         })?;
-        if actual != ObjectKind::Commit && !(kind == Kind::Tag && actual == ObjectKind::Tag) {
+        if actual != ObjectKind::Commit && !(kind == RefKind::Tag && actual == ObjectKind::Tag) {
             return Err(RefError::WrongKind { id: new, actual });
         }
-        atomic_write(&path, format!("{new}\n").as_bytes())
+        Ok(atomic_write(&path, format!("{new}\n").as_bytes())?)
     }
     /// Deletes a ref with exclusive access to the home lock guard.
     pub fn delete(
         &self,
         _lock: &mut HomeLock,
-        kind: Kind,
+        kind: RefKind,
         name: &RefName,
         expect: Expect,
     ) -> Result<(), RefError> {
@@ -220,12 +127,12 @@ impl RefStore {
             match fs::remove_dir(path) {
                 Ok(()) => parent = path.parent(),
                 Err(e) if e.kind() == io::ErrorKind::DirectoryNotEmpty => break,
-                Err(source) => return Err(io_error(path, source)),
+                Err(source) => return Err(io_error(path, source).into()),
             }
         }
         Ok(())
     }
-    pub fn list(&self, kind: Kind) -> Result<Vec<(RefName, ObjectId)>, RefError> {
+    pub fn list(&self, kind: RefKind) -> Result<Vec<(RefName, ObjectId)>, RefError> {
         check_directory(&self.root)?;
         check_directory(&self.root.join(REFS_DIR))?;
         let base = self.root.join(REFS_DIR).join(kind.directory());
@@ -244,42 +151,42 @@ impl RefStore {
             if let Some(id) = read_value(path, kind, &name)? {
                 result.push((name, id));
             }
-            Ok(())
+            Ok::<(), RefError>(())
         })?;
         result.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(result)
     }
     /// Sync containing directories once after a batch.
     pub fn sync_refs(&self) -> Result<(), RefError> {
-        sync_directories(&self.root.join(REFS_DIR))
+        Ok(sync_directories(&self.root.join(REFS_DIR))?)
     }
     /// Removes abandoned ref staging files with exclusive access to the home lock guard.
     pub fn clean_temporary_files(&self, _lock: &mut HomeLock) -> Result<(), RefError> {
-        clean_directory(&self.root.join(REFS_DIR), true)
+        Ok(clean_directory(&self.root.join(REFS_DIR), true)?)
     }
 }
 
-fn metadata(path: &Path) -> Result<Option<fs::Metadata>, RefError> {
+fn metadata(path: &Path) -> Result<Option<fs::Metadata>, LowerRefError> {
     match fs::symlink_metadata(path) {
         Ok(meta) => Ok(Some(meta)),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(source) => Err(io_error(path, source)),
     }
 }
-fn check_directory(path: &Path) -> Result<(), RefError> {
+fn check_directory(path: &Path) -> Result<(), LowerRefError> {
     if let Some(meta) = metadata(path)?
         && !meta.file_type().is_dir()
     {
-        return Err(RefError::InvalidRef(path.into()));
+        return Err(LowerRefError::InvalidRef(path.into()));
     }
     Ok(())
 }
-fn read_bytes(path: &Path, limit: u64) -> Result<Option<Vec<u8>>, RefError> {
+fn read_bytes(path: &Path, limit: u64) -> Result<Option<Vec<u8>>, LowerRefError> {
     let Some(meta) = metadata(path)? else {
         return Ok(None);
     };
     if !meta.file_type().is_file() {
-        return Err(RefError::InvalidRef(path.into()));
+        return Err(LowerRefError::InvalidRef(path.into()));
     }
     let file = File::open(path).map_err(|source| io_error(path, source))?;
     let mut bytes = Vec::new();
@@ -287,11 +194,15 @@ fn read_bytes(path: &Path, limit: u64) -> Result<Option<Vec<u8>>, RefError> {
         .read_to_end(&mut bytes)
         .map_err(|source| io_error(path, source))?;
     if bytes.len() as u64 > limit {
-        return Err(RefError::InvalidRef(path.into()));
+        return Err(LowerRefError::InvalidRef(path.into()));
     }
     Ok(Some(bytes))
 }
-fn read_value(path: &Path, kind: Kind, name: &RefName) -> Result<Option<ObjectId>, RefError> {
+fn read_value(
+    path: &Path,
+    kind: RefKind,
+    name: &RefName,
+) -> Result<Option<ObjectId>, LowerRefError> {
     let Some(bytes) = read_bytes(path, REF_FILE_MAX_BYTES as u64)? else {
         return Ok(None);
     };
@@ -299,9 +210,9 @@ fn read_value(path: &Path, kind: Kind, name: &RefName) -> Result<Option<ObjectId
         .ok()
         .and_then(|text| text.strip_suffix('\n'))
         .and_then(|text| text.parse::<ObjectId>().ok())
-        .ok_or_else(|| RefError::InvalidRef(path.into()))?;
-    if kind == Kind::Pin && name.pin_parts()?.1 != id {
-        return Err(RefError::InvalidRef(path.into()));
+        .ok_or_else(|| LowerRefError::InvalidRef(path.into()))?;
+    if kind == RefKind::Pin && name.pin_parts()?.1 != id {
+        return Err(LowerRefError::InvalidRef(path.into()));
     }
     Ok(Some(id))
 }
@@ -317,11 +228,11 @@ fn temporary_name(name: &str) -> bool {
         && pid.bytes().all(|b| b.is_ascii_digit())
         && counter.bytes().all(|b| b.is_ascii_digit())
 }
-fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), RefError> {
+fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), LowerRefError> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let parent = path
         .parent()
-        .ok_or_else(|| RefError::InvalidRef(path.into()))?;
+        .ok_or_else(|| LowerRefError::InvalidRef(path.into()))?;
     fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
     let (temporary, mut file) = loop {
         let temporary = parent.join(format!(
@@ -351,7 +262,7 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), RefError> {
     }
     result
 }
-fn entries(path: &Path) -> Result<Vec<fs::DirEntry>, RefError> {
+fn entries(path: &Path) -> Result<Vec<fs::DirEntry>, LowerRefError> {
     check_directory(path)?;
     match fs::read_dir(path) {
         Ok(entries) => entries
@@ -361,10 +272,10 @@ fn entries(path: &Path) -> Result<Vec<fs::DirEntry>, RefError> {
         Err(source) => Err(io_error(path, source)),
     }
 }
-fn walk(
+fn walk<E: From<LowerRefError>>(
     path: &Path,
-    visit: &mut impl FnMut(&Path) -> Result<(), RefError>,
-) -> Result<(), RefError> {
+    visit: &mut impl FnMut(&Path) -> Result<(), E>,
+) -> Result<(), E> {
     for entry in entries(path)? {
         let path = entry.path();
         let ty = entry
@@ -377,12 +288,12 @@ fn walk(
         } else if ty.is_file() {
             visit(&path)?;
         } else {
-            return Err(RefError::InvalidRef(path));
+            return Err(LowerRefError::InvalidRef(path).into());
         }
     }
     Ok(())
 }
-fn clean_directory(path: &Path, recursive: bool) -> Result<(), RefError> {
+fn clean_directory(path: &Path, recursive: bool) -> Result<(), LowerRefError> {
     for entry in entries(path)? {
         let child = entry.path();
         let ty = entry
@@ -393,15 +304,15 @@ fn clean_directory(path: &Path, recursive: bool) -> Result<(), RefError> {
         } else if recursive && ty.is_dir() {
             clean_directory(&child, true)?;
         } else if recursive && !ty.is_file() {
-            return Err(RefError::InvalidRef(child));
+            return Err(LowerRefError::InvalidRef(child));
         }
     }
     Ok(())
 }
-fn sync_directory(path: &Path) -> Result<(), RefError> {
+fn sync_directory(path: &Path) -> Result<(), LowerRefError> {
     crate::fs::sync_directory(path).map_err(|source| io_error(path, source))
 }
-fn sync_directories(path: &Path) -> Result<(), RefError> {
+fn sync_directories(path: &Path) -> Result<(), LowerRefError> {
     for entry in entries(path)? {
         let child = entry.path();
         if entry
@@ -418,36 +329,36 @@ fn sync_directories(path: &Path) -> Result<(), RefError> {
     Ok(())
 }
 
-pub(crate) fn inspect_refs(root: &Path) -> Result<(), RefError> {
+pub(crate) fn inspect_refs(root: &Path) -> Result<(), LowerRefError> {
     let refs = root.join(REFS_DIR);
     for entry in entries(&refs)? {
         let path = entry.path();
         let kind = match entry.file_name().to_str() {
-            Some(HEADS_DIR) => Kind::Branch,
-            Some(TAGS_DIR) => Kind::Tag,
-            Some(PINS_DIR) => Kind::Pin,
-            _ => return Err(RefError::InvalidRef(path)),
+            Some(HEADS_DIR) => RefKind::Branch,
+            Some(TAGS_DIR) => RefKind::Tag,
+            Some(PINS_DIR) => RefKind::Pin,
+            _ => return Err(LowerRefError::InvalidRef(path)),
         };
         check_directory(&path)?;
         walk(&path, &mut |file| {
             let relative = file
                 .strip_prefix(&path)
-                .map_err(|_| RefError::InvalidRef(file.into()))?;
+                .map_err(|_| LowerRefError::InvalidRef(file.into()))?;
             let value = relative
                 .components()
                 .map(|part| part.as_os_str().to_str())
                 .collect::<Option<Vec<_>>>()
-                .ok_or_else(|| RefError::InvalidRef(file.into()))?
+                .ok_or_else(|| LowerRefError::InvalidRef(file.into()))?
                 .join("/");
             let name = kind.name(&value)?;
             read_value(file, kind, &name)?;
-            Ok(())
+            Ok::<(), LowerRefError>(())
         })?;
     }
     Ok(())
 }
-fn io_error(path: &Path, source: io::Error) -> RefError {
-    RefError::Io {
+fn io_error(path: &Path, source: io::Error) -> LowerRefError {
+    LowerRefError::Io {
         path: path.into(),
         source,
     }
@@ -493,3 +404,14 @@ impl Error for RefError {
 
 #[cfg(test)]
 mod tests;
+
+impl From<LowerRefError> for RefError {
+    fn from(error: LowerRefError) -> Self {
+        match error {
+            LowerRefError::InvalidName(name) => Self::InvalidName(name),
+            LowerRefError::InvalidRef(path) => Self::InvalidRef(path),
+            LowerRefError::Conflict { existing } => Self::Conflict { existing },
+            LowerRefError::Io { path, source } => Self::Io { path, source },
+        }
+    }
+}

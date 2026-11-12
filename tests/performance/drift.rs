@@ -1,7 +1,7 @@
 use std::{fs, hint::black_box};
 
 use criterion::{BenchmarkId, Criterion};
-use folt_core::folio_dir::FolioId;
+use folt_core::id::FolioId;
 use folt_core::object::hash_blob;
 use folt_core::placement::{
     self, Observation, Placement, PlacementBase, PlacementKind, PlacementOps,

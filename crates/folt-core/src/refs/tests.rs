@@ -1,52 +1,76 @@
 use super::*;
 
 #[test]
-fn accepts_portable_names() {
-    for name in ["main", "feature/one", "v1.2", "a_b-c", "0", "com0", "lpt10"] {
-        assert_eq!(RefName::parse(name).unwrap().as_str(), name);
+fn lower_ref_error_converts_variant_for_variant() {
+    let errors = [
+        LowerRefError::InvalidName("bad name".into()),
+        LowerRefError::InvalidRef(PathBuf::from("invalid")),
+        LowerRefError::Conflict {
+            existing: PathBuf::from("existing"),
+        },
+        LowerRefError::Io {
+            path: PathBuf::from("io"),
+            source: io::Error::new(io::ErrorKind::PermissionDenied, "denied"),
+        },
+    ];
+    for lower in errors {
+        let text = lower.to_string();
+        // Compare all fields before moving the lower error into its conversion.
+        let expected = match &lower {
+            LowerRefError::InvalidName(name) => (0, name.clone(), None),
+            LowerRefError::InvalidRef(path) => (1, path.to_str().unwrap().into(), None),
+            LowerRefError::Conflict { existing } => (2, existing.to_str().unwrap().into(), None),
+            LowerRefError::Io { path, source } => (
+                3,
+                path.to_str().unwrap().into(),
+                Some((source.kind(), source.to_string())),
+            ),
+        };
+        let upper = RefError::from(lower);
+        assert_eq!(upper.to_string(), text);
+        match upper {
+            RefError::InvalidName(name) => assert_eq!(expected, (0, name, None)),
+            RefError::InvalidRef(path) => {
+                assert_eq!(expected, (1, path.to_str().unwrap().into(), None))
+            }
+            RefError::Conflict { existing } => {
+                assert_eq!(expected, (2, existing.to_str().unwrap().into(), None))
+            }
+            RefError::Io { path, source } => assert_eq!(
+                expected,
+                (
+                    3,
+                    path.to_str().unwrap().into(),
+                    Some((source.kind(), source.to_string()))
+                )
+            ),
+            error => panic!("unexpected converted variant: {error:?}"),
+        }
     }
 }
 
 #[test]
-fn refuses_invalid_grammar() {
-    for name in [
-        "", "Main", "a b", "a..b", "/a", "a/", "a//b", ".a", "-a", "a.", "a.lock", "a/.b", "é",
-        "a\\b",
-    ] {
-        assert!(RefName::parse(name).is_err(), "{name:?}");
-    }
-}
-
-#[test]
-fn refuses_device_names_in_any_component() {
-    for name in [
-        "con", "prn.txt", "aux", "nul", "com1", "com9.txt", "lpt1", "x/lpt9",
-    ] {
-        assert!(RefName::parse(name).is_err(), "{name}");
-    }
-}
-
-#[test]
-fn refuses_only_exactly_64_hex_digits() {
-    assert!(RefName::parse(&"a".repeat(64)).is_err());
-    for name in ["a".repeat(63), "a".repeat(65), "z".repeat(64)] {
-        assert!(RefName::parse(&name).is_ok());
-    }
-}
-
-#[test]
-fn enforces_100_byte_limit() {
-    assert!(RefName::parse(&"x".repeat(100)).is_ok());
-    assert!(RefName::parse(&"x".repeat(101)).is_err());
-}
-
-#[test]
-fn pin_names_round_trip_outside_user_grammar() {
-    let parent = FolioId::from_bytes([1; 16]);
-    let commit = crate::object::hash_blob(b"pin");
-    let name = pin_name(parent, commit);
-    assert_eq!(name.as_str().len(), 101);
-    assert_eq!(name.pin_parts().unwrap(), (parent, commit));
-    assert!(RefName::parse(name.as_str()).is_err());
-    assert!(parse_pin("main").is_err());
+fn ref_error_keeps_the_upper_variants() {
+    let id = ObjectId::from_bytes([1; 32]);
+    let stale = RefError::Stale { actual: Some(id) };
+    assert!(matches!(stale, RefError::Stale { actual: Some(actual) } if actual == id));
+    assert_eq!(
+        stale.to_string(),
+        format!("stale ref; actual value: {:?}", Some(id))
+    );
+    let missing = RefError::MissingTarget(id);
+    assert!(matches!(missing, RefError::MissingTarget(actual) if actual == id));
+    assert_eq!(missing.to_string(), format!("missing ref target: {id}"));
+    let wrong = RefError::WrongKind {
+        id,
+        actual: ObjectKind::Blob,
+    };
+    assert!(matches!(
+        wrong,
+        RefError::WrongKind {
+            actual: ObjectKind::Blob,
+            ..
+        }
+    ));
+    assert_eq!(wrong.to_string(), format!("invalid ref target {id}: Blob"));
 }

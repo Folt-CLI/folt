@@ -110,7 +110,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Storage and identity
 - **Definition:** The identity assigned to a Folio, generated as a random version 4 UUID and displayed in lowercase hyphenated form. It names the Folio directory in the home.
-- **Code:** `crates/folt-core/src/folio_dir.rs:20` (`FolioId`); `crates/folt-core/src/placement_fs.rs:20` (`internal_path`)
+- **Code:** `crates/folt-core/src/id/folio.rs:7` (`FolioId`); `crates/folt-core/src/placement_fs.rs:21` (`internal_path`)
 - **Related:** [Folio](#folio), [folio-name](#folio-name), [owned key](#owned-key).
 - **Not:** A content hash or a readable name; `folio-id` is an owned front matter key that Folt does not write today.
 - **Status:** decided
@@ -137,7 +137,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Storage and identity
 - **Definition:** The directory `<home>/folios/<Folio id>/` that holds one Folio’s `folio.main`, `blobs/` and `refs/`. Its identity and layout information are read from the registry.
-- **Code:** `crates/folt-core/src/folio_dir.rs:71` (`FolioDir`)
+- **Code:** `crates/folt-core/src/folio_dir.rs:35` (`FolioDir`)
 - **Related:** [home](#home), [Folio id](#folio-id), [object store](#object-store), [internal row](#internal-row).
 - **Not:** A directory Folio in the user’s files.
 - **Status:** decided
@@ -166,7 +166,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** An immutable blob, commit or tag with an id computed from the SHA-256 of its canonical encoding. The object kind is part of that encoding.
-- **Code:** `crates/folt-core/src/object.rs:43` (`ObjectId`); `crates/folt-core/src/object.rs:90` (`ObjectKind`)
+- **Code:** `crates/folt-core/src/id/object.rs:7` (`ObjectId`); `crates/folt-core/src/object.rs:44` (`ObjectKind`)
 - **Related:** [object store](#object-store), [blob](#blob), [commit](#commit), [tag](#tag).
 - **Not:** A Folio id, mutable working file or ref file; object kind means the object kind enum, not a placement or ref kind.
 - **Status:** decided
@@ -175,7 +175,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** An object whose body is the exact captured content bytes. Staging stores working content as a blob for a later commit.
-- **Code:** `crates/folt-core/src/object.rs:91` (`Blob`); `crates/folt-core/src/working_state.rs:94` (`stage`)
+- **Code:** `crates/folt-core/src/object.rs:45` (`Blob`); `crates/folt-core/src/working_state.rs:94` (`stage`)
 - **Related:** [object](#object), [stage](#stage), [commit](#commit).
 - **Not:** Every file ending in `.blob`: commit and tag objects use that extension too.
 - **Status:** decided
@@ -184,7 +184,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** An immutable history object recording a required content blob id, parents, author, time, message, optional body and optional group. The commit operation publishes the object, advances the branch ref and updates the affected working state.
-- **Code:** `crates/folt-core/src/object.rs:659` (`Commit`); `crates/folt-core/src/history.rs:191` (`apply_commit`)
+- **Code:** `crates/folt-core/src/object.rs:613` (`Commit`); `crates/folt-core/src/history.rs:191` (`apply_commit`)
 - **Related:** [blob](#blob), [branch](#branch), [stage](#stage), [tip](#tip).
 - **Not:** A Git commit of this repository or a placement’s recorded starting commit id.
 - **Status:** decided
@@ -193,7 +193,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** A portable name for a history ref. Branch and tag names are validated by `RefName::parse`; retention pin names are constructed separately by `pin_name` from the reference parent’s Folio id and the commit id.
-- **Code:** `crates/folt-core/src/refs.rs:21` (`RefName`); `crates/folt-core/src/refs.rs:71` (`pin_name`)
+- **Code:** `crates/folt-core/src/ref_name/name.rs:12` (`RefName`); `crates/folt-core/src/ref_name/name.rs:62` (`pin_name`)
 - **Related:** [branch](#branch), [tag](#tag), [pin (retention ref)](#pin-retention-ref), [Folio id](#folio-id).
 - **Not:** A folio-name, declared reference alias or object id.
 - **Status:** decided
@@ -202,7 +202,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** A named ref under `refs/heads/` pointing to a commit of one Folio. The fixed default branch is `main`, and a placement’s `head` stores the branch name it follows.
-- **Code:** `crates/folt-core/src/refs.rs:88` (`Kind`); `crates/folt-core/src/config/names.rs:76` (`DEFAULT_BRANCH`)
+- **Code:** `crates/folt-core/src/ref_name/kind.rs:6` (`RefKind`); `crates/folt-core/src/config/names.rs:76` (`DEFAULT_BRANCH`)
 - **Related:** [commit](#commit), [tip](#tip), [placement](#placement), [checkout](#checkout).
 - **Not:** The working file `folio.main` or a Git branch of this repository; ref kind means the ref kind enum, not the object or placement kind enums.
 - **Status:** decided
@@ -211,7 +211,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** A named ref under `refs/tags/` that can point to a commit directly or to a tag object carrying a target, name, tagger, time and message.
-- **Code:** `crates/folt-core/src/refs.rs:88` (`Kind`); `crates/folt-core/src/object.rs:745` (`Tag`)
+- **Code:** `crates/folt-core/src/ref_name/kind.rs:6` (`RefKind`); `crates/folt-core/src/object.rs:699` (`Tag`)
 - **Related:** [branch](#branch), [commit](#commit), [object](#object).
 - **Not:** A branch that advances with commits or a pin reference field.
 - **Status:** decided
@@ -220,7 +220,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** History
 - **Definition:** A ref under `refs/pins/` that retains a commit in the child Folio’s history. Its name combines the referring parent’s Folio id and the commit id.
-- **Code:** `crates/folt-core/src/refs.rs:71` (`pin_name`); `crates/folt-core/src/refs.rs:88` (`Kind`)
+- **Code:** `crates/folt-core/src/ref_name/name.rs:62` (`pin_name`); `crates/folt-core/src/ref_name/kind.rs:6` (`RefKind`)
 - **Related:** [commit](#commit), [pin (reference field)](#pin-reference-field), [reference](#reference).
 - **Not:** The optional text field of a declared reference.
 - **Status:** decided
@@ -505,7 +505,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 - **Layer:** Operations
 - **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:136` (`build_and_publish`); `crates/folt-core/src/placement_fs.rs:571` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:116` (`copy_content`)
+- **Code:** `crates/folt-core/src/folio_dir.rs:100` (`build_and_publish`); `crates/folt-core/src/placement_fs.rs:571` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:116` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
@@ -725,7 +725,7 @@ Bojan-Ivanovski/folt in the findings. Type renames belong to
 | base | Placement hash and signature; merge base; PR base branch; name prefix before a suffix | Base means placement content and signature; qualify merge base, PR base branch and name prefix. |
 | home | Folt home; OS home; former home after a move; retired workspace marker | Home means the Folt storage directory; qualify OS home and former home. Portability, restore and multi-user rules are open: [#17](https://github.com/Folt-CLI/folt/issues/17). |
 | Folio directory and directory Folio | Storage directory in the home; registered user directory | Folio directory means storage; directory Folio means the user directory anchored at a marker. |
-| placement and same-named types | Registry and in-memory Placement; working-state and front-matter Edit; history Refusal and placement Refusal/RefusalReason and registration RefusalReason; ref Kind, ObjectKind and PlacementKind | Placement means the registry row; qualify the in-memory type. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types and kind enums require module or domain qualification; renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
+| placement and same-named types | Registry and in-memory Placement; working-state and front-matter Edit; history Refusal and placement Refusal/RefusalReason and registration RefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; qualify the in-memory type. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types and kind enums require module or domain qualification; renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
 | ref, refs, reference, edge, pin | History pointers; registry reference rows; declared relationships; informal edge; retention pin; reference pin field | Reference is the declared relationship, with edge an informal synonym. Distinguish the refs table from history refs and retention pins from opaque reference pin fields; [#152](https://github.com/Folt-CLI/folt/issues/152) implements commit-hash pins. |
 | unresolved | Unknown reference target; undecodable front matter key | Use unresolved reference for the cached unknown target, and unresolved key for parser ambiguity. |
 | marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; planned conflict markers; build-skip marker | Marker means `__folio__.md`; qualify codec, conflict and build-skip markers. Workspace and home format markers are retired below. |

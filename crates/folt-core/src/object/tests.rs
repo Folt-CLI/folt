@@ -142,3 +142,10 @@ fn utc_time_text_is_canonical() {
         assert_eq!(text.parse::<CommitTime>().unwrap(), time);
     }
 }
+
+#[test]
+fn invalid_object_id_converts_to_invalid_hash() {
+    let error = ObjectError::from(InvalidObjectId);
+    assert!(matches!(error, ObjectError::InvalidHash));
+    assert_eq!(error.to_string(), InvalidObjectId.to_string());
+}

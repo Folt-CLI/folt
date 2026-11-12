@@ -4,7 +4,8 @@ use std::fmt;
 use crate::home::HomeLock;
 use crate::placement::PlacementOps;
 use crate::placement_rules::{self, MoveTarget, RulesError};
-use crate::refs::{Kind, RefError, RefName, RefStore};
+use crate::ref_name::{RefKind, RefName};
+use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry};
 use crate::store::{ObjectStore, StoreError};
 
@@ -24,7 +25,7 @@ pub fn resolve(
     object_limit: u64,
 ) -> Result<MoveTarget, CheckoutError> {
     let commit = refs
-        .read(Kind::Branch, branch)?
+        .read(RefKind::Branch, branch)?
         .ok_or_else(|| CheckoutError::MissingBranch(branch.clone()))?;
     let content = objects.get_commit(commit, object_limit)?.content;
     Ok(MoveTarget {

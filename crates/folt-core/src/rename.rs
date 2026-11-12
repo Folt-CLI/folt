@@ -9,12 +9,13 @@ use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::folio_dir::FolioId;
 use crate::folio_name::FolioName;
 use crate::front_matter::{self, FrontMatterError};
 use crate::history::{self, CommitMetadata, HistoryError, HistoryStores};
 use crate::home::HomeLock;
-use crate::object::{Commit, ObjectError, ObjectId, ObjectKind, hash_blob};
+use crate::id::FolioId;
+use crate::id::ObjectId;
+use crate::object::{Commit, ObjectError, ObjectKind, hash_blob};
 use crate::placement::{Observation, PlacementOps, Signature};
 use crate::placement_fs::{PlacementFs, atomic_rewrite};
 use crate::placement_rules::RulesError;

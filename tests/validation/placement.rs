@@ -87,20 +87,22 @@ mod conversion {
     use super::*;
     use folt_core::checkout::{self, CheckoutStores};
     use folt_core::home::HomeLock;
-    use folt_core::object::{ObjectId, hash_blob};
+    use folt_core::id::ObjectId;
+    use folt_core::object::hash_blob;
     use folt_core::placement::{PlacementError, PlacementKind, StagedBlob};
     use folt_core::placement_rules::{self, ConvertPlan, RefusalReason, RulesError};
-    use folt_core::refs::RefName;
+    use folt_core::ref_name::RefName;
     use folt_core::registry::Placement;
 
     fn initial_main(folio: &mut TestFolio, lock: &mut HomeLock) -> ObjectId {
-        use folt_core::refs::{Expect, Kind};
+        use folt_core::ref_name::RefKind;
+        use folt_core::refs::Expect;
         let commit = folio.commit_object(lock, b"initial");
         folio
             .refs
             .update(
                 lock,
-                Kind::Branch,
+                RefKind::Branch,
                 &RefName::parse("main").unwrap(),
                 commit,
                 Expect::Absent,

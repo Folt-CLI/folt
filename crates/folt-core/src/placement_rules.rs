@@ -6,12 +6,13 @@ use std::fmt;
 use std::path::PathBuf;
 
 use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
-use crate::folio_dir::FolioId;
 use crate::home::HomeLock;
-use crate::object::ObjectId;
+use crate::id::FolioId;
+use crate::id::ObjectId;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_fs::resolved_path;
-use crate::refs::{Kind, RefError, RefName, RefStore};
+use crate::ref_name::{RefKind, RefName};
+use crate::refs::{RefError, RefStore};
 use crate::registry::{self, Registry, RegistryError};
 use crate::store::ObjectStore;
 
@@ -53,13 +54,13 @@ pub fn gather<R: Borrow<RefStore>>(
         let tip = if let Some(tip) = tips.get(&key) {
             *tip
         } else {
-            let name = RefName::parse(&row.head)?;
+            let name = RefName::parse(&row.head).map_err(RefError::from)?;
             let refs = match stores.entry(id) {
                 std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::hash_map::Entry::Vacant(entry) => entry.insert(open_refs(id)?),
             };
             let refs: &RefStore = (*refs).borrow();
-            let tip = refs.read(Kind::Branch, &name)?;
+            let tip = refs.read(RefKind::Branch, &name)?;
             tips.insert(key, tip);
             tip
         };

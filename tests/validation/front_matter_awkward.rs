@@ -1,9 +1,9 @@
 use folt_core::config::limits::SCAN_LIMIT;
-use folt_core::folio_dir::FolioId;
 use folt_core::front_matter::{
     Block, Edit, FrontMatterError, Reference, apply_edit, locate, read_id, read_name,
     read_references, set_id, set_name, set_reference, set_references,
 };
+use folt_core::id::FolioId;
 
 const ID: &str = "12345678-1234-4234-8234-123456789abc";
 const NEW_ID: &str = "12345678-1234-4234-8234-123456789abd";

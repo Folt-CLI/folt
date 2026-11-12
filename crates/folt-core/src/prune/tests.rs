@@ -92,7 +92,7 @@ fn stage_reachability_accounts_for_twins_and_other_folios() {
     for (keep_twin, other_folio, expected) in [(false, false, 1), (true, false, 0), (true, true, 1)]
     {
         if other_folio {
-            twin.id = crate::folio_dir::FolioId::from_bytes([9; 16]);
+            twin.id = crate::id::FolioId::from_bytes([9; 16]);
         }
         let mut all = vec![input.row.clone()];
         if keep_twin {

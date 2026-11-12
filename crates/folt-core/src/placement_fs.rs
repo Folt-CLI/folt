@@ -7,9 +7,10 @@ use crate::config::limits::STREAM_BUFFER_SIZE;
 use crate::config::names::{
     CONTENT_FILE, FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE, TEMP_TAG_NAME,
 };
-use crate::folio_dir::FolioId;
 use crate::home::Home;
-use crate::object::{ObjectHasher, ObjectId, ObjectKind};
+use crate::id::FolioId;
+use crate::id::ObjectId;
+use crate::object::{ObjectHasher, ObjectKind};
 use crate::placement::{
     Observation, Placement, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
     Written,

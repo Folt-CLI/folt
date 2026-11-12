@@ -1,4 +1,4 @@
-use crate::object::ObjectId;
+use crate::id::ObjectId;
 use crate::store::{ObjectStore, StoreError};
 use std::error::Error;
 use std::fmt;
@@ -146,12 +146,12 @@ pub fn classify(
     }
 }
 
-/// Kind-specific placement operations. Implementations perform filesystem work.
+/// PlacementKind-specific placement operations. Implementations perform filesystem work.
 pub trait PlacementOps {
     /// Creates a placement; copies read the supplied commit content blob.
     fn create(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
         objects: &ObjectStore,
         content: ObjectId,
@@ -160,7 +160,7 @@ pub trait PlacementOps {
     /// Reads facts about a placement path.
     fn read(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
     ) -> Result<Observation, PlacementError>;
 
@@ -168,7 +168,7 @@ pub trait PlacementOps {
     /// When supplied, copies recheck the expected observation before replacement.
     fn refresh(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
         objects: &ObjectStore,
         content: ObjectId,
@@ -181,7 +181,7 @@ pub trait PlacementOps {
     /// Replaces an existing entry with the requested kind after rechecking its facts.
     fn convert(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
         to_kind: PlacementKind,
         objects: &ObjectStore,
@@ -193,14 +193,14 @@ pub trait PlacementOps {
     /// Absolute links and entries that are not intact links are left untouched.
     fn normalize_link(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
     ) -> Result<(), PlacementError>;
 
     /// Moves an entry without replacing an existing destination.
     fn relocate(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
         to: &std::path::Path,
         expected: &Observation,
@@ -209,7 +209,7 @@ pub trait PlacementOps {
     /// Removes an entry after rechecking its observation.
     fn unlink(
         &self,
-        id: crate::folio_dir::FolioId,
+        id: crate::id::FolioId,
         placement: &Placement,
         expected: &Observation,
     ) -> Result<(), PlacementError>;

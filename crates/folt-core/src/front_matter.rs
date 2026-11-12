@@ -11,7 +11,7 @@ use std::ops::Range;
 
 use crate::config::limits::{SCAN_LIMIT, SCAN_WINDOW};
 use crate::config::names::{OWNED, OWNED_ID, OWNED_NAME, OWNED_REFERENCES};
-use crate::folio_dir::FolioId;
+use crate::id::FolioId;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FrontMatterError {
