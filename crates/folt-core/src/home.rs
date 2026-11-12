@@ -8,10 +8,12 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, SQLITE_HEADER};
 use crate::config::names::{HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR};
+use crate::config::settings::{FileSettings, Settings, SettingsError};
 use crate::layout::{HOME_FORMAT_VERSION, LayoutSupport, LayoutVersion};
 use crate::registry::{Registry, RegistryError};
 
@@ -27,6 +29,8 @@ pub mod config_file;
 pub struct Home {
     path: PathBuf,
     warnings: Vec<HomeWarning>,
+    environment: Environment,
+    busy_timeout: Duration,
 }
 
 impl Home {
@@ -42,7 +46,8 @@ impl Home {
     /// Opens or creates a home directory and validates its contents and format.
     ///
     /// Concurrent first runs are not serialised until the home lock exists.
-    pub fn open_or_create(path: PathBuf) -> Result<Self, HomeError> {
+    pub fn open_or_create(path: PathBuf, environment: &Environment) -> Result<Self, HomeError> {
+        let settings = Settings::resolve(environment, FileSettings::default())?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|source| HomeError::CannotCreate {
                 path: parent.to_path_buf(),
@@ -62,6 +67,8 @@ impl Home {
 
         recognize_home(&path)?;
         let home = Self {
+            environment: environment.clone(),
+            busy_timeout: settings.busy_timeout,
             warnings: home_warnings(&path)?,
             path: path.clone(),
         };
@@ -94,6 +101,14 @@ impl Home {
         }
 
         Ok(home)
+    }
+
+    pub(crate) fn environment(&self) -> &Environment {
+        &self.environment
+    }
+
+    pub(crate) fn busy_timeout(&self) -> Duration {
+        self.busy_timeout
     }
 
     /// Returns the home directory path.
@@ -458,6 +473,7 @@ fn has_folt_application_id(path: &Path) -> bool {
 pub enum HomeError {
     NoHomeDirectory,
     InvalidFoltHome(OsString),
+    InvalidSettings(SettingsError),
     CannotCreate {
         path: PathBuf,
         source: io::Error,
@@ -530,6 +546,7 @@ impl fmt::Display for HomeError {
                 formatter,
                 "could not determine the home directory; set FOLT_HOME"
             ),
+            Self::InvalidSettings(source) => fmt::Display::fmt(source, formatter),
             Self::InvalidFoltHome(value) => {
                 write!(formatter, "FOLT_HOME must be an absolute path: {value:?}")
             }
@@ -606,8 +623,15 @@ impl Error for HomeError {
             | Self::WriteFailed { source, .. }
             | Self::LockIo { source, .. } => Some(source),
             Self::Registry(source) => Some(source),
+            Self::InvalidSettings(source) => Some(source),
             _ => None,
         }
+    }
+}
+
+impl From<SettingsError> for HomeError {
+    fn from(error: SettingsError) -> Self {
+        Self::InvalidSettings(error)
     }
 }
 

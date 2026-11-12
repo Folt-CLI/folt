@@ -8,7 +8,6 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction};
 
 use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
-use crate::config::limits::BUSY_TIMEOUT;
 use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE, REGISTRY_FILE, RENAME_PENDING_PREFIX};
 use crate::folio_dir::FolioId;
 use crate::folio_name::FolioName;
@@ -17,6 +16,7 @@ use crate::layout::{HOME_FORMAT_VERSION, LayoutVersion};
 use crate::object::ObjectId;
 pub use crate::placement::PlacementBase;
 use crate::placement::{PlacementKind, Signature, StagedBlob};
+use std::time::Duration;
 
 /// SQLite unique constraint extended result code (dimensionless).
 const SQLITE_CONSTRAINT_UNIQUE: i32 = 2067;
@@ -234,7 +234,7 @@ impl Registry {
             Err(source) => return Err(RegistryError::Io(source)),
         }
         let connection = Connection::open(&path)?;
-        configure(&connection, true)?;
+        configure(&connection, true, home.busy_timeout())?;
         let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
         let app: i64 = connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
         if version > SCHEMA_VERSION {
@@ -288,7 +288,7 @@ impl Registry {
             Ok(true) => {
                 let connection =
                     Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-                configure(&connection, false)?;
+                configure(&connection, false, home.busy_timeout())?;
                 check_schema(&connection, &path)?;
                 Some(connection)
             }
@@ -1048,8 +1048,12 @@ fn query_folio_name(
         .transpose()
 }
 
-fn configure(connection: &Connection, writer: bool) -> Result<(), RegistryError> {
-    connection.busy_timeout(BUSY_TIMEOUT)?;
+fn configure(
+    connection: &Connection,
+    writer: bool,
+    busy_timeout: Duration,
+) -> Result<(), RegistryError> {
+    connection.busy_timeout(busy_timeout)?;
     connection.pragma_update(None, "foreign_keys", "ON")?;
     connection.pragma_update(None, "synchronous", "FULL")?;
     if writer {

@@ -1,4 +1,5 @@
 //! Unique temporary directories and Folt homes, removed on drop.
+use crate::config::env::Environment;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -50,7 +51,7 @@ impl TempHome {
     pub(crate) fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let directory = TempDir::new()?;
         let root = directory.path().to_path_buf();
-        let home = Home::open_or_create(root.join("home"))?;
+        let home = Home::open_or_create(root.join("home"), &Environment::default())?;
         Ok(Self {
             root,
             home,

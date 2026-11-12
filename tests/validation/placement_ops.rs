@@ -1,3 +1,4 @@
+use folt_core::config::env::Environment;
 use folt_core::object::hash_blob;
 #[cfg(unix)]
 use folt_core::placement::PlacementKind;
@@ -18,7 +19,9 @@ fn placement_home() -> TempHome {
         let mut home = home;
         let alias = home.root().join("alias");
         std::os::unix::fs::symlink(std::fs::canonicalize(home.root()).unwrap(), &alias).unwrap();
-        home.home = folt_core::home::Home::open_or_create(alias.join("home")).unwrap();
+        home.home =
+            folt_core::home::Home::open_or_create(alias.join("home"), &Environment::default())
+                .unwrap();
         home
     };
     home
@@ -658,7 +661,7 @@ fn rehome_after_renaming_and_reopening_the_home() {
     drop(lock);
     let new_path = home.root().join("moved-home");
     std::fs::rename(home.path(), &new_path).unwrap();
-    let moved_home = Home::open_or_create(new_path).unwrap();
+    let moved_home = Home::open_or_create(new_path, &Environment::default()).unwrap();
     let lock = moved_home.try_lock().unwrap();
     let mut registry = Registry::open_or_create(&moved_home, &lock).unwrap();
     let row = registry.folio_row(copy.id).unwrap().unwrap();
@@ -710,7 +713,7 @@ fn rehome_repairs_relative_links_after_renaming_the_home() {
 
     let new_path = home.root().join("moved-home");
     std::fs::rename(home.path(), &new_path).unwrap();
-    let moved_home = Home::open_or_create(new_path).unwrap();
+    let moved_home = Home::open_or_create(new_path, &Environment::default()).unwrap();
     let lock = moved_home.try_lock().unwrap();
     let mut registry = Registry::open_or_create(&moved_home, &lock).unwrap();
     let row = registry.folio_row(link.id).unwrap().unwrap();

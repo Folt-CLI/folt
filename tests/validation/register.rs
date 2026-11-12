@@ -1,3 +1,4 @@
+use folt_core::config::env::Environment;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -337,7 +338,7 @@ fn refusals_stop_the_entire_batch_without_creating_markers_or_registry() {
 fn configuration_confirmation_and_changed_files_are_rechecked() {
     let home = TempHome::new();
     assert_eq!(
-        Settings::load(&home.home).unwrap().large_file_bytes(),
+        Settings::load(&home.home).unwrap().large_file_bytes,
         DEFAULT_LARGE_FILE_BYTES
     );
     fs::write(home.path().join("config.toml"), "large_file_bytes = 4\n").unwrap();
@@ -373,7 +374,7 @@ fn batch_total_requires_confirmation_even_when_individual_files_do_not() {
     for path in &paths {
         fs::File::create(path)
             .unwrap()
-            .set_len(folt_core::config::limits::BATCH_TOTAL_BYTES / 2 + 1)
+            .set_len(folt_core::config::limits::DEFAULT_BATCH_TOTAL_BYTES / 2 + 1)
             .unwrap();
     }
     let plan = plan_register(&home.home, &paths).unwrap();
@@ -385,7 +386,7 @@ fn batch_total_requires_confirmation_even_when_individual_files_do_not() {
         .write(true)
         .open(&paths[1])
         .unwrap()
-        .set_len(folt_core::config::limits::BATCH_TOTAL_BYTES / 2 - 1)
+        .set_len(folt_core::config::limits::DEFAULT_BATCH_TOTAL_BYTES / 2 - 1)
         .unwrap();
     assert!(plan_register(&home.home, &paths).unwrap().notes.is_empty());
 }
@@ -1046,7 +1047,7 @@ fn link_registration_through_a_symlinked_home_uses_the_home_spelling() {
     let mut home = TempHome::new();
     let alias = home.root().join("home-alias");
     std::os::unix::fs::symlink(home.path(), &alias).unwrap();
-    home.home = folt_core::home::Home::open_or_create(alias).unwrap();
+    home.home = folt_core::home::Home::open_or_create(alias, &Environment::default()).unwrap();
     assert_link_registration(&home);
 }
 
@@ -1846,4 +1847,55 @@ fn source_changed_after_planning_a_name_write_is_blocked_without_rewriting() {
     );
     assert_eq!(fs::read(path).unwrap(), b"user changed body");
     assert!(!home.path().join("registry.db").exists());
+}
+
+#[test]
+fn environment_override_reaches_registration() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("file");
+    fs::write(&path, b"abcd").unwrap();
+    let environment = Environment {
+        large_file_bytes: Some("4".into()),
+        ..Environment::default()
+    };
+    let home =
+        folt_core::home::Home::open_or_create(directory.path().join("override"), &environment)
+            .unwrap();
+    let plan = plan_register(&home, [&path]).unwrap();
+    assert_eq!(
+        plan.entries[0].status,
+        RegisterStatus::NeedsConfirmation { size: 4 }
+    );
+    let home = folt_core::home::Home::open_or_create(
+        directory.path().join("default"),
+        &Environment::default(),
+    )
+    .unwrap();
+    let plan = plan_register(&home, [&path]).unwrap();
+    assert_eq!(plan.entries[0].status, RegisterStatus::New);
+}
+
+#[test]
+fn environment_batch_total_overrides_the_default() {
+    let directory = tempfile::tempdir().unwrap();
+    let paths = [directory.path().join("a"), directory.path().join("b")];
+    for path in &paths {
+        fs::write(path, b"abcdef").unwrap();
+    }
+    let environment = Environment {
+        batch_total_bytes: Some("10".into()),
+        ..Environment::default()
+    };
+    let home =
+        folt_core::home::Home::open_or_create(directory.path().join("override"), &environment)
+            .unwrap();
+    let plan = plan_register(&home, &paths).unwrap();
+    assert_eq!(plan.notes.len(), 1);
+    let home = folt_core::home::Home::open_or_create(
+        directory.path().join("default"),
+        &Environment::default(),
+    )
+    .unwrap();
+    let plan = plan_register(&home, &paths).unwrap();
+    assert!(plan.notes.is_empty());
 }

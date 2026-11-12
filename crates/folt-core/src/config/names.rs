@@ -72,6 +72,15 @@ pub(crate) const ANONYMOUS_AUTHOR: &str = "anonymous";
 /// Home override environment variable name (UTF-8 text).
 pub(crate) const ENV_FOLT_HOME: &str = "FOLT_HOME";
 
+/// FOLT_LARGE_FILE_BYTES environment variable name (UTF-8 text).
+pub(crate) const ENV_FOLT_LARGE_FILE_BYTES: &str = "FOLT_LARGE_FILE_BYTES";
+
+/// FOLT_BATCH_TOTAL_BYTES environment variable name (UTF-8 text).
+pub(crate) const ENV_FOLT_BATCH_TOTAL_BYTES: &str = "FOLT_BATCH_TOTAL_BYTES";
+
+/// FOLT_BUSY_TIMEOUT_MS environment variable name (UTF-8 text).
+pub(crate) const ENV_FOLT_BUSY_TIMEOUT_MS: &str = "FOLT_BUSY_TIMEOUT_MS";
+
 /// Fixed default Folio branch name (UTF-8 text).
 pub(crate) const DEFAULT_BRANCH: &str = "main";
 

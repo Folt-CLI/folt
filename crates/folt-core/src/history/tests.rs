@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::env::Environment;
 use crate::placement::StagedBlob;
 use crate::test_support::{TempDir, facts, target};
 
@@ -103,7 +104,7 @@ fn branch_sync_failure_leaves_cached_rows_untouched_and_harmless() {
     let directory = TempDir::new().unwrap();
     let root = directory.path().join("home");
     {
-        let home = Home::open_or_create(root.clone()).unwrap();
+        let home = Home::open_or_create(root.clone(), &Environment::default()).unwrap();
         let mut lock = home.try_lock().unwrap();
         let folio = create_folio(
             home.path(),
