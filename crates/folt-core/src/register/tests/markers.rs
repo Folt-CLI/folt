@@ -129,7 +129,7 @@ fn collapsed_directory_request_is_blocked_before_creating_markers() {
     assert_eq!(blocked.entries[0].path, plan.entries[1].path);
     assert_eq!(
         blocked.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::DestinationChanged {
+        RegisterStatus::Refused(RegisterRefusalReason::DestinationChanged {
             path: plan.entries[1].path.clone(),
         })
     );

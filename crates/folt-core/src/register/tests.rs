@@ -26,6 +26,6 @@ fn injected() -> RegistryError {
 fn permission_error_maps_to_unreadable() {
     assert_eq!(
         io_refusal(&io::Error::from(io::ErrorKind::PermissionDenied)),
-        RefusalReason::Unreadable
+        RegisterRefusalReason::Unreadable
     );
 }
