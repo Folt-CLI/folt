@@ -50,7 +50,7 @@ fn edited_then_missing_copy_reports_drift() {
 #[test]
 fn link_points_to_internal_working_file() {
     use folt_core::object::ObjectKind;
-    use folt_core::placement::{Placement, PlacementKind};
+    use folt_core::placement::{PlacementKind, PlacementSpec};
     let home = TempHome::new();
     let lock = home.lock();
     let folio = TestFolio::new(&home, &lock);
@@ -58,7 +58,7 @@ fn link_points_to_internal_working_file() {
         .objects
         .put(&lock, ObjectKind::Blob, b"initial")
         .unwrap();
-    let placement = Placement {
+    let placement = PlacementSpec {
         path: home.root().join("link.txt"),
         kind: PlacementKind::Link,
         head: "main".into(),

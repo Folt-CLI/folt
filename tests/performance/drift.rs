@@ -4,7 +4,7 @@ use criterion::{BenchmarkId, Criterion};
 use folt_core::id::FolioId;
 use folt_core::object::hash_blob;
 use folt_core::placement::{
-    self, Observation, Placement, PlacementBase, PlacementKind, PlacementOps,
+    self, Observation, PlacementBase, PlacementKind, PlacementOps, PlacementSpec,
 };
 use folt_core::placement_fs::PlacementFs;
 
@@ -19,7 +19,7 @@ pub fn bench(c: &mut Criterion) {
         let bytes = crate::input(size);
         let path = home.root().join("working");
         fs::write(&path, &bytes).unwrap();
-        let mut placement = Placement {
+        let mut placement = PlacementSpec {
             path,
             kind: PlacementKind::Copy,
             head: "main".into(),

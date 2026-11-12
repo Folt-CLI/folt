@@ -1019,7 +1019,7 @@ fn apply_locked(
                 staged: None,
             };
             for row in [&mut internal, &mut copy] {
-                let placement = crate::placement::Placement {
+                let placement = crate::placement::PlacementSpec {
                     path: row.path.to_path_buf(),
                     kind: row.kind,
                     head: DEFAULT_BRANCH.into(),

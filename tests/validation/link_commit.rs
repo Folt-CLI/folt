@@ -4,7 +4,7 @@ use folt_core::id::FolioId;
 use folt_core::id::ObjectId;
 use folt_core::object::Commit;
 use folt_core::placement::{
-    Observation, Placement, PlacementError, PlacementKind, PlacementOps, Written,
+    Observation, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_rules::{self, RefusalReason, RulesError};
@@ -25,7 +25,7 @@ struct LinkFs<'a> {
 }
 
 impl PlacementOps for LinkFs<'_> {
-    fn read(&self, id: FolioId, row: &Placement) -> Result<Observation, PlacementError> {
+    fn read(&self, id: FolioId, row: &PlacementSpec) -> Result<Observation, PlacementError> {
         if row.kind == PlacementKind::Link {
             Ok(self.observation.clone())
         } else {
@@ -36,7 +36,7 @@ impl PlacementOps for LinkFs<'_> {
     fn create(
         &self,
         id: FolioId,
-        row: &Placement,
+        row: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
     ) -> Result<Written, PlacementError> {
@@ -46,7 +46,7 @@ impl PlacementOps for LinkFs<'_> {
     fn refresh(
         &self,
         id: FolioId,
-        row: &Placement,
+        row: &PlacementSpec,
         objects: &ObjectStore,
         content: ObjectId,
         expected: Option<&Observation>,
@@ -54,14 +54,14 @@ impl PlacementOps for LinkFs<'_> {
         self.fs.refresh(id, row, objects, content, expected)
     }
 
-    fn sync_parent(&self, row: &Placement) -> Result<(), PlacementError> {
+    fn sync_parent(&self, row: &PlacementSpec) -> Result<(), PlacementError> {
         self.fs.sync_parent(row)
     }
 
     fn convert(
         &self,
         id: FolioId,
-        row: &Placement,
+        row: &PlacementSpec,
         kind: PlacementKind,
         objects: &ObjectStore,
         content: ObjectId,
@@ -70,14 +70,14 @@ impl PlacementOps for LinkFs<'_> {
         self.fs.convert(id, row, kind, objects, content, expected)
     }
 
-    fn normalize_link(&self, id: FolioId, row: &Placement) -> Result<(), PlacementError> {
+    fn normalize_link(&self, id: FolioId, row: &PlacementSpec) -> Result<(), PlacementError> {
         self.fs.normalize_link(id, row)
     }
 
     fn relocate(
         &self,
         id: FolioId,
-        row: &Placement,
+        row: &PlacementSpec,
         to: &std::path::Path,
         expected: &Observation,
     ) -> Result<Written, PlacementError> {
@@ -87,13 +87,13 @@ impl PlacementOps for LinkFs<'_> {
     fn unlink(
         &self,
         id: FolioId,
-        row: &Placement,
+        row: &PlacementSpec,
         expected: &Observation,
     ) -> Result<(), PlacementError> {
         self.fs.unlink(id, row, expected)
     }
 
-    fn hash_placement(&self, row: &Placement) -> Result<ObjectId, PlacementError> {
+    fn hash_placement(&self, row: &PlacementSpec) -> Result<ObjectId, PlacementError> {
         self.fs.hash_placement(row)
     }
 }

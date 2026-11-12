@@ -61,7 +61,7 @@ fn run(
 fn copy(home: &TempHome, folio: &mut TestFolio, lock: &HomeLock, head: &str) -> Placement {
     let internal = folio.internal();
     let path = home.root().join(format!("copy-{head}.md"));
-    let placement = folt_core::placement::Placement {
+    let placement = folt_core::placement::PlacementSpec {
         path: path.clone(),
         kind: PlacementKind::Copy,
         head: head.into(),
