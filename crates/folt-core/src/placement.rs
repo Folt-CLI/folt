@@ -146,7 +146,7 @@ pub fn classify(
     }
 }
 
-/// RefKind-specific placement operations. Implementations perform filesystem work.
+/// PlacementKind-specific placement operations. Implementations perform filesystem work.
 pub trait PlacementOps {
     /// Creates a placement; copies read the supplied commit content blob.
     fn create(
