@@ -21,6 +21,7 @@ parent in its description.
 | Guide | Covers |
 | --- | --- |
 | [Glossary](../../GLOSSARY.md) | The terms of Folt and of the process, defined once |
+| Agent roles | Role files for the [analysis agent](agents/analyst.md), [implementation agent](agents/implementer.md) and [review agent](agents/reviewer.md) |
 | [Working templates](working/README.md) | How to work a ticket by size and issue type |
 | [Workflow](workflow.md) | Issue stages, branches, commits, issue types and fields, and PRs |
 | [Stacked pull requests](stacked-prs.md) | Creating, updating and merging native PR stacks |
