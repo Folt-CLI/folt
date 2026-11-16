@@ -27,13 +27,4 @@ details into public issues. No repository license has been selected yet.
 
 ## Local checks
 
-Run the gate in [Testing](docs/dev/testing.md) before opening a pull request.
-Its core commands are below; the gate also covers the excluded suites through
-the second Clippy command and PR/full aliases defined there:
-
-```sh
-cargo fmt --all --check
-cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo build --locked --workspace
-cargo test --locked --workspace
-```
+Run the gate in [docs/dev/testing.md#gate-before-push](docs/dev/testing.md#gate-before-push).
