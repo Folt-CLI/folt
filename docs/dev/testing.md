@@ -133,14 +133,9 @@ The PR's Verification section lists the local suite command and result, and
 each CI job on Ubuntu, macOS and Windows with its result, filled in after CI
 finishes. Say plainly what did not run.
 
-## Standard paragraph for every implementation agent prompt
+## Implementation agent guidance
 
-> Every ticket adds or updates the tests for what it changes, in the same pull
-> request. A bug fix adds a regression case that fails before the fix. Write the
-> tests and run `cargo test --locked --workspace`. Do not add dependencies
-> without the ticket's selected solution. Do not analyse code, reviews or CI;
-> implement and fix only. The orchestrator runs the gate before committing or
-> pushing and hands you findings and failing output to fix.
+See the [implementation agent role file](agents/implementer.md) for implementation agent guidance.
 
 ## Suites and layout
 

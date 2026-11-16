@@ -67,6 +67,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [registry](#registry)
 - [rename](#rename)
 - [review agent](#review-agent)
+- [role file](#role-file)
 - [Rollback](#rollback)
 - [scan limit](#scan-limit)
 - [Settings](#settings)
@@ -679,6 +680,15 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - **Code:** none (process term; see `docs/dev/agents/`)
 - **Related:** [implementation agent](#implementation-agent), [analysis agent](#analysis-agent), [work item](#work-item).
 - **Not:** The Scope section of a ticket.
+- **Status:** decided
+
+### role file
+
+- **Layer:** Process
+- **Definition:** A file under `docs/dev/agents/` holding the guidance of one agent role.
+- **Code:** none (process term; see `docs/dev/agents/`)
+- **Related:** [analysis agent](#analysis-agent), [implementation agent](#implementation-agent), [review agent](#review-agent), [orchestrator](#orchestrator).
+- **Not:** `AGENTS.md`, which only dispatches.
 - **Status:** decided
 
 ### worktree
