@@ -10,7 +10,9 @@ use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_rules::{self, Behind};
 use folt_core::refs::RefStore;
-use folt_core::register::{self, RefusalReason, RegisterStatus, apply_register, plan_register};
+use folt_core::register::{
+    self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
+};
 use folt_core::registry::{PlacementPath, Registry};
 
 use crate::common::TempHome;
@@ -127,7 +129,7 @@ fn directories_create_real_markers_and_deduplicate_in_both_orders() {
         fs::write(&child, b"child").unwrap();
         assert_eq!(
             plan_register(&home.home, [&child]).unwrap().entries[0].status,
-            RegisterStatus::Refused(RefusalReason::InsideDirectoryFolio)
+            RegisterStatus::Refused(RegisterRefusalReason::InsideDirectoryFolio)
         );
     }
 }
@@ -149,7 +151,7 @@ fn directory_replaced_by_file_blocks_registration() {
     assert_eq!(blocked.entries[0].path, destination);
     assert_eq!(
         blocked.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::DestinationChanged {
+        RegisterStatus::Refused(RegisterRefusalReason::DestinationChanged {
             path: blocked.entries[0].path.clone(),
         })
     );
@@ -184,7 +186,7 @@ fn file_replaced_by_directory_blocks_registration() {
     );
     assert_eq!(
         blocked.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::DestinationChanged {
+        RegisterStatus::Refused(RegisterRefusalReason::DestinationChanged {
             path: blocked.entries[0].path.clone(),
         })
     );
@@ -316,7 +318,7 @@ fn refusals_stop_the_entire_batch_without_creating_markers_or_registry() {
     assert_eq!(plan.summary.refused, 1);
     assert_eq!(
         plan.entries[2].status,
-        RegisterStatus::Refused(RefusalReason::Missing)
+        RegisterStatus::Refused(RegisterRefusalReason::Missing)
     );
     assert_eq!(apply_register(&home.home, &plan, true).unwrap(), plan);
     assert!(!dir.join(folt_core::config::names::MARKER_FILE).exists());
@@ -324,13 +326,13 @@ fn refusals_stop_the_entire_batch_without_creating_markers_or_registry() {
     let own = home.path().join("config.toml");
     assert_eq!(
         plan_register(&home.home, [&own]).unwrap().entries[0].status,
-        RegisterStatus::Refused(RefusalReason::InsideHome)
+        RegisterStatus::Refused(RegisterRefusalReason::InsideHome)
     );
     let marker = dir.join(folt_core::config::names::MARKER_FILE);
     fs::create_dir(&marker).unwrap();
     assert_eq!(
         plan_register(&home.home, [&dir]).unwrap().entries[0].status,
-        RegisterStatus::Refused(RefusalReason::NotAFile)
+        RegisterStatus::Refused(RegisterRefusalReason::NotAFile)
     );
 }
 
@@ -425,7 +427,7 @@ fn repointed_parent_blocks_file_registration() {
         };
         assert_eq!(blocked.summary.refused, 1);
         assert_eq!(blocked.entries[0].path, destination);
-        let reason = RefusalReason::DestinationChanged {
+        let reason = RegisterRefusalReason::DestinationChanged {
             path: destination.clone(),
         };
         assert_eq!(
@@ -491,7 +493,7 @@ fn assert_repointed_parent_cannot_collapse_requests(links: bool) {
     assert_eq!(blocked.entries[0].path, plan.entries[1].path);
     assert_eq!(
         blocked.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::DestinationChanged {
+        RegisterStatus::Refused(RegisterRefusalReason::DestinationChanged {
             path: plan.entries[1].path.clone(),
         })
     );
@@ -559,7 +561,7 @@ fn assert_repointed_parent_cannot_collapse_marker_requests(links: bool, director
         assert_eq!(blocked.entries[0].path, plan.entries[1].path);
         assert_eq!(
             blocked.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::DestinationChanged {
+            RegisterStatus::Refused(RegisterRefusalReason::DestinationChanged {
                 path: plan.entries[1].path.clone(),
             })
         );
@@ -679,7 +681,7 @@ fn repointed_parent_cannot_collapse_directory_requests() {
     assert_eq!(blocked.entries[0].path, plan.entries[1].path);
     assert_eq!(
         blocked.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::DestinationChanged {
+        RegisterStatus::Refused(RegisterRefusalReason::DestinationChanged {
             path: plan.entries[1].path.clone(),
         })
     );
@@ -811,7 +813,7 @@ fn repointed_parent_blocks_directory_registration() {
         let blocked = apply_register(&home.home, &plan, false).unwrap();
         assert_eq!(blocked.summary.refused, 1);
         assert_eq!(blocked.entries[0].path, destination);
-        let reason = RefusalReason::DestinationChanged {
+        let reason = RegisterRefusalReason::DestinationChanged {
             path: destination.clone(),
         };
         assert_eq!(
@@ -889,19 +891,19 @@ fn symlinks_and_devices_are_refused() {
     symlink(&path, &link).unwrap();
     assert_eq!(
         plan_register(&home.home, [&link]).unwrap().entries[0].status,
-        RegisterStatus::Refused(RefusalReason::Symlink)
+        RegisterStatus::Refused(RegisterRefusalReason::Symlink)
     );
     let dir = home.root().join("notes");
     fs::create_dir(&dir).unwrap();
     symlink(&path, dir.join(folt_core::config::names::MARKER_FILE)).unwrap();
     assert_eq!(
         plan_register(&home.home, [&dir]).unwrap().entries[0].status,
-        RegisterStatus::Refused(RefusalReason::Symlink)
+        RegisterStatus::Refused(RegisterRefusalReason::Symlink)
     );
     let socket = std::path::Path::new("/dev/null");
     assert_eq!(
         plan_register(&home.home, [&socket]).unwrap().entries[0].status,
-        RegisterStatus::Refused(RefusalReason::NotAFile)
+        RegisterStatus::Refused(RegisterRefusalReason::NotAFile)
     );
 }
 
@@ -982,7 +984,7 @@ fn apply_rechecks_disappearing_sources_before_creating_any_marker() {
     let refused = apply_register(&home.home, &plan, false).unwrap();
     assert_eq!(
         refused.entries[1].status,
-        RegisterStatus::Refused(RefusalReason::Missing)
+        RegisterStatus::Refused(RegisterRefusalReason::Missing)
     );
     assert!(!dir.join(folt_core::config::names::MARKER_FILE).exists());
     assert!(!home.path().join("registry.db").exists());
@@ -1002,7 +1004,7 @@ fn unreadable_file_refuses_the_whole_call_when_access_is_denied() {
         let plan = plan_register(&home.home, [&path]).unwrap();
         assert_eq!(
             plan.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::Unreadable)
+            RegisterStatus::Refused(RegisterRefusalReason::Unreadable)
         );
         assert_eq!(apply_register(&home.home, &plan, true).unwrap(), plan);
         assert!(!home.path().join("registry.db").exists());
@@ -1300,7 +1302,7 @@ fn registry_collisions_suffix_only_stems_and_explicit_names_block_the_batch() {
         let plan = plan_register(&home.home, [request, paths[3].clone().into()]).unwrap();
         assert_eq!(
             plan.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::NameTaken {
+            RegisterStatus::Refused(RegisterRefusalReason::NameTaken {
                 name: name("same"),
                 holder: NameHolder::Folio(id),
             })
@@ -1332,7 +1334,7 @@ fn explicit_collisions_between_paths_never_get_a_suffix() {
             .find(|e| matches!(e.status, RegisterStatus::Refused(_)))
             .unwrap();
         assert!(
-            matches!(&refused.status, RegisterStatus::Refused(RefusalReason::NameTaken {
+            matches!(&refused.status, RegisterStatus::Refused(RegisterRefusalReason::NameTaken {
             name: taken, holder: NameHolder::Path(_),
         }) if taken == &name("Taken"))
         );
@@ -1369,7 +1371,7 @@ fn repeated_paths_merge_options_but_refuse_conflicting_names_even_on_replay() {
     .unwrap();
     assert_eq!(
         plan.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::ConflictingNames)
+        RegisterStatus::Refused(RegisterRefusalReason::ConflictingNames)
     );
     assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
     let valid = plan_register(&home.home, [named(&path, "Chosen")]).unwrap();
@@ -1377,7 +1379,7 @@ fn repeated_paths_merge_options_but_refuse_conflicting_names_even_on_replay() {
     let registered = plan_register(&home.home, [named(&path, "Chosen")]).unwrap();
     assert_eq!(
         registered.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::NameOnRegisteredPath)
+        RegisterStatus::Refused(RegisterRefusalReason::NameOnRegisteredPath)
     );
     assert!(registered.to_string().contains("rename (#155)"));
     assert_eq!(
@@ -1395,7 +1397,7 @@ fn front_matter_names_refuse_options_even_when_equal_and_invalid_grammar() {
         let plan = plan_register(&home.home, [named(&path, option)]).unwrap();
         assert_eq!(
             plan.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::NameOptionWithFrontMatter)
+            RegisterStatus::Refused(RegisterRefusalReason::NameOptionWithFrontMatter)
         );
         assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
     }
@@ -1404,7 +1406,7 @@ fn front_matter_names_refuse_options_even_when_equal_and_invalid_grammar() {
         let plan = plan_register(&home.home, [&path]).unwrap();
         assert!(matches!(
             plan.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::InvalidFrontMatterName(_))
+            RegisterStatus::Refused(RegisterRefusalReason::InvalidFrontMatterName(_))
         ));
         assert!(
             plan.to_string()
@@ -1437,7 +1439,7 @@ fn editor_refusals_are_reported_with_the_path() {
         let plan = plan_register(&home.home, [&path]).unwrap();
         assert_eq!(
             plan.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::FrontMatter(reason))
+            RegisterStatus::Refused(RegisterRefusalReason::FrontMatter(reason))
         );
         assert!(
             plan.to_string()
@@ -1467,7 +1469,7 @@ fn stem_slugging_preserves_case_and_shortens_suffixes_to_64_bytes() {
         let plan = plan_register(&home.home, [&path]).unwrap();
         assert!(matches!(
             plan.entries[0].status,
-            RegisterStatus::Refused(RefusalReason::NoUsableStem(_))
+            RegisterStatus::Refused(RegisterRefusalReason::NoUsableStem(_))
         ));
         assert!(plan.to_string().contains("--name"));
     }
@@ -1575,7 +1577,7 @@ fn markdown_prefix_is_bounded_and_changed_markdown_blocks_apply() {
     let changed = apply_register(&home.home, &plan, false).unwrap();
     assert_eq!(
         changed.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::FileChanged)
+        RegisterStatus::Refused(RegisterRefusalReason::FileChanged)
     );
     assert!(!home.path().join("registry.db").exists());
 }
@@ -1592,14 +1594,14 @@ fn markdown_needing_a_write_refuses_readonly_and_multiple_hard_links() {
     fs::set_permissions(&path, readonly).unwrap();
     let plan = plan_register(&home.home, [&path]).unwrap();
     assert!(
-        matches!(&plan.entries[0].status, RegisterStatus::Refused(RefusalReason::NameNotWritable { reason }) if reason.contains("read-only"))
+        matches!(&plan.entries[0].status, RegisterStatus::Refused(RegisterRefusalReason::NameNotWritable { reason }) if reason.contains("read-only"))
     );
     fs::set_permissions(&path, original).unwrap();
     let alias = home.root().join("alias");
     fs::hard_link(&path, &alias).unwrap();
     let plan = plan_register(&home.home, [&path]).unwrap();
     assert!(
-        matches!(&plan.entries[0].status, RegisterStatus::Refused(RefusalReason::NameNotWritable { reason }) if reason.contains("hard links"))
+        matches!(&plan.entries[0].status, RegisterStatus::Refused(RegisterRefusalReason::NameNotWritable { reason }) if reason.contains("hard links"))
     );
     // Existing names need no write, so hard links are allowed.
     fs::write(&path, b"---\nfolio-name: Existing\n---\n").unwrap();
@@ -1625,7 +1627,7 @@ fn link_apply_replays_explicit_names_and_stores_them() {
     assert!(refused.paths.is_empty());
     assert_eq!(
         refused.registration.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::NameOnRegisteredPath)
+        RegisterStatus::Refused(RegisterRefusalReason::NameOnRegisteredPath)
     );
 }
 
@@ -1648,7 +1650,7 @@ fn directory_and_marker_requests_merge_names_and_refuse_override() {
     let plan = plan_register(&home.home, [named(&dir, "Chosen")]).unwrap();
     assert_eq!(
         plan.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::NameOptionWithFrontMatter)
+        RegisterStatus::Refused(RegisterRefusalReason::NameOptionWithFrontMatter)
     );
 }
 
@@ -1785,7 +1787,9 @@ fn needed_name_write_past_scan_limit_is_refused_with_the_path() {
     assert_eq!(plan.summary.refused, 1);
     assert_eq!(
         plan.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::FrontMatter(FrontMatterError::Unterminated))
+        RegisterStatus::Refused(RegisterRefusalReason::FrontMatter(
+            FrontMatterError::Unterminated
+        ))
     );
     assert!(
         plan.to_string()
@@ -1843,7 +1847,7 @@ fn source_changed_after_planning_a_name_write_is_blocked_without_rewriting() {
     let result = apply_register(&home.home, &plan, false).unwrap();
     assert_eq!(
         result.entries[0].status,
-        RegisterStatus::Refused(RefusalReason::FileChanged)
+        RegisterStatus::Refused(RegisterRefusalReason::FileChanged)
     );
     assert_eq!(fs::read(path).unwrap(), b"user changed body");
     assert!(!home.path().join("registry.db").exists());

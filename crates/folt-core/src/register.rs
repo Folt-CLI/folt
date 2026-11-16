@@ -83,7 +83,7 @@ pub enum NameHolder {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RefusalReason {
+pub enum RegisterRefusalReason {
     /// Name the target explicitly instead of its symlink.
     Symlink,
     NotAFile,
@@ -111,7 +111,7 @@ pub enum RefusalReason {
     },
 }
 
-impl fmt::Display for RefusalReason {
+impl fmt::Display for RegisterRefusalReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NameOnRegisteredPath => {
@@ -138,7 +138,7 @@ impl fmt::Display for RefusalReason {
 pub enum RegisterStatus {
     New,
     AlreadyRegistered,
-    Refused(RefusalReason),
+    Refused(RegisterRefusalReason),
     NeedsConfirmation { size: u64 },
 }
 
@@ -215,7 +215,8 @@ pub fn plan_register(
         if let Some(&index) = seen.get(&path) {
             let previous: &mut RegisterRequest = &mut requests[index];
             if previous.name.is_some() && request.name.is_some() && previous.name != request.name {
-                entries[index].status = RegisterStatus::Refused(RefusalReason::ConflictingNames);
+                entries[index].status =
+                    RegisterStatus::Refused(RegisterRefusalReason::ConflictingNames);
                 continue;
             }
             if previous.name.is_none() {
@@ -227,7 +228,7 @@ pub fn plan_register(
             }
             if !matches!(
                 entries[index].status,
-                RegisterStatus::Refused(RefusalReason::ConflictingNames)
+                RegisterStatus::Refused(RegisterRefusalReason::ConflictingNames)
             ) {
                 entries[index] =
                     inspect_entry(&home_path, &registry, &settings, &previous.path, path)?;
@@ -262,7 +263,7 @@ fn register_destination(is_directory: bool, path: &Path, resolution_succeeded: b
     }
 }
 
-fn refuse_name(entry: &mut RegisterEntry, reason: RefusalReason) {
+fn refuse_name(entry: &mut RegisterEntry, reason: RegisterRefusalReason) {
     entry.status = RegisterStatus::Refused(reason);
     entry.name = None;
     entry.name_source = None;
@@ -303,7 +304,7 @@ fn resolve_names(
     // Explicit options first, then front matter, preserving request order in each group.
     for (index, (entry, request)) in entries.iter_mut().zip(requests).enumerate() {
         if entry.status == RegisterStatus::AlreadyRegistered && request.name.is_some() {
-            refuse_name(entry, RefusalReason::NameOnRegisteredPath);
+            refuse_name(entry, RegisterRefusalReason::NameOnRegisteredPath);
         }
         if !matches!(
             entry.status,
@@ -324,7 +325,7 @@ fn resolve_names(
             let name = match front_matter::read_name(&bytes) {
                 Ok(name) => name.map(|name| name.into_owned()),
                 Err(error) => {
-                    refuse_name(entry, RefusalReason::FrontMatter(error));
+                    refuse_name(entry, RegisterRefusalReason::FrontMatter(error));
                     continue;
                 }
             };
@@ -338,12 +339,12 @@ fn resolve_names(
             let name = match FolioName::parse(&value) {
                 Ok(name) => name,
                 Err(error) => {
-                    refuse_name(entry, RefusalReason::InvalidFrontMatterName(error));
+                    refuse_name(entry, RegisterRefusalReason::InvalidFrontMatterName(error));
                     continue;
                 }
             };
             if request.name.is_some() {
-                refuse_name(entry, RefusalReason::NameOptionWithFrontMatter);
+                refuse_name(entry, RegisterRefusalReason::NameOptionWithFrontMatter);
                 continue;
             }
             entry.name = Some(name);
@@ -364,7 +365,7 @@ fn resolve_names(
                 continue;
             };
             if let Some(holder) = holder(registry, &assigned, &name)? {
-                refuse_name(entry, RefusalReason::NameTaken { name, holder });
+                refuse_name(entry, RegisterRefusalReason::NameTaken { name, holder });
             } else {
                 assigned.insert(name, entry.path.clone());
             }
@@ -388,7 +389,7 @@ fn resolve_names(
             let base = match FolioName::from_stem(stem.unwrap_or_default()) {
                 Ok(name) => name,
                 Err(error) => {
-                    refuse_name(entry, RefusalReason::NoUsableStem(error));
+                    refuse_name(entry, RegisterRefusalReason::NoUsableStem(error));
                     continue;
                 }
             };
@@ -425,7 +426,7 @@ fn resolve_names(
                 Ok(Some(edit)) => edit,
                 Ok(None) => continue,
                 Err(error) => {
-                    refuse_name(entry, RefusalReason::FrontMatter(error));
+                    refuse_name(entry, RegisterRefusalReason::FrontMatter(error));
                     continue;
                 }
             };
@@ -447,7 +448,7 @@ fn resolve_names(
                         .map(|e| e.to_string())
                 };
                 if let Some(reason) = reason {
-                    refuse_name(entry, RefusalReason::NameNotWritable { reason });
+                    refuse_name(entry, RegisterRefusalReason::NameNotWritable { reason });
                 }
             }
         }
@@ -478,7 +479,7 @@ fn inspect_entry(
         entry
     };
     if path.starts_with(home) {
-        return Ok(refuse(entry, RefusalReason::InsideHome));
+        return Ok(refuse(entry, RegisterRefusalReason::InsideHome));
     }
     if let Ok(key) = PlacementPath::resolve(input)
         && registry.placement_at(&key)?.is_some()
@@ -492,7 +493,7 @@ fn inspect_entry(
             && let Ok(key) = PlacementPath::resolve(&marker)
             && registry.placement_at(&key)?.is_some()
         {
-            return Ok(refuse(entry, RefusalReason::InsideDirectoryFolio));
+            return Ok(refuse(entry, RegisterRefusalReason::InsideDirectoryFolio));
         }
     }
     let named = match fs::symlink_metadata(input) {
@@ -500,7 +501,7 @@ fn inspect_entry(
         Err(error) => return Ok(refuse(entry, io_refusal(&error))),
     };
     if named.is_symlink() {
-        return Ok(refuse(entry, RefusalReason::Symlink));
+        return Ok(refuse(entry, RegisterRefusalReason::Symlink));
     }
     let metadata = if named.is_dir() {
         match fs::symlink_metadata(&path) {
@@ -515,14 +516,14 @@ fn inspect_entry(
         named
     };
     if metadata.is_symlink() {
-        return Ok(refuse(entry, RefusalReason::Symlink));
+        return Ok(refuse(entry, RegisterRefusalReason::Symlink));
     }
     if !metadata.is_file() {
-        return Ok(refuse(entry, RefusalReason::NotAFile));
+        return Ok(refuse(entry, RegisterRefusalReason::NotAFile));
     }
     // Opening a regular file checks access without reading its bytes.
     if File::open(&path).is_err() {
-        return Ok(refuse(entry, RefusalReason::Unreadable));
+        return Ok(refuse(entry, RegisterRefusalReason::Unreadable));
     }
     entry.signature = Some(crate::placement_fs::signature(&metadata));
     entry.size = metadata.len();
@@ -532,11 +533,11 @@ fn inspect_entry(
     Ok(entry)
 }
 
-fn io_refusal(error: &io::Error) -> RefusalReason {
+fn io_refusal(error: &io::Error) -> RegisterRefusalReason {
     if error.kind() == io::ErrorKind::NotFound {
-        RefusalReason::Missing
+        RegisterRefusalReason::Missing
     } else {
-        RefusalReason::Unreadable
+        RegisterRefusalReason::Unreadable
     }
 }
 
@@ -648,7 +649,7 @@ fn block_changed(
             .any(|(old, new)| new == destination(entry) && old != new);
         if request_moved {
             let path = entry.path.clone();
-            refuse_name(entry, RefusalReason::DestinationChanged { path });
+            refuse_name(entry, RegisterRefusalReason::DestinationChanged { path });
             continue;
         }
         let old = previous_by_destination
@@ -667,7 +668,7 @@ fn block_changed(
             });
         let Some(old) = old else {
             let path = entry.path.clone();
-            refuse_name(entry, RefusalReason::DestinationChanged { path });
+            refuse_name(entry, RegisterRefusalReason::DestinationChanged { path });
             continue;
         };
         if matches!(
@@ -677,7 +678,7 @@ fn block_changed(
             && old.signature.is_some()
             && (old.signature != entry.signature || old.prefix != entry.prefix)
         {
-            refuse_name(entry, RefusalReason::FileChanged);
+            refuse_name(entry, RegisterRefusalReason::FileChanged);
         }
     }
     report(
@@ -911,7 +912,10 @@ fn apply_locked(
                         content.get(..content.len().min(SCAN_WINDOW)) != Some(prefix.as_slice())
                     })
                 {
-                    refuse_name(&mut current.entries[index], RefusalReason::FileChanged);
+                    refuse_name(
+                        &mut current.entries[index],
+                        RegisterRefusalReason::FileChanged,
+                    );
                     current = report(
                         current.entries.clone(),
                         current.requests.clone(),
@@ -937,7 +941,10 @@ fn apply_locked(
                     }
                 };
                 if edit.as_ref() != Some(planned_edit) {
-                    refuse_name(&mut current.entries[index], RefusalReason::FileChanged);
+                    refuse_name(
+                        &mut current.entries[index],
+                        RegisterRefusalReason::FileChanged,
+                    );
                     current = report(
                         current.entries.clone(),
                         current.requests.clone(),
@@ -949,7 +956,10 @@ fn apply_locked(
                 let updated = front_matter::apply_edit(&content, planned_edit)
                     .map_err(|error| io::Error::other(error.to_string()))?;
                 let Some(expected) = entry.signature.as_ref() else {
-                    refuse_name(&mut current.entries[index], RefusalReason::FileChanged);
+                    refuse_name(
+                        &mut current.entries[index],
+                        RegisterRefusalReason::FileChanged,
+                    );
                     current = report(
                         current.entries.clone(),
                         current.requests.clone(),
@@ -973,7 +983,10 @@ fn apply_locked(
                 );
                 if let Err(error) = write {
                     if error.kind() == io::ErrorKind::InvalidData {
-                        refuse_name(&mut current.entries[index], RefusalReason::FileChanged);
+                        refuse_name(
+                            &mut current.entries[index],
+                            RegisterRefusalReason::FileChanged,
+                        );
                         current = report(
                             current.entries.clone(),
                             current.requests.clone(),
