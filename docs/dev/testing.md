@@ -63,11 +63,15 @@ cargo test-full --locked
 Commit and push only when all commands pass. A failure goes back to the
 implementation agent with the output. Never push a failing suite. The second
 Clippy command and the aliases also cover suites excluded from the local run.
+CI runs `cargo test-pr` and `cargo test-performance --test`, not
+`cargo test-full`, so the gate is a superset of CI.
 For offline work, export `CARGO_NET_OFFLINE=true` and add `--offline` to each
 Cargo command that resolves dependencies.
 
 The `*` is unquoted in the Cargo alias strings because Cargo splits arguments
 without a shell. Quote it when invoking Cargo directly from a shell.
+A tool that takes each command as separate arguments passes `*` bare, without
+quotes; the gate lists no shell syntax other than that quoting.
 
 ## Skipping PR builds
 
