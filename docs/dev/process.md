@@ -36,7 +36,7 @@ parent in its description.
 | [Repository settings](repository.md) | Recorded GitHub settings, drift checks and application |
 | [Verification](verification.md) | Checks actually performed and their status |
 
-[AGENTS.md](../../AGENTS.md) points future sessions to this process.
+[AGENTS.md](../../AGENTS.md) points each agent to its role file.
 [CONTRIBUTING.md](../../CONTRIBUTING.md) is the contributor entry point.
 The [working templates](working/README.md) hold the size, status and closing
 rules. Use the other guides for their specific procedures.
