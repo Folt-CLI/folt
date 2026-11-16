@@ -1,20 +1,14 @@
 # Pull request review
 
 After a pull request is opened or updated, where the [size requires review](working/README.md),
-run a read-only Codex review of its
+run a read-only review of its
 diff against the pull request's base. For a stack, review each pull request
 against its own base. CI and branch protection on the bottom base apply to
 every layer; see [Stacked pull requests](stacked-prs.md).
 
 ## Review agent
 
-Run headless Codex with `codex exec`. The `-p` option means `--profile`; it does
-not supply the prompt. `codex exec review --uncommitted` does not accept a
-custom prompt. For a custom prompt, run:
-
-```sh
-codex exec -s read-only -C <worktree> -o <file> - < prompt
-```
+The review agent runs read-only against the pull request's diff; how it is started is not part of this document.
 
 The prompt should tell the agent to review read-only, compare the PR diff with
 its base, and report only actionable findings. Include an out-of-scope list.
@@ -36,9 +30,9 @@ in the review prompt, and waits for CI to finish before posting the review.
 
 ## Dependabot PRs
 
-Always run a read-only Codex review on every Dependabot PR. Verify that the bump
+Always run a read-only review on every Dependabot PR. Verify that the bump
 will not break workflows or code using the diff, CI result and release notes of
-the bumped dependencies. Codex has no network; paste the CI result and release
+the bumped dependencies. The review agent has no network; paste the CI result and release
 notes into the review prompt. When clean, leave a PR comment whose entire body
 is exactly `No issues.`. Otherwise post findings as for any review below.
 

@@ -59,9 +59,9 @@ their timing. `commit-message.prefix` sets the commit subject to
 needed, including an epic or issue. Squash nonconforming PR commits into one
 commit with that subject.
 
-Always run a read-only Codex review on every Dependabot PR to verify that the
+Always run a read-only review on every Dependabot PR to verify that the
 bump will not break workflows or code, using the diff, CI result and release
-notes of the bumped dependencies. Codex has no network, so paste the CI result
+notes of the bumped dependencies. The review agent has no network, so paste the CI result
 and release notes into the prompt. Leave a PR comment that is exactly
 `No issues.` when clean; otherwise post findings as for any
 [review](review.md). No bot bypass or automatic merge is introduced.
