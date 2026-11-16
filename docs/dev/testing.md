@@ -41,10 +41,9 @@ use the subject `Test[#N]:`.
 
 ## Roles
 
-Implementation agents (headless Codex in the ticket's worktree) implement and
-fix. They do not analyse code, reviews or CI. The orchestrator analyses: it runs
+Implementation agents run headless in the ticket's worktree and implement and fix. They do not analyse code, reviews or CI. The orchestrator analyses: it runs
 the gate, reads CI, and hands findings and failing excerpts to the agent. The
-review agent reviews the diff, the tests in it and the CI result; it does not
+headless review agent reviews the diff, the tests in it and the CI result; it does not
 run anything.
 
 ## Gate before push
@@ -81,7 +80,7 @@ A PR skips only when every commit in `base..head` has a subject starting with
 `Documentation[#N]:` (a numeric issue number), or its last non-empty message
 line is exactly `[SKIP BUILD]`. Both are case-sensitive; carriage returns are
 ignored. Only the orchestrator adds the marker, on every commit of an eligible
-PR; Codex agents never add it. See [Commit body](workflow.md#commit-body).
+PR; implementation agents never add it. See [Commit body](workflow.md#commit-body).
 
 The code-path guard overrides both rules. Any change in `crates/`, root `tests/`,
 `Cargo.toml`, `Cargo.lock`, `.cargo/`, `rust-toolchain*` or `.github/workflows/`
@@ -134,7 +133,7 @@ The PR's Verification section lists the local suite command and result, and
 each CI job on Ubuntu, macOS and Windows with its result, filled in after CI
 finishes. Say plainly what did not run.
 
-## Standard paragraph for every Codex implementation prompt
+## Standard paragraph for every implementation agent prompt
 
 > Every ticket adds or updates the tests for what it changes, in the same pull
 > request. A bug fix adds a regression case that fails before the fix. Write the
@@ -241,7 +240,7 @@ includes writing a new object and syncing it. Reads use the OS cache normally;
 these are not cold-disk measurements. Drift cases include observing the file and,
 when its size matches the base, hashing it before classifying it.
 
-Codex and PR CI run `cargo test-performance --test` to execute each benchmark
+Implementation agents and PR CI run `cargo test-performance --test` to execute each benchmark
 once without statistical measurement. With cached dependencies, run it offline
 with `CARGO_NET_OFFLINE=true cargo test-performance --test`. The alias forwards
 arguments to Criterion after `--`, so put Cargo options before the alias's

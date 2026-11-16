@@ -9,6 +9,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 ## A-Z index
 
 - [alias](#alias)
+- [analysis agent](#analysis-agent)
 - [base](#base)
 - [behind](#behind)
 - [blob](#blob)
@@ -35,6 +36,8 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [gate](#gate)
 - [home](#home)
 - [home lock](#home-lock)
+- [implementation agent](#implementation-agent)
+- [implementation scope](#implementation-scope)
 - [incident](#incident)
 - [internal row](#internal-row)
 - [issue type](#issue-type)
@@ -63,6 +66,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - [register](#register)
 - [registry](#registry)
 - [rename](#rename)
+- [review agent](#review-agent)
 - [Rollback](#rollback)
 - [scan limit](#scan-limit)
 - [Settings](#settings)
@@ -639,6 +643,42 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 - **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
 - **Related:** [gate](#gate), [worktree](#worktree), [Question](#question).
 - **Not:** The implementation agent, whose role is to implement and fix.
+- **Status:** decided
+
+### implementation agent
+
+- **Layer:** Process
+- **Definition:** The agent that implements an implementation scope in a worktree; it does not commit, push, run the gate or analyse.
+- **Code:** none (process term; see `docs/dev/agents/`)
+- **Related:** [implementation scope](#implementation-scope), [worktree](#worktree), [orchestrator](#orchestrator), [gate](#gate).
+- **Not:** The orchestrator.
+- **Status:** decided
+
+### analysis agent
+
+- **Layer:** Process
+- **Definition:** The read-only agent that drafts findings, options and Analysis text and never selects a solution.
+- **Code:** none (process term; see `docs/dev/agents/`)
+- **Related:** [orchestrator](#orchestrator), [implementation scope](#implementation-scope), [Question](#question).
+- **Not:** The orchestrator or the developer.
+- **Status:** decided
+
+### review agent
+
+- **Layer:** Process
+- **Definition:** The read-only agent that reviews a diff and reports findings and runs nothing.
+- **Code:** none (process term; see `docs/dev/agents/`)
+- **Related:** [orchestrator](#orchestrator), [implementation agent](#implementation-agent), [gate](#gate).
+- **Not:** The developer's review decision.
+- **Status:** decided
+
+### implementation scope
+
+- **Layer:** Process
+- **Definition:** The complete executable scope of work attached to a ticket as `<N>-solution-<k>.md`.
+- **Code:** none (process term; see `docs/dev/agents/`)
+- **Related:** [implementation agent](#implementation-agent), [analysis agent](#analysis-agent), [work item](#work-item).
+- **Not:** The Scope section of a ticket.
 - **Status:** decided
 
 ### worktree

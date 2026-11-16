@@ -26,6 +26,7 @@ parent in its description.
 | [Stacked pull requests](stacked-prs.md) | Creating, updating and merging native PR stacks |
 | [Review](review.md) | Read-only agent reviews and posting findings |
 | [Testing](testing.md) | Test rule, push gate, CI review, roles |
+| [Orchestrator rules](orchestrator.md) | What the orchestrator does that agents do not |
 | [Issue format](issue-format.md) | Work-item and release-epic format and analysis attachments |
 | [Ticket planning](ticket-planning.md) | Issue types and fields, assignment, priority, relationships, milestones and iterations |
 | [Incidents](incidents.md) | Reports, evidence, linked response work and resolution |

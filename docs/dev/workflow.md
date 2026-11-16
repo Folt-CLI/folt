@@ -19,7 +19,7 @@ no implementation.
    outcome and scope before implementation starts.
 2. **Analyse and discuss.** For M and L, the orchestrator inspects the code
    and records factual findings, constraints, and compatibility concerns. Each
-   possible solution is a complete Codex scope attachment. The orchestrator
+   possible solution is a complete implementation scope attachment. The orchestrator
    writes Analysis inline as if the developer had already asked for context,
    comparison and the next step, following
    [Issue format](issue-format.md#analysis-and-solution-selection). The
@@ -94,7 +94,7 @@ the only subject type that is not an issue type. `#0` means there is no ticket
 and none is needed: no epic or issue. Dependabot sets the subject through
 `commit-message.prefix` in [.github/dependabot.yml](../../.github/dependabot.yml).
 If a Dependabot PR's commits do not follow this format, squash them into one
-commit with that subject. Always run the read-only Codex
+commit with that subject. Always run the read-only
 [Dependabot review](review.md#dependabot-prs) before merging.
 
 ### Commit size
@@ -117,7 +117,7 @@ stays at about 72 characters or fewer.
 
 For an eligible PR with no guarded code paths, only the orchestrator may add
 `[SKIP BUILD]` as the last paragraph of every commit body (the last non-empty
-line must be exactly that marker). Codex agents never add it. A subject starting
+line must be exactly that marker). Implementation agents never add it. A subject starting
 with `Documentation[#N]:` also qualifies; every PR commit must qualify, and the
 code-path guard overrides both rules. Do not use GitHub's `[skip ci]` syntax,
 which leaves the required check pending. See [Skipping PR builds](testing.md#skipping-pr-builds)
