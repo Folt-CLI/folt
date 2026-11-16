@@ -13,6 +13,8 @@ Set the milestone, Priority, Size, Status and ownership from the [shared steps](
 
 ## Analysis and review
 
+For a Question, follow [Working a Question](../orchestrator.md#working-a-question).
+
 M needs analysis AND review. Analysis agents are read-only and produce drafts
 as files: findings, solution scopes and Analysis text. The orchestrator publishes
 them to the ticket and attaches them.

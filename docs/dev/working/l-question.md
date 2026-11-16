@@ -9,6 +9,8 @@ Set type Question and the milestone, Priority, Size, Status and ownership from t
 
 ## Analysis and review
 
+For a Question, follow [Working a Question](../orchestrator.md#working-a-question).
+
 L needs analysis and review. The orchestrator writes Analysis inline in the
 ticket, links the findings
 attachment from Details and attaches each solution as a complete implementation scope.
