@@ -1,4 +1,4 @@
-## When it applies
+# When it applies
 
 Use M when a ticket is still loose and can be read several ways. It needs analysis and review, and the developer selects a solution. If there is one straightforward solution, use S or XS, not M.
 

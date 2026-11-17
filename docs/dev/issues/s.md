@@ -1,4 +1,4 @@
-## When it applies
+# When it applies
 
 Use S for straightforward work with its solution already decided. The ticket asks no questions.
 

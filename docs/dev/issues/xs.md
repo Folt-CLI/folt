@@ -1,4 +1,4 @@
-## When it applies
+# When it applies
 
 Use XS for the smallest work item; the ticket is self-descriptive.
 

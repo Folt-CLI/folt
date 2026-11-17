@@ -1,4 +1,4 @@
-## When it applies
+# When it applies
 
 XL is a release; it only groups the work and is always an Epic.
 

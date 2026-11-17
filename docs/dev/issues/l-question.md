@@ -1,4 +1,4 @@
-## When it applies
+# When it applies
 
 An L is always a Question. Split it into M/S/XS child tickets under it.
 

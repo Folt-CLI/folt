@@ -42,15 +42,6 @@ Use M when a ticket is still loose and can be read several ways: it needs analys
 | Epic | Use only `## Objective` in the body. Follow XL: title `<version> -- Folt`, group release work, close with `Disposition: Released` after all children close. | `Epic[#N]: ...` |
 | Incident | Follow [Incidents](incidents.md) for evidence, impact, linked response tickets and resolution; the report is not itself the fix. | `Incident[#N]: ...` |
 
-## Rules held elsewhere
-
-- [Ticket planning](ticket-planning.md) holds priority and relationship rules.
-- [Workflow](../delivery/workflow.md) holds commit and pull request rules.
-
-## Existing guides
-
-Use [Process](../process.md) and [AGENTS.md](../../../AGENTS.md) as entry points. Consult [Workflow](../delivery/workflow.md), [Ticket planning](ticket-planning.md), [Issue format](issue-format.md), [Testing](../delivery/testing.md), [Review](../delivery/review.md), [Incidents](incidents.md) and [Stacked pull requests](../delivery/stacked-prs.md) for their specific procedures.
-
 ## Open points
 
 - XL has no decided Status path; confirm which statuses an Epic visits before it is Done.
