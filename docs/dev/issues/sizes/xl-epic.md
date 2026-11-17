@@ -20,7 +20,7 @@ The Status path of an XL is not decided; see [Open points](../rules.md#open-poin
 
 ## Who does what
 
-Follow [Testing roles](../../delivery/testing.md#roles) for children: an implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator analyses, runs the gate, commits, pushes and opens PRs; only the developer merges. Give every PR a milestone, an assignee and the project.
+Follow [Testing roles](../../delivery/testing.md#roles) for children, and [Pull requests](../../delivery/workflow.md#pull-requests) for delivery.
 
 ## Components and parents
 
@@ -28,4 +28,4 @@ Group work with native child relationships; follow each child's size for Compone
 
 ## Closing
 
-Close with `Disposition: Released` only after all children are closed. A parent may be `S5: Done` with its Disposition before closure; do not rely on "Auto-close issue" for parents.
+Close with `Disposition: Released` only after all children are closed. See the [closing rules](../rules.md#shared-steps) for parents.

@@ -24,15 +24,13 @@ The developer selects the solution before implementation. Mark its implementatio
 
 ## Statuses
 
-Suggested path: `S0: To Do` -> `S1: In Analysis` -> `S3: Ready For Implementation` -> `S4: In Implementation` -> `S5: Done`.
+See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
 
 S3 requires a recorded selected solution: mark the attachment **[Selected Solution]** and fill Solution. Do not start the implementation agent or move the ticket to S3 or S4 before this is recorded.
 
-Project workflows set Done on close and on merge.
-
 ## Who does what
 
-An implementation agent implements and fixes in a dedicated worktree and does not analyse; the orchestrator analyses. The orchestrator runs the [gate](../../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project. Apply the [type row](../rules.md#by-issue-type).
+See [Roles](../../delivery/testing.md#roles) and [Pull requests](../../delivery/workflow.md#pull-requests). Apply the [type row](../rules.md#by-issue-type).
 
 ## Components and parents
 
@@ -40,4 +38,4 @@ Set up to two Component issue fields, for example Source Code and Tests for unit
 
 ## Closing
 
-Record Disposition and PR verification. A parent cannot close until all children are closed. It may be `S5: Done` with its Disposition before then; do not rely on "Auto-close issue" for parents.
+Record Disposition and PR verification. See the [closing rules](../rules.md#shared-steps) for parents.

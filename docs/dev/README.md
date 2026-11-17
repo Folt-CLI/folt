@@ -2,9 +2,9 @@
 
 Staged issue workflow shared by the Folt repositories. Keep process docs under docs/dev and issue forms under .github/ISSUE_TEMPLATE. GitHub issues are the durable work record.
 
-Work items contain exactly Summary, Scope, Analysis, Solution and Details. Fill Summary and Scope at creation. The orchestrator investigates and attaches findings and separate proposals; the developer selects the solution before implementation where analysis applies; see the working templates. Details contains the findings attachment and two to four key points. Do not add Acceptance criteria, Implementation plan or Closeout sections. Record delivery and performed verification in the PR.
+See [Issue format](issues/issue-format.md#work-items) for the work-item body sections. The orchestrator investigates and attaches findings and separate proposals; the developer selects the solution before implementation where analysis applies; see the working templates. Details contains the findings attachment and two to four key points. Do not add Acceptance criteria, Implementation plan or Closeout sections. Record delivery and performed verification in the PR.
 
-Use native parent links for grouping and blocked-by links for prerequisites. Independent release work defaults to epic #1; use an existing delivery group or Question, or an explicit developer instruction when applicable. See [Issue format](issues/issue-format.md#epics) for release Epics. Do not repeat a ticket's parent in its description.
+See [Dependencies and grouped work](issues/ticket-planning.md#dependencies-and-grouped-work) for parents and prerequisites. See [Issue format](issues/issue-format.md#epics) for release Epics.
 
 | Guide | Covers |
 | --- | --- |

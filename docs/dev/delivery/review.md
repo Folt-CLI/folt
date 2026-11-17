@@ -18,7 +18,7 @@ Follow [Testing](testing.md#ci-result-in-the-review): the orchestrator fetches a
 
 Always run a read-only review on every Dependabot PR. Verify that the bump will not break workflows or code using the diff, CI result and release notes of the bumped dependencies. The review agent has no network; paste the CI result and release notes into the review prompt. When clean, leave a PR comment whose entire body is exactly `No issues.`. Otherwise post findings as for any review below.
 
-The commit subject is `Dependabot[#0]: <Dependabot's description>`, set through `commit-message.prefix` in [.github/dependabot.yml](../../../.github/dependabot.yml). `Dependabot` is the only subject type that is not an issue type; `#0` means there is no ticket and none is needed, including an epic or issue. If the PR's commits do not follow this format, squash them into one commit with that subject.
+See [Branches and commits](workflow.md#branches-and-commits) for the Dependabot commit subject.
 
 ## Post findings
 

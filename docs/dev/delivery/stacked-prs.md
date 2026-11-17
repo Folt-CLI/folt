@@ -2,7 +2,7 @@
 
 Use a stack when a ticket depends on implementation in another ticket whose pull request is still open. Create a native GitHub stack with the `gh stack` extension. A stack is a chain of pull requests in one repository: the bottom pull request targets `develop`, and each later pull request targets the branch below it. Each pull request shows its own layer's diff. Cross-fork stacks and GitHub Desktop are not supported. See GitHub's [about stacked pull requests](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs).
 
-Keep one worktree per ticket. Stacks may span linked worktrees, but `gh stack rebase` updates only clean worktrees. Stack state is shared by worktrees in the clone; do not run other Git tools concurrently with stack mutations.
+See [Branches and commits](workflow.md#branches-and-commits) for worktrees. Stacks may span linked worktrees, but `gh stack rebase` updates only clean worktrees. Stack state is shared by worktrees in the clone; do not run other Git tools concurrently with stack mutations.
 
 ## Prerequisites
 
@@ -36,10 +36,10 @@ CI and branch protection on the bottom pull request's base apply to every layer.
 
 ## Merge and ticket status
 
-Only the developer merges a pull request. `gh stack merge` merges every stack member up to the selected PR in one atomic, all-or-nothing operation; with no argument it uses the current stack, or pass a PR number to merge up to that PR. Through the GitHub UI, merge one layer at a time from the bottom up. Do not run `gh stack merge` or a merge API unless the developer instructs you to merge that stack. The synchronous pull request merge API does not support stacks; the stack merge uses GitHub's asynchronous merge endpoint. GitHub's documentation describes automatic retargeting of upper pull requests after a bottom pull request merges with merge commit, squash or rebase methods; the about-stacked-prs page lists all three methods as supported. The merge-commit case has not been observed in this repository.
+See [Pull requests](workflow.md#pull-requests) for who merges. `gh stack merge` merges every stack member up to the selected PR in one atomic, all-or-nothing operation; with no argument it uses the current stack, or pass a PR number to merge up to that PR. Through the GitHub UI, merge one layer at a time from the bottom up. Do not run `gh stack merge` or a merge API unless the developer instructs you to merge that stack. The synchronous pull request merge API does not support stacks; the stack merge uses GitHub's asynchronous merge endpoint. GitHub's documentation describes automatic retargeting of upper pull requests after a bottom pull request merges with merge commit, squash or rebase methods; the about-stacked-prs page lists all three methods as supported. The merge-commit case has not been observed in this repository.
 
 Update the Folt project status separately for each ticket, following [Ticket planning](../issues/ticket-planning.md). A shared stack does not change ticket ownership or status.
 
 ## Unverified
 
-Enablement for this repository has not been confirmed. The `line` and `side` review-comment parameters and requesting changes on an agent-authored pull request have not been verified here; see [Review](review.md).
+Enablement for this repository has not been confirmed. See [Unverified](review.md#unverified).

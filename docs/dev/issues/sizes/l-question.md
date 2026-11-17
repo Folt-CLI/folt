@@ -18,11 +18,11 @@ The developer selects the answer. Mark its implementation scope attachment **[Se
 
 ## Statuses
 
-Suggested path: `S0: To Do` -> `S1: In Analysis` -> `S3: Ready For Implementation` -> `S4: In Implementation` -> `S5: Done`. Project workflows set Done on close and on merge. An answered Question may be Done with Answered while its children remain open.
+See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path. An answered Question may be Done with Answered while its children remain open.
 
 ## Who does what
 
-The orchestrator analyses; the developer selects the answer. An implementation agent implements and fixes in dedicated child worktrees and does not analyse. The orchestrator runs the [gate](../../delivery/testing.md#gate-before-push), commits, pushes and opens PRs; only the developer merges. Give every PR a milestone, an assignee and the project.
+The orchestrator analyses; the developer selects the answer. See [Roles](../../delivery/testing.md#roles) and [Pull requests](../../delivery/workflow.md#pull-requests).
 
 ## Components and parents
 
@@ -30,7 +30,7 @@ L may name several Components describing what can be done; represent each one by
 
 ## Closing
 
-Close with `Disposition: Answered` only after all children are closed. It may be `S5: Done` with its Disposition before then; do not rely on "Auto-close issue" for parents.
+Close with `Disposition: Answered` only after all children are closed. See the [closing rules](../rules.md#shared-steps) for parents.
 
 ## Working a Question
 

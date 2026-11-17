@@ -19,9 +19,9 @@ Security settings enable private vulnerability reporting, Dependabot alerts and 
 
 Actions require full commit SHA pinning. The default `GITHUB_TOKEN` permission is read-only and workflows cannot approve pull requests by default. Existing workflow-level permissions still govern explicit grants; these defaults do not replace review of workflow code. The script leaves Actions enablement and allowed-action selections alone.
 
-[dependabot.yml](../../.github/dependabot.yml) checks `github-actions` monthly and groups version updates. Cargo version updates remain deferred. Security updates are a separate repository feature; the monthly group does not control their timing. `commit-message.prefix` sets the commit subject to `Dependabot[#0]: <Dependabot's description>`. `#0` means there is no ticket and none is needed, including an epic or issue. Squash nonconforming PR commits into one commit with that subject.
+[dependabot.yml](../../.github/dependabot.yml) checks `github-actions` monthly and groups version updates. Cargo version updates remain deferred. Security updates are a separate repository feature; the monthly group does not control their timing. `commit-message.prefix` sets the commit subject to `Dependabot[#0]: <Dependabot's description>`. See [Branches and commits](delivery/workflow.md#branches-and-commits) for the Dependabot subject rules.
 
-Always run a read-only review on every Dependabot PR to verify that the bump will not break workflows or code, using the diff, CI result and release notes of the bumped dependencies. The review agent has no network, so paste the CI result and release notes into the prompt. Leave a PR comment that is exactly `No issues.` when clean; otherwise post findings as for any [review](delivery/review.md). No bot bypass or automatic merge is introduced.
+Review every Dependabot PR as described in [Dependabot PRs](delivery/review.md#dependabot-prs). No bot bypass or automatic merge is introduced.
 
 [LICENSE-MIT](../../LICENSE-MIT) and [LICENSE-APACHE](../../LICENSE-APACHE) provide the `MIT OR Apache-2.0` choice declared by Cargo; the README links both. The issue chooser disables blank issues and links to the security policy. Existing issue forms and the PR template remain the entry points.
 

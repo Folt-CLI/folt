@@ -11,7 +11,7 @@ You are the implementation agent. Implement and fix only. The orchestrator hands
 ## Do
 
 - Change only the files the implementation scope lists.
-- Every ticket adds or updates the tests for what it changes, in the same pull request. A bug fix adds a regression case that fails before the fix.
+- Add or update the tests as in the [Rule](../delivery/testing.md#rule).
 - Write the tests and run `cargo test --locked --workspace`.
 - Work in the worktree and Git branch the prompt names.
 - End with a `## Changes` list when the prompt asks.

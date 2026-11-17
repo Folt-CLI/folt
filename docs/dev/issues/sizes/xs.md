@@ -24,11 +24,11 @@ XS may skip the scope file when the ticket is self-descriptive. Follow the [S an
 
 The ticket is ready when its Solution and scope exist at creation. Only self-descriptive XS may skip the scope. Do not start the implementation agent or move the ticket to S3 or S4 before these requirements are met.
 
-Suggested path: `S0: To Do` -> `S4: In Implementation` -> `S5: Done`. Project workflows set Done on close and on merge.
+See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
 
 ## Who does what
 
-An implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator runs the [gate](../../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project.
+See [Roles](../../delivery/testing.md#roles) and [Pull requests](../../delivery/workflow.md#pull-requests).
 
 ## Components and parents
 
@@ -36,4 +36,4 @@ Set exactly one Component issue field. Use the [shared parent and repository rul
 
 ## Closing
 
-Record Disposition and PR verification. A parent cannot close until all children are closed. It may be `S5: Done` with its Disposition before then; do not rely on "Auto-close issue" for parents.
+Record Disposition and PR verification. See the [closing rules](../rules.md#shared-steps) for parents.
