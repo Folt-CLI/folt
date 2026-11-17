@@ -35,7 +35,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           bash scripts/test-integrity-test.sh
-          bash scripts/test-integrity origin/${{ github.base_ref }}
+          bash scripts/test-integrity.sh origin/${{ github.base_ref }}
       - name: Decide whether to skip the build
         id: plan
         env:

@@ -3,7 +3,7 @@
 # Usage: bash scripts/test-integrity-test.sh
 set -euo pipefail
 
-script=$(cd "$(dirname "$0")" && pwd)/test-integrity
+script=$(cd "$(dirname "$0")" && pwd)/test-integrity.sh
 temp=$(mktemp -d)
 trap 'rm -rf "$temp"' EXIT
 git -c init.defaultBranch=base -c init.templateDir= init -q "$temp/repo"
@@ -381,5 +381,5 @@ expect 2 'too many arguments' "$base" HEAD extra
 expect 2 'empty base argument' ''
 expect 2 'empty head argument' "$base" ''
 expect 2 'unavailable ref' missing-ref
-grep -Fq 'Usage: scripts/test-integrity <base-ref> [<head-ref>]' "$temp/output"
+grep -Fq 'Usage: scripts/test-integrity.sh <base-ref> [<head-ref>]' "$temp/output"
 printf '%s checks passed\n' "$passed"

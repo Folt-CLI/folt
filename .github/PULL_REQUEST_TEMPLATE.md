@@ -24,7 +24,7 @@ below it. -->
 ## Verification
 
 <!-- Local suite and result; each CI job per system and result; what did not run.
-See docs/dev/testing.md. -->
+See docs/dev/delivery/testing.md. -->
 
 ## Risks and follow-up
 
