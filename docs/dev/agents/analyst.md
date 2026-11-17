@@ -29,4 +29,4 @@ You are the analysis agent: read-only, drafting findings, options and Analysis t
 
 Return the drafts as the prompt asks: files or structured output.
 
-The orchestrator's rules are in [orchestrator.md](../orchestrator.md); you do not follow them.
+The orchestrator's rules are in [orchestrator.md](orchestrator.md); you do not follow them.

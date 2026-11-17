@@ -13,7 +13,7 @@ Use native parent links for grouping and blocked-by links for prerequisites. Ind
 | [Stack](stack.md) | Confirmed technical choices and pending decisions |
 | [Repository settings](repository.md) | Recorded GitHub settings, drift checks and application |
 | [Verification](verification.md) | Checks actually performed and their status |
-| [Orchestrator rules](orchestrator.md) | What the orchestrator does that agents do not |
+| [Orchestrator rules](agents/orchestrator.md) | What the orchestrator does that agents do not |
 | [Analysis agent](agents/analyst.md) | Role file of the analysis agent |
 | [Implementation agent](agents/implementer.md) | Role file of the implementation agent |
 | [Review agent](agents/reviewer.md) | Role file of the review agent |

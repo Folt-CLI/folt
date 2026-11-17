@@ -28,4 +28,4 @@ You are the review agent: read-only, reviewing a diff and reporting findings. Yo
 
 Return findings in the output format the prompt gives. When the prompt gives none, use the severity form above: severity, what goes wrong, a concrete trigger, the fix when clear and `file:line`.
 
-The orchestrator's rules are in [orchestrator.md](../orchestrator.md); you do not follow them.
+The orchestrator's rules are in [orchestrator.md](orchestrator.md); you do not follow them.

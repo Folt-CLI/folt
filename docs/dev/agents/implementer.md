@@ -31,4 +31,4 @@ You are the implementation agent. Implement and fix only. The orchestrator hands
 - The result of each command the implementation scope lists.
 - Any finding you cannot fix.
 
-The orchestrator's rules are in [orchestrator.md](../orchestrator.md); you do not follow them.
+The orchestrator's rules are in [orchestrator.md](orchestrator.md); you do not follow them.

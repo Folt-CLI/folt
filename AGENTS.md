@@ -9,7 +9,7 @@ This file is read by every agent; find your role below.
 | analysis agent | [analyst.md](docs/dev/agents/analyst.md) | The prompt says analyse. |
 | implementation agent | [implementer.md](docs/dev/agents/implementer.md) | The prompt says implement. |
 | review agent | [reviewer.md](docs/dev/agents/reviewer.md) | The prompt says review. |
-| orchestrator | [orchestrator.md](docs/dev/orchestrator.md) | The prompt strictly says you are the Orchestrator. |
+| orchestrator | [orchestrator.md](docs/dev/agents/orchestrator.md) | The prompt strictly says you are the Orchestrator. |
 
 Read the agent role files only when the prompt strictly matches your role.
 
