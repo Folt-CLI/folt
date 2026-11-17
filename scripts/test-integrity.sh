@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Usage: scripts/test-integrity <base-ref> [<head-ref>]
+# Usage: scripts/test-integrity.sh <base-ref> [<head-ref>]
 set -euo pipefail
 
 usage() {
-  printf 'Usage: scripts/test-integrity <base-ref> [<head-ref>]\n' >&2
+  printf 'Usage: scripts/test-integrity.sh <base-ref> [<head-ref>]\n' >&2
   exit 2
 }
 
