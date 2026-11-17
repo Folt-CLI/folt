@@ -603,7 +603,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** An issue whose outcome is a decision selected by the developer and whose derived work belongs in child issues. L is always a Question; it can be Done with Disposition Answered before its children close, but cannot itself close until they all close.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [work item](#work-item), [child](#child), [Disposition](#disposition), [size](#size).
 - **Not:** An unselected agent recommendation or permission to close a parent with open children.
 - **Status:** decided
@@ -612,7 +612,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** An issue for bounded work, with exactly Summary, Scope, Analysis, Solution and Details. Summary and Scope are filled at creation; the size template determines analysis, review and solution readiness.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [size](#size), [issue type](#issue-type), [Question](#question).
 - **Not:** An Epic’s Objective-only body or the incident report format.
 - **Status:** decided
@@ -621,7 +621,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** An XL release issue that groups work, titled `<version> -- Folt` with only an Objective in its body. It needs no analysis or review of its own and closes with Disposition Released after all children close.
-- **Code:** none (process term; see [working/xl-epic.md](docs/dev/working/xl-epic.md))
+- **Code:** none (process term; see [issues/xl-epic.md](docs/dev/issues/xl-epic.md))
 - **Related:** [parent](#parent), [child](#child), [milestone](#milestone), [size](#size).
 - **Not:** A directly implemented XL work item; its Status path and Component count remain unspecified in the working templates.
 - **Status:** decided
@@ -630,7 +630,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** A report recording a problem, observed evidence and user impact. Investigation, mitigation and permanent fixes are separate linked work items.
-- **Code:** none (process term; see [incidents.md](docs/dev/incidents.md))
+- **Code:** none (process term; see [incidents.md](docs/dev/issues/incidents.md))
 - **Related:** [work item](#work-item), [issue type](#issue-type).
 - **Not:** The implementation ticket for the fix or an assumed root cause.
 - **Status:** decided
@@ -639,7 +639,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The role that analyses work, hands findings to implementation agents, runs the gate and delivers commits and pull requests. The developer selects solutions and merges unless explicitly delegating a particular merge.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [gate](#gate), [worktree](#worktree), [Question](#question).
 - **Not:** The implementation agent, whose role is to implement and fix.
 - **Status:** decided
@@ -711,7 +711,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The ticket’s scope category: XS is self-descriptive, S has a decided solution, M needs analysis and review, L is a Question split into children, and XL is an Epic. XS needs neither analysis nor review; S needs review but no analysis.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [work item](#work-item), [Question](#question), [Epic](#epic).
 - **Not:** A time estimate or permission to implement L or XL as one change; use the working templates’ current statuses, not the older guide values.
 - **Status:** decided
@@ -720,7 +720,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The issue’s kind of work: Task, Bug, Feature, Question, Epic, Maintenance, Documentation, Incident or Test. Native issue types replace Type labels, and the exact type is used in commit subjects.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [work item](#work-item), [Question](#question), [Epic](#epic), [incident](#incident).
 - **Not:** A Component field, priority or size.
 - **Status:** decided
@@ -729,7 +729,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The issue field recording the outcome before closure, replacing the older Disposition label. A parent may have its Disposition and be Done before closure while children remain open.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [Question](#question), [Epic](#epic), [parent](#parent), [child](#child).
 - **Not:** The Status field; current Status values are S0: To Do, S1: In Analysis, S3: Ready For Implementation, S4: In Implementation and S5: Done.
 - **Status:** decided
@@ -738,7 +738,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The release assignment required on every ticket and pull request. Use the release milestone for the work, currently `0.1.0`, or `Backlog` otherwise.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [Epic](#epic), [work item](#work-item).
 - **Not:** A parent relationship, priority or Status.
 - **Status:** decided
@@ -747,7 +747,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The issue that groups another issue through a native parent relationship. Derived work belongs under its Question; otherwise use an existing delivery group or release Epic unless instructed otherwise.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [child](#child), [Question](#question), [Epic](#epic).
 - **Not:** A dependency ordering or the parent Folio of a declared reference; qualify that as reference parent.
 - **Status:** decided
@@ -756,7 +756,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** An issue grouped under a parent through the native child relationship. A parent cannot close until all children close, and actual prerequisites use separate dependency links.
-- **Code:** none (process term; see [working/README.md](docs/dev/working/README.md))
+- **Code:** none (process term; see [issues/README.md](docs/dev/issues/README.md))
 - **Related:** [parent](#parent), [work item](#work-item), [Question](#question).
 - **Not:** A reference target Folio; qualify that as reference child.
 - **Status:** decided

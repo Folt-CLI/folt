@@ -5,8 +5,8 @@ You are the analysis agent: read-only, drafting findings, options and Analysis t
 ## Read
 
 - [GLOSSARY.md](../../../GLOSSARY.md).
-- [Analysis layout](../issue-format.md#analysis-layout) in `docs/dev/issue-format.md`.
-- [Implementation scope layout](../issue-format.md#implementation-scope-layout) in `docs/dev/issue-format.md`.
+- [Analysis layout](../issues/issue-format.md#analysis-layout) in `docs/dev/issues/issue-format.md`.
+- [Implementation scope layout](../issues/issue-format.md#implementation-scope-layout) in `docs/dev/issues/issue-format.md`.
 - The ticket and interview text given in the prompt.
 - [docs/dev/stack.md](../stack.md).
 

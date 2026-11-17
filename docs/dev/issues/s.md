@@ -4,7 +4,7 @@ Use S for straightforward work with its solution already decided. The ticket ask
 
 ## The ticket must contain
 
-Use the five-section [work-item body](../issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
+Use the five-section [work-item body](issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
 
 ## Analysis and review
 
@@ -18,7 +18,7 @@ Use a `> [!IMPORTANT]` decision line, **Agreed in #N** (what the parent Question
 
 Attach with gh-attach and verify at creation by downloading and comparing.
 
-S always has this scope file. Follow the [S and XS Solution layout](../issue-format.md#s-and-xs-solution-layout) and the applicable [type row](README.md#by-issue-type).
+S always has this scope file. Follow the [S and XS Solution layout](issue-format.md#s-and-xs-solution-layout) and the applicable [type row](README.md#by-issue-type).
 
 ## Statuses
 

@@ -4,13 +4,13 @@ An L is always a Question. Split it into M/S/XS child tickets under it.
 
 ## The ticket must contain
 
-Use the five-section [work-item body](../issue-format.md) with Summary and Scope filled at creation. Set type Question and the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
+Use the five-section [work-item body](issue-format.md) with Summary and Scope filled at creation. Set type Question and the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
 
 ## Analysis and review
 
 For a Question, follow [Working a Question](../orchestrator.md#working-a-question).
 
-L needs analysis and review. The orchestrator writes Analysis inline in the ticket, links the findings attachment from Details and attaches each solution as a complete implementation scope. Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../review.md).
+L needs analysis and review. The orchestrator writes Analysis inline in the ticket, links the findings attachment from Details and attaches each solution as a complete implementation scope. Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../review.md).
 
 ## Solution
 

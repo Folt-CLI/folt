@@ -6,7 +6,7 @@ Split it into M/S items when warranted.
 
 ## The ticket must contain
 
-Use the five-section [work-item body](../issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
+Use the five-section [work-item body](issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
 
 ## Analysis and review
 
@@ -16,7 +16,7 @@ M needs analysis AND review. Analysis agents are read-only and produce drafts as
 
 The orchestrator writes Analysis inline, links the findings attachment from Details and attaches each solution as a complete implementation scope.
 
-Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../review.md).
+Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../review.md).
 
 ## Solution
 

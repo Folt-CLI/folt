@@ -4,9 +4,9 @@ The issue body is the shared record of why work exists, what it includes, and ho
 
 ## Work items
 
-Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
+Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
-Use the forms under `.github/ISSUE_TEMPLATE`, one per issue type: Task, Bug, Feature, Question, Epic, Maintenance, Documentation, Incident and Test. Follow the [working templates](working/README.md) for what each size contains; the table below describes sections when their stage applies.
+Use the forms under `.github/ISSUE_TEMPLATE`, one per issue type: Task, Bug, Feature, Question, Epic, Maintenance, Documentation, Incident and Test. Follow the [working templates](README.md) for what each size contains; the table below describes sections when their stage applies.
 
 | Section | When to fill it | Purpose |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ S always has a scope attachment; self-descriptive XS may skip it. A Question's a
 Use this order in the ticket's `## Analysis` section:
 
 1. A `> [!IMPORTANT]` callout stating the decision in one sentence.
-2. `### Where we are`: bullets of facts and their consequences, followed by **Out of scope** and **Terms**. Use terms exactly as defined in [GLOSSARY.md](../../GLOSSARY.md); list a missing term as unresolved, never invent it.
+2. `### Where we are`: bullets of facts and their consequences, followed by **Out of scope** and **Terms**. Use terms exactly as defined in [GLOSSARY.md](../../../GLOSSARY.md); list a missing term as unresolved, never invent it.
 3. A comparison table when there are two or more options. Use rows such as rule duplication, diff size, main risk and reader.
 4. One `### Option N: <name>` block per option, with bold labels **You get**, **Changes**, **Watch out** and **Implementation scope**. The last links to its scope attachment.
 5. `### Recommendation`: one option and one sentence of reason.
@@ -187,11 +187,11 @@ Match the affected-area list to Scope: one page for a page change, a list for a 
 
 Findings contain facts; solution attachments contain executable implementation scopes. Long material stays in attachments and issue comments stay short. Name files with the issue number so they remain identifiable.
 
-Upload Markdown files using the `gh-attach` extension, then link their returned URLs from the issue. See [the upload procedure](github-cli.md#markdown-attachments). Verify the uploaded contents and issue links. Do not substitute public gists, repository commits, or local filesystem paths for GitHub attachments. If no signed-in browser session is available, keep upload pending and report that specific blocker.
+Upload Markdown files using the `gh-attach` extension, then link their returned URLs from the issue. See [the upload procedure](../github-cli.md#markdown-attachments). Verify the uploaded contents and issue links. Do not substitute public gists, repository commits, or local filesystem paths for GitHub attachments. If no signed-in browser session is available, keep upload pending and report that specific blocker.
 
 ## Epics
 
-An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](working/xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](workflow.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
+An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](../workflow.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
 
 ## Notes, attachments, and links
 
