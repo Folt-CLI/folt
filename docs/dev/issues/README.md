@@ -1,6 +1,6 @@
 # Issues
 
-This folder holds the guides for writing and working tickets. See [Process](../process.md) for the full index.
+This folder holds the guides for writing and working tickets. See [Process](../README.md) for the full index.
 
 - [Rules](rules.md): size table, shared steps, issue types and open points.
 - [Issue format](issue-format.md): work-item and release-epic format and analysis attachments.

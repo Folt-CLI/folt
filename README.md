@@ -65,7 +65,7 @@ The [pending decisions](docs/dev/stack.md#pending-decisions) include:
 
 Read the [glossary](GLOSSARY.md) for Folt and process terminology.
 
-Start with the [contributing guide](CONTRIBUTING.md) and [development process](docs/dev/process.md). Follow the [Code of Conduct](CODE_OF_CONDUCT.md), consult the [security policy](SECURITY.md) for vulnerability reporting, and read [AGENTS.md](AGENTS.md) for repository instructions.
+Start with the [contributing guide](CONTRIBUTING.md) and [development process](docs/dev/README.md). Follow the [Code of Conduct](CODE_OF_CONDUCT.md), consult the [security policy](SECURITY.md) for vulnerability reporting, and read [AGENTS.md](AGENTS.md) for repository instructions.
 
 ## License
 

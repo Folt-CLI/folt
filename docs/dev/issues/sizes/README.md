@@ -1,6 +1,6 @@
 # Size templates
 
-This folder holds the working template of each ticket size. See [Process](../../process.md) for the full index.
+This folder holds the working template of each ticket size. See [Process](../../README.md) for the full index.
 
 - [XS ticket](xs.md): working an XS ticket.
 - [S ticket](s.md): working an S ticket.

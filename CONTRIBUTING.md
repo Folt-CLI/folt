@@ -2,7 +2,7 @@
 
 Follow the [Code of Conduct](CODE_OF_CONDUCT.md) when participating in the community.
 
-Start with [the development process](docs/dev/process.md) and [the current stack](docs/dev/stack.md). Use the repository issue forms and native parents/dependencies. Keep work bounded, attach findings and solution options when analysis is requested, and let the developer select the solution.
+Start with [the development process](docs/dev/README.md) and [the current stack](docs/dev/stack.md). Use the repository issue forms and native parents/dependencies. Keep work bounded, attach findings and solution options when analysis is requested, and let the developer select the solution.
 
 Follow [the workflow](docs/dev/delivery/workflow.md), [stacked pull requests](docs/dev/delivery/stacked-prs.md) and [review](docs/dev/delivery/review.md) for issue branches, agent delivery, stacks and reviews. Use issue-type commit subjects, the **Summary** and **Changes** commit body and the pull request format. Record only verification actually performed.
 

@@ -32,7 +32,7 @@ Any other prompt, including an ordinary chat, does not read it.
 
 - Code: `crates/folt-core` (library), `crates/folt-cli` (the `folt` binary).
 - Tests: `tests/`.
-- Process: [docs/dev/process.md](docs/dev/process.md) and the rest of `docs/dev/`.
+- Process: [docs/dev/README.md](docs/dev/README.md) and the rest of `docs/dev/`.
 - Agent roles: `docs/dev/agents/`.
 - Terms: [GLOSSARY.md](GLOSSARY.md).
 - Issue forms: `.github/ISSUE_TEMPLATE/`. CI: `.github/workflows/`.
