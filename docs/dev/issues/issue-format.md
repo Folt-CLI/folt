@@ -191,7 +191,7 @@ Upload Markdown files using the `gh-attach` extension, then link their returned 
 
 ## Epics
 
-An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](../delivery/workflow.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
+An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](ticket-planning.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
 
 ## Notes, attachments, and links
 

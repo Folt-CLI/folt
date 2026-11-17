@@ -8,7 +8,7 @@ Use the five-section [work-item body](issue-format.md) with Summary and Scope fi
 
 ## Analysis and review
 
-For a Question, follow [Working a Question](../orchestrator.md#working-a-question).
+For a Question, follow [Working a Question](#working-a-question).
 
 L needs analysis and review. The orchestrator writes Analysis inline in the ticket, links the findings attachment from Details and attaches each solution as a complete implementation scope. Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../delivery/review.md).
 
@@ -31,3 +31,12 @@ L may name several Components describing what can be done; represent each one by
 ## Closing
 
 Close with `Disposition: Answered` only after all children are closed. It may be `S5: Done` with its Disposition before then; do not rely on "Auto-close issue" for parents.
+
+## Working a Question
+
+The orchestrator works every Question itself; Fugue's `fugue question` command is not used.
+
+1. Start with a read-only interview probing intent, users, boundaries, failure cases, constraints and code touched. Offer 3 to 5 rough directions, then obtain the developer's confirmation before any analysis.
+2. Write Analysis using [Analysis and solution selection](issue-format.md#analysis-and-solution-selection). Attach the finished interview as `<N>-conversation.md` and link it from Details. Use the [Implementation scope layout](issue-format.md#implementation-scope-layout) for each option's scope.
+3. The developer selects an option and gives a reason; record the selection and reason once in Solution. Mark the chosen scope **[Selected Solution]**.
+4. Propose child tickets as a table: key, title, issue type, size, priority, components, blocked-by. Create them only after the developer answers `yes`, with native parent and blocked-by links. On a rerun, reuse existing child tickets and relationships; do not create duplicates.

@@ -37,12 +37,7 @@
 
 ## Working a Question
 
-The orchestrator works every Question itself; Fugue's `fugue question` command is not used.
-
-1. Start with a read-only interview probing intent, users, boundaries, failure cases, constraints and code touched. Offer 3 to 5 rough directions, then obtain the developer's confirmation before any analysis.
-2. Write Analysis using [Analysis and solution selection](issues/issue-format.md#analysis-and-solution-selection). Attach the finished interview as `<N>-conversation.md` and link it from Details. Use the [Implementation scope layout](issues/issue-format.md#implementation-scope-layout) for each option's scope.
-3. The developer selects an option and gives a reason; record the selection and reason once in Solution. Mark the chosen scope **[Selected Solution]**.
-4. Propose child tickets as a table: key, title, issue type, size, priority, components, blocked-by. Create them only after the developer answers `yes`, with native parent and blocked-by links. On a rerun, reuse existing child tickets and relationships; do not create duplicates.
+See [Working a Question](issues/l-question.md#working-a-question).
 
 ## Choosing an agent tier
 

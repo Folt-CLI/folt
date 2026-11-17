@@ -46,7 +46,7 @@ gh issue close 2 --repo Folt-CLI/folt
 
 Use the repository's GitHub issue forms when creating a work item, epic, or incident in the web interface. `gh issue create` accepts a title/body but does not fill out the form interactively; use a prepared Markdown body that follows [issue-format.md](../issues/issue-format.md).
 
-Use the parent specified by the developer or an existing delivery group or Question in [workflow](workflow.md#dependencies-and-grouped-work); independent release work defaults to #1. Choose the issue type appropriate to the request. Verify the native parent and issue type after creation with `gh issue view <number> --repo Folt-CLI/folt --json parent,issueType`. Do not add a parent reference to the body. Set assignment, milestone and project membership following [ticket planning](../issues/ticket-planning.md#at-issue-creation).
+Use the parent specified by the developer or an existing delivery group or Question in [workflow](../issues/ticket-planning.md#dependencies-and-grouped-work); independent release work defaults to #1. Choose the issue type appropriate to the request. Verify the native parent and issue type after creation with `gh issue view <number> --repo Folt-CLI/folt --json parent,issueType`. Do not add a parent reference to the body. Set assignment, milestone and project membership following [ticket planning](../issues/ticket-planning.md#at-issue-creation).
 
 ## Markdown attachments
 

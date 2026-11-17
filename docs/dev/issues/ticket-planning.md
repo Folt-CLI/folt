@@ -46,3 +46,11 @@ Use the release milestone for scheduled release work and `Backlog` otherwise, fo
 Assign an iteration when the work is deliberately scheduled into a real project cycle, taking priority, dependencies and capacity into account. Leave unscheduled backlog work without an iteration; do not put every issue into the next cycle. Closed work does not belong to a future iteration.
 
 Before closure, follow the [closing rules](README.md#shared-steps) and record delivery and performed verification in the PR.
+
+## Dependencies and grouped work
+
+Place work tickets under an existing delivery group or Question where applicable; independent work defaults to epic #1 unless the developer specifies another parent. Pass the chosen parent with `--parent` when creating or editing a ticket. Do not repeat the parent in the description.
+
+A Question is the parent of tickets derived from its answer, including implementation, documentation and sub-decisions. See the [L Question template](l-question.md). A parent cannot be closed until all its children are closed. It may be set to `S5: Done` with its Disposition before then, for example an answered Question whose children remain open. Do not rely on the project workflow "Auto-close issue" for parents. Follow the [superseded-child rule](README.md#shared-steps) when a child ticket is superseded.
+
+A parent groups tickets and does not order them. Add native blocked-by links for real prerequisites, including a sub-decision that needs its parent's answer. Keep nesting shallow. Preserve existing analysis and selected solutions when regrouping. Analysis and UI exploration may proceed alongside dependency work. Keep optional enhancements from blocking the first usable slice merely because they share a parent.

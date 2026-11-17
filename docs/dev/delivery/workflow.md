@@ -73,11 +73,7 @@ Follow [Ticket planning](../issues/ticket-planning.md) for assignment, relations
 
 ## Dependencies and grouped work
 
-Place work tickets under an existing delivery group or Question where applicable; independent work defaults to epic #1 unless the developer specifies another parent. Pass the chosen parent with `--parent` when creating or editing a ticket. Do not repeat the parent in the description.
-
-A Question is the parent of tickets derived from its answer, including implementation, documentation and sub-decisions. See the [L Question template](../issues/l-question.md). A parent cannot be closed until all its children are closed. It may be set to `S5: Done` with its Disposition before then, for example an answered Question whose children remain open. Do not rely on the project workflow "Auto-close issue" for parents. Follow the [superseded-child rule](../issues/README.md#shared-steps) when a child ticket is superseded.
-
-A parent groups tickets and does not order them. Add native blocked-by links for real prerequisites, including a sub-decision that needs its parent's answer. Keep nesting shallow. Preserve existing analysis and selected solutions when regrouping. Analysis and UI exploration may proceed alongside dependency work. Keep optional enhancements from blocking the first usable slice merely because they share a parent.
+See [Dependencies and grouped work](../issues/ticket-planning.md#dependencies-and-grouped-work).
 
 ## Pull requests
 
