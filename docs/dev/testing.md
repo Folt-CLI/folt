@@ -70,10 +70,6 @@ For a planned skip, `gh pr checks <n> --repo Folt-CLI/folt --json name,bucket` s
 
 The PR's Verification section lists the local suite command and result, and each CI job on Ubuntu, macOS and Windows with its result, filled in after CI finishes. Say plainly what did not run.
 
-## Implementation agent guidance
-
-See the [implementation agent role file](agents/implementer.md) for implementation agent guidance.
-
 ## Suites and layout
 
 The local tier is `cargo test --workspace`: unit tests in `folt-core/src/`, the validation suite, and doctests. It runs in seconds with no network, Docker or extra tool at test runtime. Dependencies must already be cached for offline builds; use `export CARGO_NET_OFFLINE=true` and `cargo test --offline --workspace` when working without network access.
@@ -129,7 +125,3 @@ cargo test-performance --baseline before
 The Performance workflow runs on Ubuntu daily at 03:17 UTC, or manually. It restores the last successful scheduled run's artifact from the same branch as `old`, then runs `--baseline-lenient old` to compare and save fresh `new` results in one run. Criterion 0.8.2 rejects combining `--baseline` and `--save-baseline`; lenient comparison also allows new benchmarks or a missing/expired artifact. Baseline artifacts and logs are retained for 30 days. Each benchmark's mean change appears in the job summary; Criterion regressions produce warnings with p < 0.05 and a 10% noise threshold (20% for store writes that sync to disk). The workflow never runs on PRs; regressions do not fail the job. Operational errors still fail the scheduled run so incomplete results do not become the next baseline.
 
 Judge a regression over several nights: shared runners vary, and one warning is only a hint. Comparison with the preceding night can miss slow creep. Without a previous baseline the run saves fresh results without comparison. GitHub disables schedules after 60 days without repository activity; re-enable the workflow if needed.
-
-## Implementation order
-
-Issue [#99](https://github.com/Folt-CLI/folt/issues/99) is stacked above `maintenance/97-harness`, the branch for [#97](https://github.com/Folt-CLI/folt/issues/97) in [PR #101](https://github.com/Folt-CLI/folt/pull/101). #97 supplied the harness, aliases and this document's suites and layout first; #99 extends this file with the process rules and the gate using those existing commands.

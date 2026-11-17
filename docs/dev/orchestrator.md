@@ -47,13 +47,3 @@ The orchestrator works every Question itself; Fugue's `fugue question` command i
 ## Choosing an agent tier
 
 The orchestrator sets the tier of every agent it starts from the ticket's size and difficulty. State the tier and its reason in the report. Start from the size rules: implementation agents use small for XS and S, medium for M, and large for L. Analysis agents use medium for M and large for L; review agents use at least medium. Raise one tier when the ticket is ambiguous or costly to get wrong. Lower one tier when the scope is exact and an automated check covers it; review remains at least medium. Mechanical tracking (moving Status and fields, uploads, watching runs) uses small. The highest tier is for rare cases and needs a stated reason. Which model serves each tier is set in the developer's own configuration outside the repository; no repository document names a model.
-
-## Former AGENTS.md rule locations
-
-| Former AGENTS.md lines | Heading here |
-| --- | --- |
-| 12-19 | [Scope and decisions](#scope-and-decisions) |
-| 23-41 | [Issues and analysis](#issues-and-analysis) |
-| 45-77 | [Commits and delivery](#commits-and-delivery) |
-| 82-83 | [Repository conventions](#repository-conventions) |
-| 86-87 | [Repository conventions](#repository-conventions) |
