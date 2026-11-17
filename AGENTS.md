@@ -24,6 +24,7 @@ Any other prompt, including an ordinary chat, does not read it.
 - Follow .editorconfig.
 - Keep build outputs, local configuration and credentials out of Git.
 - Use no emojis.
+- Keep each paragraph and list item on one line in Markdown; do not hard-wrap prose at a column.
 - Never name an agent tool, model or provider in an issue, comment, pull request or Git commit message.
 - Do only what your role file allows.
 
