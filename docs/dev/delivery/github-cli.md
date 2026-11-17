@@ -93,7 +93,7 @@ Priority has field id `49325272` and values Urgent, High, Medium and Low. Compon
 {"issue_field_values":[{"field_id":49332254,"value":["Dev Docs"]}]}
 ```
 
-Disposition has field id `49332255` and values Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn and Won't Do. Set Component after solution selection and Disposition when ready to close. Follow [ticket planning](../issues/ticket-planning.md#fields-after-decisions) and [working templates](../issues/README.md) for timing and limits. Read the issue first and preserve unrelated metadata when making changes.
+Disposition has field id `49332255` and values Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn and Won't Do. Set Component after solution selection and Disposition when ready to close. Follow [ticket planning](../issues/ticket-planning.md#fields-after-decisions) and [working templates](../issues/rules.md) for timing and limits. Read the issue first and preserve unrelated metadata when making changes.
 
 ## Pull requests
 
@@ -108,7 +108,7 @@ gh pr create \
 gh pr view <number> --repo Folt-CLI/folt
 ```
 
-The PR body should include `Closes #<issue-number>` when merging it completes the linked work item. Follow the [parent closing rules](../issues/README.md#shared-steps) before using a closing keyword for a parent. A merge is a human review decision; do not merge unless the repository's required checks and review are satisfied.
+The PR body should include `Closes #<issue-number>` when merging it completes the linked work item. Follow the [parent closing rules](../issues/rules.md#shared-steps) before using a closing keyword for a parent. A merge is a human review decision; do not merge unless the repository's required checks and review are satisfied.
 
 ### Inspect checks
 

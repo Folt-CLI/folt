@@ -6,13 +6,13 @@ Use this guide whenever creating, analysing, scheduling, implementing or closing
 
 Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
-1. Choose the issue type from the initial request. See the [issue types](README.md#by-issue-type) for their uses.
+1. Choose the issue type from the initial request. See the [issue types](rules.md#by-issue-type) for their uses.
 2. Assign a responsible person. For tickets created at the developer's request, assign `Bojan-Ivanovski` unless the developer names another owner. Change the assignee when responsibility is handed off; do not leave an active issue unassigned.
-3. Add the issue to the Folt project and set its metadata using the [shared steps](README.md#shared-steps). Every ticket has a milestone (the milestone of the release it is for, currently `0.1.0`; otherwise `Backlog`), a Priority, a Size and a Status.
-4. Set its native parent relationship at creation: put a ticket derived from a decision under its Question. Use an existing delivery group when one fits; otherwise use release epic #1 unless the developer gives another parent. Follow the [size rules](README.md) when grouping work. Do not repeat the parent in the issue body.
+3. Add the issue to the Folt project and set its metadata using the [shared steps](rules.md#shared-steps). Every ticket has a milestone (the milestone of the release it is for, currently `0.1.0`; otherwise `Backlog`), a Priority, a Size and a Status.
+4. Set its native parent relationship at creation: put a ticket derived from a decision under its Question. Use an existing delivery group when one fits; otherwise use release epic #1 unless the developer gives another parent. Follow the [size rules](rules.md) when grouping work. Do not repeat the parent in the issue body.
 5. Add a native `blocked by` relationship only for a real prerequisite that prevents implementation or a dependent decision. GitHub represents the reverse `blocking` relationship on the prerequisite. Do not use parent links as dependency links or add dependencies just because work is related.
 
-Follow the [shared steps](README.md#shared-steps) for repository ownership and required fields.
+Follow the [shared steps](rules.md#shared-steps) for repository ownership and required fields.
 
 ## Priority
 
@@ -27,17 +27,17 @@ Priority may change as dependencies or product decisions change. Update the issu
 
 ## Size
 
-Follow the [size table](README.md) and the individual templates for [XS](xs.md), [S](s.md), [M](m.md), [L Questions](l-question.md) and [XL Epics](xl-epic.md). They define analysis, splitting, review and Component limits. Follow the [shared steps](README.md#shared-steps) for refining Size after analysis and applying the new review and Component limits.
+Follow the [size table](rules.md) and the individual templates for [XS](sizes/xs.md), [S](sizes/s.md), [M](sizes/m.md), [L Questions](sizes/l-question.md) and [XL Epics](sizes/xl-epic.md). They define analysis, splitting, review and Component limits. Follow the [shared steps](rules.md#shared-steps) for refining Size after analysis and applying the new review and Component limits.
 
 The Folt project's `Estimate` field has no agreed unit or scale. Leave it blank until the team defines one. Do not convert sizes into invented point or time values.
 
 ## Fields after decisions
 
-Set the Component issue field after the developer selects a solution, using Build, Dev Docs, Dev Tools, Source Code, Tests or User Docs for its actual affected areas. Follow the [size template](README.md) for limits. Set the Disposition issue field when ready to close, using Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn or Won't Do. Follow the [closing rules](README.md#shared-steps) and [type rules](README.md#by-issue-type) for the outcome. The [shared steps](README.md#shared-steps) also govern `Merged`, reasons for other closures before `S5: Done`, and superseded child tickets.
+Set the Component issue field after the developer selects a solution, using Build, Dev Docs, Dev Tools, Source Code, Tests or User Docs for its actual affected areas. Follow the [size template](rules.md) for limits. Set the Disposition issue field when ready to close, using Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn or Won't Do. Follow the [closing rules](rules.md#shared-steps) and [type rules](rules.md#by-issue-type) for the outcome. The [shared steps](rules.md#shared-steps) also govern `Merged`, reasons for other closures before `S5: Done`, and superseded child tickets.
 
 ## Project status through the workflow
 
-Use the [Status list and shared steps](README.md#shared-steps), keeping status aligned with the ticket's stage. Follow the size template's path. When blocked, keep the stage status, add the native blocked-by relationship and record the blocker and next action in the issue. Remove the dependency when it no longer blocks work.
+Use the [Status list and shared steps](rules.md#shared-steps), keeping status aligned with the ticket's stage. Follow the size template's path. When blocked, keep the stage status, add the native blocked-by relationship and record the blocker and next action in the issue. Remove the dependency when it no longer blocks work.
 
 ## Milestones and iterations
 
@@ -45,12 +45,12 @@ Use the release milestone for scheduled release work and `Backlog` otherwise, fo
 
 Assign an iteration when the work is deliberately scheduled into a real project cycle, taking priority, dependencies and capacity into account. Leave unscheduled backlog work without an iteration; do not put every issue into the next cycle. Closed work does not belong to a future iteration.
 
-Before closure, follow the [closing rules](README.md#shared-steps) and record delivery and performed verification in the PR.
+Before closure, follow the [closing rules](rules.md#shared-steps) and record delivery and performed verification in the PR.
 
 ## Dependencies and grouped work
 
 Place work tickets under an existing delivery group or Question where applicable; independent work defaults to epic #1 unless the developer specifies another parent. Pass the chosen parent with `--parent` when creating or editing a ticket. Do not repeat the parent in the description.
 
-A Question is the parent of tickets derived from its answer, including implementation, documentation and sub-decisions. See the [L Question template](l-question.md). A parent cannot be closed until all its children are closed. It may be set to `S5: Done` with its Disposition before then, for example an answered Question whose children remain open. Do not rely on the project workflow "Auto-close issue" for parents. Follow the [superseded-child rule](README.md#shared-steps) when a child ticket is superseded.
+A Question is the parent of tickets derived from its answer, including implementation, documentation and sub-decisions. See the [L Question template](sizes/l-question.md). A parent cannot be closed until all its children are closed. It may be set to `S5: Done` with its Disposition before then, for example an answered Question whose children remain open. Do not rely on the project workflow "Auto-close issue" for parents. Follow the [superseded-child rule](rules.md#shared-steps) when a child ticket is superseded.
 
 A parent groups tickets and does not order them. Add native blocked-by links for real prerequisites, including a sub-decision that needs its parent's answer. Keep nesting shallow. Preserve existing analysis and selected solutions when regrouping. Analysis and UI exploration may proceed alongside dependency work. Keep optional enhancements from blocking the first usable slice merely because they share a parent.

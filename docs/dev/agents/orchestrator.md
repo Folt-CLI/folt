@@ -10,18 +10,18 @@
 ## Issues and analysis
 
 - Work items have exactly Summary, Scope, Analysis, Solution and Details. Fill Summary/Scope at creation; follow [Issue format](../issues/issue-format.md) for the remaining sections.
-- See [working templates](../issues/README.md) for how a ticket is worked by its size and issue type.
+- See [working templates](../issues/rules.md) for how a ticket is worked by its size and issue type.
 - Implementation agents implement and fix only; they do not analyse code, reviews or CI. The orchestrator investigates. For M and L tickets the developer selects the solution before implementation; XS and S carry their solution. Follow [Testing](../delivery/testing.md) for roles and handoffs.
-- Ask the developer questions only on Question tickets, and give ticket tracking to background sub-agents; see [shared steps](../issues/README.md#shared-steps).
+- Ask the developer questions only on Question tickets, and give ticket tracking to background sub-agents; see [shared steps](../issues/rules.md#shared-steps).
 - Write Analysis inline in the ticket using the layout in [Issue format](../issues/issue-format.md#analysis-and-solution-selection). Attach findings as `<N>-code-findings.md` and each solution as a complete implementation scope `<N>-solution-<k>.md` using gh-attach. Verify uploads and use real attachment links. Analyses and scopes use `GLOSSARY.md` terms exactly and no emojis.
-- Parents wait for closed children; see [closing rules](../issues/README.md#shared-steps).
+- Parents wait for closed children; see [closing rules](../issues/rules.md#shared-steps).
 - Set ticket and PR metadata; see [ticket planning](../issues/ticket-planning.md#at-issue-creation) and [PRs](../delivery/workflow.md#pull-requests).
-- Ticket work in its repository; see [repository rules](../issues/README.md#shared-steps).
+- Ticket work in its repository; see [repository rules](../issues/rules.md#shared-steps).
 - Use the release Epic format and closure; see [Epics](../issues/issue-format.md#epics).
 
 ## Commits and delivery
 
-- When implementation finishes, follow the size's review rule in [working templates](../issues/README.md). The orchestrator runs the gate in [Testing](../delivery/testing.md), then commits in the issue format, pushes and opens or updates the PR without another request. Only the developer merges; an agent merges only when instructed for that PR as the developer last saw it. If the Git branch changes afterwards, including conflict resolution or new Git commits, the instruction lapses: stop when checks are green and ask again. Never chain cleanup after a merge command that may have failed. Follow [Review](../delivery/review.md) and [Stacked pull requests](../delivery/stacked-prs.md).
+- When implementation finishes, follow the size's review rule in [working templates](../issues/rules.md). The orchestrator runs the gate in [Testing](../delivery/testing.md), then commits in the issue format, pushes and opens or updates the PR without another request. Only the developer merges; an agent merges only when instructed for that PR as the developer last saw it. If the Git branch changes afterwards, including conflict resolution or new Git commits, the instruction lapses: stop when checks are green and ask again. Never chain cleanup after a merge command that may have failed. Follow [Review](../delivery/review.md) and [Stacked pull requests](../delivery/stacked-prs.md).
 - All agents, including implementation and delegated agents, must do implementation work in a dedicated Git worktree for the issue branch. Do not implement in the primary checkout or share one worktree between concurrent issue work. Fetch and fast-forward the base branch before creating the worktree.
 - First commit: Initial[#1]: <short explanation>.
 - Later commits: <Issue Type>[#<issue-number>]: <short explanation>, copying the exact issue type.
@@ -37,7 +37,7 @@
 
 ## Working a Question
 
-See [Working a Question](../issues/l-question.md#working-a-question).
+See [Working a Question](../issues/sizes/l-question.md#working-a-question).
 
 ## Choosing an agent tier
 

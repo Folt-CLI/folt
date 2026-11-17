@@ -1,6 +1,6 @@
 # Pull request review
 
-After a pull request is opened or updated, where the [size requires review](../issues/README.md), run a read-only review of its diff against the pull request's base. For a stack, review each pull request against its own base. CI and branch protection on the bottom base apply to every layer; see [Stacked pull requests](stacked-prs.md).
+After a pull request is opened or updated, where the [size requires review](../issues/rules.md), run a read-only review of its diff against the pull request's base. For a stack, review each pull request against its own base. CI and branch protection on the bottom base apply to every layer; see [Stacked pull requests](stacked-prs.md).
 
 ## Review agent
 

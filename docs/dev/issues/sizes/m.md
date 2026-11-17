@@ -1,4 +1,4 @@
-# When it applies
+# M ticket
 
 Use M when a ticket is still loose and can be read several ways. It needs analysis and review, and the developer selects a solution. If there is one straightforward solution, use S or XS, not M.
 
@@ -6,7 +6,7 @@ Split it into M/S items when warranted.
 
 ## The ticket must contain
 
-Use the five-section [work-item body](issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
+Use the five-section [work-item body](../issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](../rules.md#shared-steps).
 
 ## Analysis and review
 
@@ -16,7 +16,7 @@ M needs analysis AND review. Analysis agents are read-only and produce drafts as
 
 The orchestrator writes Analysis inline, links the findings attachment from Details and attaches each solution as a complete implementation scope.
 
-Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../delivery/review.md).
+Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../../delivery/review.md).
 
 ## Solution
 
@@ -32,11 +32,11 @@ Project workflows set Done on close and on merge.
 
 ## Who does what
 
-An implementation agent implements and fixes in a dedicated worktree and does not analyse; the orchestrator analyses. The orchestrator runs the [gate](../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project. Apply the [type row](README.md#by-issue-type).
+An implementation agent implements and fixes in a dedicated worktree and does not analyse; the orchestrator analyses. The orchestrator runs the [gate](../../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project. Apply the [type row](../rules.md#by-issue-type).
 
 ## Components and parents
 
-Set up to two Component issue fields, for example Source Code and Tests for unit tests. Use the [shared parent and repository rules](README.md#shared-steps).
+Set up to two Component issue fields, for example Source Code and Tests for unit tests. Use the [shared parent and repository rules](../rules.md#shared-steps).
 
 ## Closing
 

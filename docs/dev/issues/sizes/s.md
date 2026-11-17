@@ -1,14 +1,14 @@
-# When it applies
+# S ticket
 
 Use S for straightforward work with its solution already decided. The ticket asks no questions.
 
 ## The ticket must contain
 
-Use the five-section [work-item body](issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](README.md#shared-steps).
+Use the five-section [work-item body](../issue-format.md) with Summary and Scope filled at creation. Set the milestone, Priority, Size, Status and ownership from the [shared steps](../rules.md#shared-steps).
 
 ## Analysis and review
 
-S needs review but no analysis. Use a read-only [review](../delivery/review.md).
+S needs review but no analysis. Use a read-only [review](../../delivery/review.md).
 
 ## Solution
 
@@ -18,7 +18,7 @@ Use a `> [!IMPORTANT]` decision line, **Agreed in #N** (what the parent Question
 
 Attach with gh-attach and verify at creation by downloading and comparing.
 
-S always has this scope file. Follow the [S and XS Solution layout](issue-format.md#s-and-xs-solution-layout) and the applicable [type row](README.md#by-issue-type).
+S always has this scope file. Follow the [S and XS Solution layout](../issue-format.md#s-and-xs-solution-layout) and the applicable [type row](../rules.md#by-issue-type).
 
 ## Statuses
 
@@ -28,11 +28,11 @@ Suggested path: `S0: To Do` -> `S4: In Implementation` -> `S5: Done`. Project wo
 
 ## Who does what
 
-An implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator runs the [gate](../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project.
+An implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator runs the [gate](../../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project.
 
 ## Components and parents
 
-Set exactly one Component issue field. Use the [shared parent and repository rules](README.md#shared-steps).
+Set exactly one Component issue field. Use the [shared parent and repository rules](../rules.md#shared-steps).
 
 ## Closing
 

@@ -6,7 +6,7 @@ The issue body is the shared record of why work exists, what it includes, and ho
 
 Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
-Use the forms under `.github/ISSUE_TEMPLATE`, one per issue type: Task, Bug, Feature, Question, Epic, Maintenance, Documentation, Incident and Test. Follow the [working templates](README.md) for what each size contains; the table below describes sections when their stage applies.
+Use the forms under `.github/ISSUE_TEMPLATE`, one per issue type: Task, Bug, Feature, Question, Epic, Maintenance, Documentation, Incident and Test. Follow the [working templates](rules.md) for what each size contains; the table below describes sections when their stage applies.
 
 | Section | When to fill it | Purpose |
 | --- | --- | --- |
@@ -191,7 +191,7 @@ Upload Markdown files using the `gh-attach` extension, then link their returned 
 
 ## Epics
 
-An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](ticket-planning.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
+An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](sizes/xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](ticket-planning.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
 
 ## Notes, attachments, and links
 

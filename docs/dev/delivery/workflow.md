@@ -6,12 +6,12 @@ Use GitHub Issues as the durable record of a change. Keep the issue body current
 
 Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
-Sizes decide which stages apply; see [working templates](../issues/README.md). XS skips analysis and review, S skips analysis, M and L need both, and XL needs neither. XS and S tickets go straight to implementation with their solution already in the ticket. An [XL Epic](../issues/xl-epic.md) only groups work and has no implementation.
+Sizes decide which stages apply; see [working templates](../issues/rules.md). XS skips analysis and review, S skips analysis, M and L need both, and XL needs neither. XS and S tickets go straight to implementation with their solution already in the ticket. An [XL Epic](../issues/sizes/xl-epic.md) only groups work and has no implementation.
 
 1. **Propose.** Create a work item or epic from its issue form. Agree on the outcome and scope before implementation starts.
 2. **Analyse and discuss.** For M and L, the orchestrator inspects the code and records factual findings, constraints, and compatibility concerns. Each possible solution is a complete implementation scope attachment. The orchestrator writes Analysis inline as if the developer had already asked for context, comparison and the next step, following [Issue format](../issues/issue-format.md#analysis-and-solution-selection). The orchestrator explains the trade-offs and may recommend an option; the developer chooses. Leave the Solution section pending until that choice is made. Then mark the chosen attachment **[Selected Solution]** and fill Solution with the changes, affected areas, and reason for choosing it. Split work that cannot be reviewed as one bounded change into linked issues.
 3. **Implement.** All agents implement in a dedicated Git worktree for the issue branch, never in the primary checkout. Use one worktree per ticket and do not share a worktree between concurrent implementation work. Dependent tickets may use a [stacked pull request](stacked-prs.md), with each upper branch based on the lower branch. Keep changes within the agreed scope. Implementation agents implement and fix only, following the roles and standard prompt in [Testing](testing.md). Update the issue when a decision changes the plan or scope.
-4. **Review.** Follow the size's review rule in [working templates](../issues/README.md). The orchestrator runs the gate in [Testing](testing.md), then commits in the issue's commit format, pushes and opens the pull request without a further request. Follow the [review workflow](review.md) and link the issue (for example, `Closes #2`). Only the developer merges; an agent merges only when the developer tells it to for that pull request. Record requested changes on the ticket and address them on the same branch before merging.
+4. **Review.** Follow the size's review rule in [working templates](../issues/rules.md). The orchestrator runs the gate in [Testing](testing.md), then commits in the issue's commit format, pushes and opens the pull request without a further request. Follow the [review workflow](review.md) and link the issue (for example, `Closes #2`). Only the developer merges; an agent merges only when the developer tells it to for that pull request. Record requested changes on the ticket and address them on the same branch before merging.
 5. **Complete.** Record the delivered change and verification in the pull request. Link follow-up work where needed. A linked closing keyword may close the work item when its pull request merges.
 
 ## Branches and commits
@@ -65,11 +65,11 @@ before any feature is written.
 - Mark both crates unpublishable: the API is not stable yet.
 ```
 
-Stage only files belonging to the change and review the staged diff before committing. When implementation finishes, follow the size's review rule in [working templates](../issues/README.md). The orchestrator runs the gate in [Testing](testing.md), then commits, pushes and opens or updates the pull request without a further request. After pushing a commit, do not rewrite it except for unmerged branches of a stack: rebase separately, run the local suite gate in [Testing](testing.md) on every affected branch, then push with `--force-with-lease` only when all pass. Stop and report if the local and remote stacks have diverged. Only the developer merges; an agent merges only when the developer instructs it to for that pull request.
+Stage only files belonging to the change and review the staged diff before committing. When implementation finishes, follow the size's review rule in [working templates](../issues/rules.md). The orchestrator runs the gate in [Testing](testing.md), then commits, pushes and opens or updates the pull request without a further request. After pushing a commit, do not rewrite it except for unmerged branches of a stack: rebase separately, run the local suite gate in [Testing](testing.md) on every affected branch, then push with `--force-with-lease` only when all pass. Stop and report if the local and remote stacks have diverged. Only the developer merges; an agent merges only when the developer instructs it to for that pull request.
 
 ## Issue types, fields and the Folt project
 
-Follow [Ticket planning](../issues/ticket-planning.md) for assignment, relationships, Priority, milestones and iterations. Follow [working templates](../issues/README.md) for issue types, required fields, sizes, statuses and closing rules.
+Follow [Ticket planning](../issues/ticket-planning.md) for assignment, relationships, Priority, milestones and iterations. Follow [working templates](../issues/rules.md) for issue types, required fields, sizes, statuses and closing rules.
 
 ## Dependencies and grouped work
 
@@ -79,9 +79,9 @@ See [Dependencies and grouped work](../issues/ticket-planning.md#dependencies-an
 
 Give every pull request a milestone, an assignee and the Folt project. See [ticket planning](../issues/ticket-planning.md#at-issue-creation) for ticket metadata.
 
-When implementation finishes, follow the size's review rule in [working templates](../issues/README.md). The orchestrator runs the gate in [Testing](testing.md), then commits in the issue format, pushes and opens or updates the pull request without a further request. Follow [Review](review.md) for read-only agent review, posting findings, recording requested changes on the ticket and fixing accepted findings on the same branch. Where review applies, repeat it until a review has no findings. Only the developer merges; an agent merges only when the developer tells it to for that pull request.
+When implementation finishes, follow the size's review rule in [working templates](../issues/rules.md). The orchestrator runs the gate in [Testing](testing.md), then commits in the issue format, pushes and opens or updates the pull request without a further request. Follow [Review](review.md) for read-only agent review, posting findings, recording requested changes on the ticket and fixing accepted findings on the same branch. Where review applies, repeat it until a review has no findings. Only the developer merges; an agent merges only when the developer tells it to for that pull request.
 
-For a stacked pull request, state its position in the stack and identify the pull request below it. Where the [size requires review](../issues/README.md), review the pull request using [Review](review.md).
+For a stacked pull request, state its position in the stack and identify the pull request below it. Where the [size requires review](../issues/rules.md), review the pull request using [Review](review.md).
 
 The title uses the commit subject format, `<Issue Type>[#<issue-number>]: <short explanation>`. The description follows [the pull request template](../../../.github/PULL_REQUEST_TEMPLATE.md), in this order:
 
