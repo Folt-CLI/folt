@@ -1,22 +1,10 @@
 # Folt development process
 
-Staged issue workflow shared by the Folt repositories. Keep process docs
-under docs/dev and issue forms under .github/ISSUE_TEMPLATE. GitHub issues are
-the durable work record.
+Staged issue workflow shared by the Folt repositories. Keep process docs under docs/dev and issue forms under .github/ISSUE_TEMPLATE. GitHub issues are the durable work record.
 
-Work items contain exactly Summary, Scope, Analysis, Solution and Details.
-Fill Summary and Scope at creation. The orchestrator investigates and attaches
-findings and separate proposals; the developer selects the solution before
-implementation where analysis applies; see the working templates.
-Details contains the findings attachment and two to four key points. Do not add
-Acceptance criteria, Implementation plan or Closeout sections. Record delivery
-and performed verification in the PR.
+Work items contain exactly Summary, Scope, Analysis, Solution and Details. Fill Summary and Scope at creation. The orchestrator investigates and attaches findings and separate proposals; the developer selects the solution before implementation where analysis applies; see the working templates. Details contains the findings attachment and two to four key points. Do not add Acceptance criteria, Implementation plan or Closeout sections. Record delivery and performed verification in the PR.
 
-Use native parent links for grouping and blocked-by links for prerequisites.
-Independent release work defaults to epic #1; use an existing delivery group or
-Question, or an explicit developer instruction when applicable. See
-[Issue format](issue-format.md#epics) for release Epics. Do not repeat a ticket's
-parent in its description.
+Use native parent links for grouping and blocked-by links for prerequisites. Independent release work defaults to epic #1; use an existing delivery group or Question, or an explicit developer instruction when applicable. See [Issue format](issue-format.md#epics) for release Epics. Do not repeat a ticket's parent in its description.
 
 | Guide | Covers |
 | --- | --- |
@@ -36,7 +24,4 @@ parent in its description.
 | [Repository settings](repository.md) | Recorded GitHub settings, drift checks and application |
 | [Verification](verification.md) | Checks actually performed and their status |
 
-[AGENTS.md](../../AGENTS.md) points each agent to its role file.
-[CONTRIBUTING.md](../../CONTRIBUTING.md) is the contributor entry point.
-The [working templates](working/README.md) hold the size, status and closing
-rules. Use the other guides for their specific procedures.
+[AGENTS.md](../../AGENTS.md) points each agent to its role file. [CONTRIBUTING.md](../../CONTRIBUTING.md) is the contributor entry point. The [working templates](working/README.md) hold the size, status and closing rules. Use the other guides for their specific procedures.

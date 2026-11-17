@@ -1,21 +1,14 @@
 # GitHub and `gh` reference
 
-Use `gh` for repeatable issue and pull request operations. Always pass the
-repository explicitly when running from a checkout that may have another
-`origin`:
+Use `gh` for repeatable issue and pull request operations. Always pass the repository explicitly when running from a checkout that may have another `origin`:
 
 ```sh
 --repo Folt-CLI/folt
 ```
 
-The GitHub issue body is the durable record. Before editing it, read the current
-issue; when replacing the body, provide the complete updated text so existing
-sections are preserved.
+The GitHub issue body is the durable record. Before editing it, read the current issue; when replacing the body, provide the complete updated text so existing sections are preserved.
 
-Use `Folt-CLI/folt` in every `gh --repo` argument and
-maintained GitHub URL. The initial local origin is
-`https://github.com/Folt-CLI/folt.git`; inspect `git remote -v`
-before changing any remote configuration.
+Use `Folt-CLI/folt` in every `gh --repo` argument and maintained GitHub URL. The initial local origin is `https://github.com/Folt-CLI/folt.git`; inspect `git remote -v` before changing any remote configuration.
 
 ## Issues
 
@@ -51,54 +44,37 @@ gh issue comment 2 \
 gh issue close 2 --repo Folt-CLI/folt
 ```
 
-Use the repository's GitHub issue forms when creating a work item, epic, or
-incident in the web interface. `gh issue create` accepts a title/body but does
-not fill out the form interactively; use a prepared Markdown body that follows
-[issue-format.md](issue-format.md).
+Use the repository's GitHub issue forms when creating a work item, epic, or incident in the web interface. `gh issue create` accepts a title/body but does not fill out the form interactively; use a prepared Markdown body that follows [issue-format.md](issue-format.md).
 
-Use the parent specified by the developer or an existing delivery group or
-Question in [workflow](workflow.md#dependencies-and-grouped-work); independent
-release work defaults to #1. Choose the issue type appropriate to the request.
-Verify the native parent and issue type after creation with
-`gh issue view <number> --repo Folt-CLI/folt --json parent,issueType`.
-Do not add a parent reference to the body. Set assignment, milestone and project
-membership following [ticket planning](ticket-planning.md#at-issue-creation).
+Use the parent specified by the developer or an existing delivery group or Question in [workflow](workflow.md#dependencies-and-grouped-work); independent release work defaults to #1. Choose the issue type appropriate to the request. Verify the native parent and issue type after creation with `gh issue view <number> --repo Folt-CLI/folt --json parent,issueType`. Do not add a parent reference to the body. Set assignment, milestone and project membership following [ticket planning](ticket-planning.md#at-issue-creation).
 
 ## Markdown attachments
 
-The built-in `--attach` flag supports images and videos. For Markdown documents,
-use [sudosubin/gh-attach](https://github.com/sudosubin/gh-attach). Install it once:
+The built-in `--attach` flag supports images and videos. For Markdown documents, use [sudosubin/gh-attach](https://github.com/sudosubin/gh-attach). Install it once:
 
 ```sh
 gh extension install sudosubin/gh-attach
 ```
 
-Document uploads require a signed-in GitHub browser session matching the `gh`
-account. The extension uses that session automatically. Do not copy session
-cookies into commands, logs, or issue text.
+Document uploads require a signed-in GitHub browser session matching the `gh` account. The extension uses that session automatically. Do not copy session cookies into commands, logs, or issue text.
 
 ```sh
 gh attach /tmp/2-code-findings.md /tmp/2-solution-1.md /tmp/2-solution-2.md \
   --repo Folt-CLI/folt --json href,name
 ```
 
-Use the returned `href` values as normal Markdown links in the issue body.
-Read the latest issue body first and preserve other sections. Verify every
-uploaded file by downloading it and comparing it with the original:
+Use the returned `href` values as normal Markdown links in the issue body. Read the latest issue body first and preserve other sections. Verify every uploaded file by downloading it and comparing it with the original:
 
 ```sh
 gh attach download '<returned-url>' --output /tmp/downloaded-solution.md
 cmp /tmp/2-solution-1.md /tmp/downloaded-solution.md
 ```
 
-Keep uploads linked from the issue so reviewers can access them. Do not mark a
-solution selected until the developer chooses it.
+Keep uploads linked from the issue so reviewers can access them. Do not mark a solution selected until the developer chooses it.
 
 ## Issue types and fields
 
-Set the issue type with the PATCH command above. Read issue field values with
-`gh api repos/Folt-CLI/folt/issues/<n>/issue-field-values`. To set values, POST
-to that same endpoint with a JSON input file:
+Set the issue type with the PATCH command above. Read issue field values with `gh api repos/Folt-CLI/folt/issues/<n>/issue-field-values`. To set values, POST to that same endpoint with a JSON input file:
 
 ```sh
 gh api -X POST repos/Folt-CLI/folt/issues/<n>/issue-field-values \
@@ -111,20 +87,13 @@ The input has this shape:
 {"issue_field_values":[{"field_id":49325272,"value":"High"}]}
 ```
 
-Priority has field id `49325272` and values Urgent, High, Medium and Low.
-Component has field id `49332254` and takes an array of Build, Dev Docs,
-Dev Tools, Source Code, Tests and User Docs, for example:
+Priority has field id `49325272` and values Urgent, High, Medium and Low. Component has field id `49332254` and takes an array of Build, Dev Docs, Dev Tools, Source Code, Tests and User Docs, for example:
 
 ```json
 {"issue_field_values":[{"field_id":49332254,"value":["Dev Docs"]}]}
 ```
 
-Disposition has field id `49332255` and values Abandoned, Answered, Duplicate,
-Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn and
-Won't Do. Set Component after solution selection and Disposition when ready to
-close. Follow [ticket planning](ticket-planning.md#fields-after-decisions) and
-[working templates](working/README.md) for timing and limits. Read the issue
-first and preserve unrelated metadata when making changes.
+Disposition has field id `49332255` and values Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn and Won't Do. Set Component after solution selection and Disposition when ready to close. Follow [ticket planning](ticket-planning.md#fields-after-decisions) and [working templates](working/README.md) for timing and limits. Read the issue first and preserve unrelated metadata when making changes.
 
 ## Pull requests
 
@@ -139,16 +108,11 @@ gh pr create \
 gh pr view <number> --repo Folt-CLI/folt
 ```
 
-The PR body should include `Closes #<issue-number>` when merging it completes
-the linked work item. Follow the
-[parent closing rules](working/README.md#shared-steps) before using a closing
-keyword for a parent. A merge is a human review decision; do not merge
-unless the repository's required checks and review are satisfied.
+The PR body should include `Closes #<issue-number>` when merging it completes the linked work item. Follow the [parent closing rules](working/README.md#shared-steps) before using a closing keyword for a parent. A merge is a human review decision; do not merge unless the repository's required checks and review are satisfied.
 
 ### Inspect checks
 
-Follow [Testing](testing.md#ci-result-in-the-review) for CI analysis and the
-review handoff:
+Follow [Testing](testing.md#ci-result-in-the-review) for CI analysis and the review handoff:
 
 ```sh
 gh pr checks <number> --repo Folt-CLI/folt --watch
@@ -157,23 +121,17 @@ gh run view <run-id> --repo Folt-CLI/folt --log-failed
 
 ### Posting a code review
 
-Post a review with `gh api` and a JSON input file. Set `commit_id` to the head
-commit being reviewed, `event` to `COMMENT`, and include a summary `body`. For
-each inline comment, provide the changed `path`, `line`, `side` and comment
-`body`:
+Post a review with `gh api` and a JSON input file. Set `commit_id` to the head commit being reviewed, `event` to `COMMENT`, and include a summary `body`. For each inline comment, provide the changed `path`, `line`, `side` and comment `body`:
 
 ```sh
 gh api repos/{owner}/{repo}/pulls/{n}/reviews --input review.json
 ```
 
-See [Review](review.md) for the review payload format and review cycle. Resolve
-fixed threads through GraphQL `resolveReviewThread`; reply with the reason when
-a finding is rejected.
+See [Review](review.md) for the review payload format and review cycle. Resolve fixed threads through GraphQL `resolveReviewThread`; reply with the reason when a finding is rejected.
 
 ### Stacked pull requests
 
-Use `gh stack` from the [stacked pull request guide](stacked-prs.md). These
-commands require the `github/gh-stack` extension:
+Use `gh stack` from the [stacked pull request guide](stacked-prs.md). These commands require the `github/gh-stack` extension:
 
 | Command | Purpose |
 | --- | --- |

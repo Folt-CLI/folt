@@ -2,9 +2,7 @@
 
 ## How to use this file
 
-Read this file before analysis or implementation.
-Terms are exact: use each only in its defined sense, and add a term in the change that introduces it.
-`Status: open: #N` means the named Question has not settled the stated meaning.
+Read this file before analysis or implementation. Terms are exact: use each only in its defined sense, and add a term in the change that introduces it. `Status: open: #N` means the named Question has not settled the stated meaning.
 
 ## A-Z index
 
@@ -765,10 +763,7 @@ Terms are exact: use each only in its defined sense, and add a term in the chang
 
 ## Terms in conflict
 
-These rows distinguish existing meanings and link to defined terms without selecting future behavior.
-Issue links refer to Folt-CLI/folt, including tickets originally linked under
-Bojan-Ivanovski/folt in the findings. Type renames belong to
-[#178](https://github.com/Folt-CLI/folt/issues/178).
+These rows distinguish existing meanings and link to defined terms without selecting future behavior. Issue links refer to Folt-CLI/folt, including tickets originally linked under Bojan-Ivanovski/folt in the findings. Type renames belong to [#178](https://github.com/Folt-CLI/folt/issues/178).
 
 | Term | Meanings found | Decided meaning, or open Question |
 | --- | --- | --- |
@@ -797,8 +792,7 @@ Bojan-Ivanovski/folt in the findings. Type renames belong to
 
 ## Retired words
 
-These replacements apply to Folt terminology; historical quotations retain
-their original wording. A Git HEAD or Git index is still qualified as Git.
+These replacements apply to Folt terminology; historical quotations retain their original wording. A Git HEAD or Git index is still qualified as Git.
 
 | Retired word | Current word or representation | Ticket that retired it |
 | --- | --- | --- |
