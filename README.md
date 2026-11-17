@@ -13,8 +13,6 @@
 
 Folt is a standalone Rust CLI being built to manage documents, called Folios,
 the way Git manages source code: locally and with remotes.
-[Foltivo](https://github.com/Bojan-Ivanovski/foltivo-backend) is the first intended
-remote host, much as GitHub is for Git, but Folt does not depend on it.
 
 ## What exists today
 
