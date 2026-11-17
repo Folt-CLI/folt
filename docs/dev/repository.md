@@ -78,7 +78,6 @@ The command shows the current diff, applies any pending declared settings, then 
 
 ```sh
 bash -n scripts/repo-settings.sh
-python3 scripts/tests/test_repo_settings.py
 # When installed:
 shellcheck scripts/repo-settings.sh
 ```
