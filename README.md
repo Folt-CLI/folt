@@ -21,9 +21,9 @@ Folt is in early development. **The CLI currently only prints its version.** The
 - **Library-level front matter and references:** inspect and edit names, IDs and references in a limited YAML subset while preserving unrelated content.
 - **Library-level registry, history and refs:** track Folios and placements, record commits, and manage branches and tags.
 - **Library-level placements:** track internal files, copies and links, detect changes, and convert between copies and links.
-- **Library-level register:** plan and apply explicit-path registration of files and directory Folios. See [registration details](docs/dev/register.md).
+- **Library-level register:** plan and apply explicit-path registration of files and directory Folios. See [registration details](docs/dev/library/register.md).
 - **Library-level rename:** update a Folio's registered name and internal file.
-- **Library-level prune:** report or remove absent external placement records without deleting files. See [pruning details](docs/dev/prune.md).
+- **Library-level prune:** report or remove absent external placement records without deleting files. See [pruning details](docs/dev/library/prune.md).
 - **Library-level checkout:** move a placement to a branch tip; internal placements can only check out `main`.
 
 ## Build from source

@@ -4,7 +4,7 @@ Follow the [Code of Conduct](CODE_OF_CONDUCT.md) when participating in the commu
 
 Start with [the development process](docs/dev/process.md) and [the current stack](docs/dev/stack.md). Use the repository issue forms and native parents/dependencies. Keep work bounded, attach findings and solution options when analysis is requested, and let the developer select the solution.
 
-Follow [the workflow](docs/dev/workflow.md), [stacked pull requests](docs/dev/stacked-prs.md) and [review](docs/dev/review.md) for issue branches, agent delivery, stacks and reviews. Use issue-type commit subjects, the **Summary** and **Changes** commit body and the pull request format. Record only verification actually performed.
+Follow [the workflow](docs/dev/delivery/workflow.md), [stacked pull requests](docs/dev/delivery/stacked-prs.md) and [review](docs/dev/delivery/review.md) for issue branches, agent delivery, stacks and reviews. Use issue-type commit subjects, the **Summary** and **Changes** commit body and the pull request format. Record only verification actually performed.
 
 Keep secrets and build outputs out of Git. Document configuration using placeholders only.
 
@@ -14,4 +14,4 @@ For defects, include reproduction steps and impact. A private security reporting
 
 ## Local checks
 
-Run the gate in [docs/dev/testing.md#gate-before-push](docs/dev/testing.md#gate-before-push).
+Run the gate in [docs/dev/delivery/testing.md#gate-before-push](docs/dev/delivery/testing.md#gate-before-push).

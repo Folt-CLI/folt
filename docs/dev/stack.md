@@ -11,7 +11,7 @@
 - **Home:** one global home, `~/.folt` (`%USERPROFILE%\.folt` on Windows), with a `FOLT_HOME` environment override; Folt writes nothing into user directories ([#14](https://github.com/Folt-CLI/folt/issues/14)). The home's layout version is the `format_version` row in the registry's `folt_metadata` table; a newer version is refused. A directory that is neither empty nor recognisably a Folt home is refused before the lock is taken ([#65](https://github.com/Folt-CLI/folt/issues/65)). This replaces the per-workspace `.folt/` marker of [#2](https://github.com/Folt-CLI/folt/issues/2).
 - **Registry:** an embedded SQLite database in the home through `rusqlite` with the bundled C library; a Folio exists independently of its placements. Building needs a C compiler ([#27](https://github.com/Folt-CLI/folt/issues/27)).
 - **Lock:** an exclusive file lock on a permanent `lock` file in the home; temporary files live in `<home>/tmp/`; leftovers are deleted when the lock is acquired ([#19](https://github.com/Folt-CLI/folt/issues/19)).
-- **Tests:** the test structure and tiers are described in [Testing](testing.md) ([#96](https://github.com/Folt-CLI/folt/issues/96)).
+- **Tests:** the test structure and tiers are described in [Testing](delivery/testing.md) ([#96](https://github.com/Folt-CLI/folt/issues/96)).
 
 Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 

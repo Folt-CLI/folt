@@ -16,7 +16,7 @@ M needs analysis AND review. Analysis agents are read-only and produce drafts as
 
 The orchestrator writes Analysis inline, links the findings attachment from Details and attaches each solution as a complete implementation scope.
 
-Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../review.md).
+Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../delivery/review.md).
 
 ## Solution
 
@@ -32,7 +32,7 @@ Project workflows set Done on close and on merge.
 
 ## Who does what
 
-An implementation agent implements and fixes in a dedicated worktree and does not analyse; the orchestrator analyses. The orchestrator runs the [gate](../testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project. Apply the [type row](README.md#by-issue-type).
+An implementation agent implements and fixes in a dedicated worktree and does not analyse; the orchestrator analyses. The orchestrator runs the [gate](../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project. Apply the [type row](README.md#by-issue-type).
 
 ## Components and parents
 

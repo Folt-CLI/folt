@@ -600,7 +600,7 @@ pub(crate) fn atomic_rewrite(
         let fallback_signature = signature(&output.metadata()?);
         // Known limit: a rename cannot be conditional on content, so an edit made
         // between the check above and this rename is replaced. See "Known limit:
-        // the write window" in docs/dev/register.md.
+        // the write window" in docs/dev/library/register.md.
         fs::rename(&temporary, path)?;
         let metadata = rewrite_metadata(&output, path);
         // Rename may change ctime. Prefer the post-rename signature, but always

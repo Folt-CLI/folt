@@ -20,7 +20,7 @@ The Status path of an XL is not decided; see [Open points](README.md#open-points
 
 ## Who does what
 
-Follow [Testing roles](../testing.md#roles) for children: an implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator analyses, runs the gate, commits, pushes and opens PRs; only the developer merges. Give every PR a milestone, an assignee and the project.
+Follow [Testing roles](../delivery/testing.md#roles) for children: an implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator analyses, runs the gate, commits, pushes and opens PRs; only the developer merges. Give every PR a milestone, an assignee and the project.
 
 ## Components and parents
 

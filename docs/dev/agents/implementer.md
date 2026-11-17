@@ -6,7 +6,7 @@ You are the implementation agent. Implement and fix only. The orchestrator hands
 
 - [GLOSSARY.md](../../../GLOSSARY.md).
 - The implementation scope given in the prompt.
-- [Rule](../testing.md#rule) and [Suites and layout](../testing.md#suites-and-layout) in `docs/dev/testing.md`.
+- [Rule](../delivery/testing.md#rule) and [Suites and layout](../delivery/testing.md#suites-and-layout) in `docs/dev/delivery/testing.md`.
 
 ## Do
 

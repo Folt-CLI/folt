@@ -693,7 +693,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** A dedicated Git working directory for one issue branch where implementation takes place. Concurrent issue work uses separate worktrees.
-- **Code:** none (process term; see [workflow.md](docs/dev/workflow.md))
+- **Code:** none (process term; see [workflow.md](docs/dev/delivery/workflow.md))
 - **Related:** [work item](#work-item), [orchestrator](#orchestrator), [gate](#gate).
 - **Not:** The primary checkout or the external files Folt manages as placements.
 - **Status:** decided
@@ -702,7 +702,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Process
 - **Definition:** The required local verification the orchestrator runs before a push, with every required command passing. The CI gate separately requires a successful plan and successful or explicitly planned skipped checks.
-- **Code:** none (process term; see [testing.md](docs/dev/testing.md))
+- **Code:** none (process term; see [testing.md](docs/dev/delivery/testing.md))
 - **Related:** [orchestrator](#orchestrator), [worktree](#worktree).
 - **Not:** A read-only review or an unperformed checklist; the Testing guide defines the commands.
 - **Status:** decided

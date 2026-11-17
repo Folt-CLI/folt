@@ -28,7 +28,7 @@ Suggested path: `S0: To Do` -> `S4: In Implementation` -> `S5: Done`. Project wo
 
 ## Who does what
 
-An implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator runs the [gate](../testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project.
+An implementation agent implements and fixes in a dedicated worktree and does not analyse. The orchestrator runs the [gate](../delivery/testing.md#gate-before-push), commits, pushes and opens the PR; only the developer merges. Give every PR a milestone, an assignee and the project.
 
 ## Components and parents
 

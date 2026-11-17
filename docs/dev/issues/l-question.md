@@ -10,7 +10,7 @@ Use the five-section [work-item body](issue-format.md) with Summary and Scope fi
 
 For a Question, follow [Working a Question](../orchestrator.md#working-a-question).
 
-L needs analysis and review. The orchestrator writes Analysis inline in the ticket, links the findings attachment from Details and attaches each solution as a complete implementation scope. Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../review.md).
+L needs analysis and review. The orchestrator writes Analysis inline in the ticket, links the findings attachment from Details and attaches each solution as a complete implementation scope. Follow [Analysis and solution selection](issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../delivery/review.md).
 
 ## Solution
 
@@ -22,7 +22,7 @@ Suggested path: `S0: To Do` -> `S1: In Analysis` -> `S3: Ready For Implementatio
 
 ## Who does what
 
-The orchestrator analyses; the developer selects the answer. An implementation agent implements and fixes in dedicated child worktrees and does not analyse. The orchestrator runs the [gate](../testing.md#gate-before-push), commits, pushes and opens PRs; only the developer merges. Give every PR a milestone, an assignee and the project.
+The orchestrator analyses; the developer selects the answer. An implementation agent implements and fixes in dedicated child worktrees and does not analyse. The orchestrator runs the [gate](../delivery/testing.md#gate-before-push), commits, pushes and opens PRs; only the developer merges. Give every PR a milestone, an assignee and the project.
 
 ## Components and parents
 

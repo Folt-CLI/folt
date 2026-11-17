@@ -26,7 +26,7 @@ gh stack submit
 
 `gh stack init` can also adopt existing branches, listed bottom to top. Use `gh stack link` to link existing branches or pull requests into a stack. Use `gh stack view` to inspect its order and pull request status. See the [GitHub CLI reference](github-cli.md#stacked-pull-requests) for the supported commands.
 
-The bottom pull request targets `develop`; `gh stack submit` sets the chained bases for the upper pull requests. State the stack position in each pull request using the [pull request template](../../.github/PULL_REQUEST_TEMPLATE.md).
+The bottom pull request targets `develop`; `gh stack submit` sets the chained bases for the upper pull requests. State the stack position in each pull request using the [pull request template](../../../.github/PULL_REQUEST_TEMPLATE.md).
 
 ## Keep the stack current
 
@@ -38,7 +38,7 @@ CI and branch protection on the bottom pull request's base apply to every layer.
 
 Only the developer merges a pull request. `gh stack merge` merges every stack member up to the selected PR in one atomic, all-or-nothing operation; with no argument it uses the current stack, or pass a PR number to merge up to that PR. Through the GitHub UI, merge one layer at a time from the bottom up. Do not run `gh stack merge` or a merge API unless the developer instructs you to merge that stack. The synchronous pull request merge API does not support stacks; the stack merge uses GitHub's asynchronous merge endpoint. GitHub's documentation describes automatic retargeting of upper pull requests after a bottom pull request merges with merge commit, squash or rebase methods; the about-stacked-prs page lists all three methods as supported. The merge-commit case has not been observed in this repository.
 
-Update the Folt project status separately for each ticket, following [Ticket planning](issues/ticket-planning.md). A shared stack does not change ticket ownership or status.
+Update the Folt project status separately for each ticket, following [Ticket planning](../issues/ticket-planning.md). A shared stack does not change ticket ownership or status.
 
 ## Unverified
 

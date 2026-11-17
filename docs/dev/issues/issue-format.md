@@ -187,11 +187,11 @@ Match the affected-area list to Scope: one page for a page change, a list for a 
 
 Findings contain facts; solution attachments contain executable implementation scopes. Long material stays in attachments and issue comments stay short. Name files with the issue number so they remain identifiable.
 
-Upload Markdown files using the `gh-attach` extension, then link their returned URLs from the issue. See [the upload procedure](../github-cli.md#markdown-attachments). Verify the uploaded contents and issue links. Do not substitute public gists, repository commits, or local filesystem paths for GitHub attachments. If no signed-in browser session is available, keep upload pending and report that specific blocker.
+Upload Markdown files using the `gh-attach` extension, then link their returned URLs from the issue. See [the upload procedure](../delivery/github-cli.md#markdown-attachments). Verify the uploaded contents and issue links. Do not substitute public gists, repository commits, or local filesystem paths for GitHub attachments. If no signed-in browser session is available, keep upload pending and report that specific blocker.
 
 ## Epics
 
-An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](../workflow.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
+An epic contains only `## Objective` followed by a quick explanation of what we want from the release. Its title is `<version> -- Folt`. Close it with the Disposition issue field set to Released only after all its children are closed; see the [XL template](xl-epic.md). Place release work under its existing delivery group or Question where applicable; otherwise default to #1 unless the developer specifies another parent. See [workflow](../delivery/workflow.md#dependencies-and-grouped-work). Use native parent relationships; the description does not repeat them.
 
 ## Notes, attachments, and links
 
