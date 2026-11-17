@@ -1,6 +1,6 @@
 # Folt development process
 
-Staged issue workflow shared by the Foltivo repositories. Keep process docs
+Staged issue workflow shared by the Folt repositories. Keep process docs
 under docs/dev and issue forms under .github/ISSUE_TEMPLATE. GitHub issues are
 the durable work record.
 
