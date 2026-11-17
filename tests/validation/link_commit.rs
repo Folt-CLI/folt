@@ -3,16 +3,20 @@ use folt_core::history::{self, HistoryStores};
 use folt_core::id::FolioId;
 use folt_core::id::ObjectId;
 use folt_core::object::Commit;
+use folt_core::ops::refusal::RefusalReason;
+use folt_core::ops::rules_error::RulesError;
 use folt_core::placement::{
     Observation, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
 use folt_core::placement_fs::PlacementFs;
-use folt_core::placement_rules::{self, RefusalReason, RulesError};
+use folt_core::placement_rules;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
 use folt_core::registry::{NewPlacement, PlacementPath};
 use folt_core::store::ObjectStore;
 use folt_core::working_state::{self, Edit, Staged};
+
+use std::path::PathBuf;
 
 use crate::common::TempHome;
 use crate::support::{TestFolio, metadata};
@@ -25,6 +29,10 @@ struct LinkFs<'a> {
 }
 
 impl PlacementOps for LinkFs<'_> {
+    fn link_target(&self, id: FolioId) -> PathBuf {
+        self.fs.link_target(id)
+    }
+
     fn read(&self, id: FolioId, row: &PlacementSpec) -> Result<Observation, PlacementError> {
         if row.kind == PlacementKind::Link {
             Ok(self.observation.clone())

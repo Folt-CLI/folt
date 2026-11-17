@@ -4,10 +4,10 @@ use crate::config::names::MARKDOWN_EXTENSIONS;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
+use crate::ops::facts::{Behind, PlacementFacts, needs_hash};
+use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps, StagedBlob};
-use crate::placement_rules::{
-    Behind, PlacementFacts, Refusal, RefusalReason, RulesError, needs_hash,
-};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry, RegistryError};

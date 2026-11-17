@@ -233,7 +233,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** The commit id currently held by a branch ref. A placement records its own starting commit separately, so it can differ from the tip.
-- **Code:** `crates/folt-core/src/working_state.rs:35` (`gather`); `crates/folt-core/src/placement_rules.rs:112` (`Behind`)
+- **Code:** `crates/folt-core/src/working_state.rs:35` (`gather`); `crates/folt-core/src/ops/facts.rs:22` (`Behind`)
 - **Related:** [branch](#branch), [commit](#commit), [behind](#behind).
 - **Not:** The branch name stored in `head`, a content blob id or an ancestry comparison.
 - **Status:** decided
@@ -343,7 +343,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A comparison between a placement’s recorded commit and its branch tip. Behind means both exist and differ; the other results are UpToDate, NoHistory, Unrecorded and MissingTip.
-- **Code:** `crates/folt-core/src/placement_rules.rs:112` (`Behind`); `crates/folt-core/src/working_state.rs:58` (`judge_working`)
+- **Code:** `crates/folt-core/src/ops/facts.rs:22` (`Behind`); `crates/folt-core/src/working_state.rs:58` (`judge_working`)
 - **Related:** [tip](#tip), [branch](#branch), [drift](#drift), [checkout](#checkout).
 - **Not:** Proof that one commit is an ancestor of another; the current comparison does not walk history.
 - **Status:** decided
@@ -473,7 +473,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The caller-gathered inputs to a judge function, represented by `PlacementFacts`, `CommitFacts`, `PruneFacts` or `ResetFacts`. They carry the observations, registry rows, hashes and history information required by the particular decision.
-- **Code:** `crates/folt-core/src/placement_rules.rs:20` (`PlacementFacts`); `crates/folt-core/src/history.rs:30` (`CommitFacts`); `crates/folt-core/src/prune.rs:22` (`PruneFacts`); `crates/folt-core/src/history.rs:386` (`ResetFacts`)
+- **Code:** `crates/folt-core/src/ops/facts.rs:7` (`PlacementFacts`); `crates/folt-core/src/history.rs:30` (`CommitFacts`); `crates/folt-core/src/prune.rs:22` (`PruneFacts`); `crates/folt-core/src/history.rs:386` (`ResetFacts`)
 - **Related:** [plan and apply](#plan-and-apply), [observation](#observation), [placement](#placement), [refusal](#refusal).
 - **Not:** The resulting plan or refusal, or writes performed by apply.
 - **Status:** decided
@@ -482,7 +482,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** A domain decision that a requested operation is not allowed under the observed [facts](#facts). Placement rules represent it as a path plus a reason; history and registration have their own refusal types.
-- **Code:** `crates/folt-core/src/placement_rules.rs:1100` (`Refusal`); `crates/folt-core/src/placement_rules.rs:1075` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`Refusal`); `crates/folt-core/src/register.rs:86` (`RegisterRefusalReason`)
+- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`Refusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`Refusal`); `crates/folt-core/src/register.rs:86` (`RegisterRefusalReason`)
 - **Related:** [plan and apply](#plan-and-apply), [placement](#placement), [register](#register).
 - **Not:** One shared error type: qualify the module for each refusal; the rename of the two `Refusal` types is open (plan ticket G6 of [#203](https://github.com/Folt-CLI/folt/issues/203)).
 - **Status:** decided
@@ -538,7 +538,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Code structure
 - **Definition:** The module tree of operations (register, rename, checkout, prune and history operations), each following plan and apply.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/ops/mod.rs:1`
 - **Related:** [register](#register), [rename](#rename), [checkout](#checkout), [prune](#prune), [plan and apply](#plan-and-apply).
 - **Not:** The CLI commands.
 - **Status:** decided

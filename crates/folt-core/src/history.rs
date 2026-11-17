@@ -7,10 +7,13 @@ use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{Author, Commit, CommitTime, ObjectError, ObjectKind, Tag, hash_blob};
+use crate::ops::facts::PlacementFacts;
+use crate::ops::refusal;
+use crate::ops::rules_error::RulesError;
 use crate::placement::{
     Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
 };
-use crate::placement_rules::{self, MovePlan, MoveTarget, PlacementFacts, RulesError};
+use crate::placement_rules::{self, MovePlan, MoveTarget};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{Expect, RefError, RefStore};
 use crate::registry::{Placement, Registry, RegistryError};
@@ -618,11 +621,11 @@ pub enum Refusal {
     InvalidFacts,
     TagMismatch,
     TagExists,
-    Move(placement_rules::Refusal),
+    Move(refusal::Refusal),
 }
 
-impl From<placement_rules::Refusal> for Refusal {
-    fn from(error: placement_rules::Refusal) -> Self {
+impl From<refusal::Refusal> for Refusal {
+    fn from(error: refusal::Refusal) -> Self {
         Self::Move(error)
     }
 }
@@ -708,8 +711,8 @@ impl From<RulesError> for HistoryError {
         Self::Rules(error)
     }
 }
-impl From<placement_rules::Refusal> for HistoryError {
-    fn from(error: placement_rules::Refusal) -> Self {
+impl From<refusal::Refusal> for HistoryError {
+    fn from(error: refusal::Refusal) -> Self {
         Self::Refused(error.into())
     }
 }

@@ -2,8 +2,9 @@
 
 use crate::id::FolioId;
 use crate::object::hash_blob;
+use crate::ops::facts::PlacementFacts;
 use crate::placement::{Observation, PlacementBase, PlacementKind, Signature};
-use crate::placement_rules::{MoveTarget, PlacementFacts};
+use crate::placement_rules::MoveTarget;
 use crate::ref_name::RefName;
 use crate::registry::{self, PlacementPath};
 

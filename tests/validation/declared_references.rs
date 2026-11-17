@@ -6,9 +6,9 @@ use folt_core::front_matter::{FrontMatterError, Reference};
 use folt_core::history;
 use folt_core::id::FolioId;
 use folt_core::object::{ObjectKind, ObjectWriter, hash_blob};
+use folt_core::ops::rules_error::RulesError;
 use folt_core::placement::PlacementKind;
 use folt_core::placement_fs::PlacementFs;
-use folt_core::placement_rules::RulesError;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::register::{apply_register, plan_register};
 use folt_core::registry::{
