@@ -16,22 +16,7 @@ Sizes decide which stages apply; see [working templates](../issues/rules.md). XS
 
 ## Branches and commits
 
-The first repository commit is the one exception to the issue-branch workflow: it establishes the project scaffold and its development process. Stage the intended files explicitly, inspect the staged changes, and use a title in this format:
-
-```text
-Initial[#<issue-number>]: <short explanation>
-```
-
-Always include a body with a `**Summary**` heading and a short explanation of why the change was made; the initial commit may use the Summary only. The first commit uses the active release epic's number. For example:
-
-```markdown
-**Summary**
-
-Establish the initial Folt scaffold and development workflow so release work can
-proceed from a consistent, documented baseline.
-```
-
-After the initial commit, each work item gets its own branch and dedicated Git worktree. Before creating the worktree, fetch and fast-forward its base so the branch starts from the current remote state. For an independent ticket, the base is `develop`; for a dependent ticket in an open stack, use the lower branch. All implementation agents use that worktree; the primary checkout is not an implementation workspace. The bottom pull request targets `develop`; upper pull requests target the preceding stack branch. See [Stacked pull requests](stacked-prs.md). Promote releases from `develop` to `main` through a PR. Use `<type>/<issue-number>-<short-slug>` (for example, `feature/2-schema-migrations`). Keep one issue's work on its branch and use focused commits with this format:
+Each work item gets its own branch and dedicated Git worktree. Before creating the worktree, fetch and fast-forward its base so the branch starts from the current remote state. For an independent ticket, the base is `develop`; for a dependent ticket in an open stack, use the lower branch. All implementation agents use that worktree; the primary checkout is not an implementation workspace. The bottom pull request targets `develop`; upper pull requests target the preceding stack branch. See [Stacked pull requests](stacked-prs.md). Promote releases from `develop` to `main` through a PR. Use `<type>/<issue-number>-<short-slug>` (for example, `feature/2-schema-migrations`). Keep one issue's work on its branch and use focused commits with this format:
 
 ```text
 <Issue Type>[#<issue-number>]: <short explanation>
@@ -49,7 +34,7 @@ Keep commits small and focused. When a ticket covers several distinct changes, g
 
 Every commit body has a `**Summary**` heading followed by one to three sentences on why the commit exists. When a commit touches more than one thing, or the reason is not obvious from the diff, add a `**Changes**` heading with one bullet per notable change in the form "what changed: why it changed". Each bullet gives the reason, not the lines changed. A one-line fix may use the Summary only. Do not repeat the issue number (the subject has it) and do not add attribution lines. The subject is imperative and capitalised, has no trailing period, and stays at about 72 characters or fewer.
 
-For an eligible PR with no guarded code paths, only the orchestrator may add `[SKIP BUILD]` as the last paragraph of every commit body (the last non-empty line must be exactly that marker). Implementation agents never add it. A subject starting with `Documentation[#N]:` also qualifies; every PR commit must qualify, and the code-path guard overrides both rules. Do not use GitHub's `[skip ci]` syntax, which leaves the required check pending. See [Skipping PR builds](testing.md#skipping-pr-builds) for the guard paths and events that always run in full.
+The `[SKIP BUILD]` marker and the rules for skipping PR builds are in [Skipping PR builds](testing.md#skipping-pr-builds).
 
 ```text
 Maintenance[#8]: Add the Rust workspace

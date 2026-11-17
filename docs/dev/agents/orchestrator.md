@@ -20,11 +20,10 @@
 
 ## Commits and delivery
 
-- See step 4 of [Stages](../delivery/workflow.md#stages). Only the developer merges; an agent merges only when instructed for that PR as the developer last saw it. If the Git branch changes afterwards, including conflict resolution or new Git commits, the instruction lapses: stop when checks are green and ask again. Never chain cleanup after a merge command that may have failed. Follow [Review](../delivery/review.md) and [Stacked pull requests](../delivery/stacked-prs.md).
+- See step 4 of [Stages](../delivery/workflow.md#stages). Merge rules are in [Pull requests](../delivery/workflow.md#pull-requests). Follow [Review](../delivery/review.md) and [Stacked pull requests](../delivery/stacked-prs.md).
 - See step 3 of [Stages](../delivery/workflow.md#stages) and [Branches and commits](../delivery/workflow.md#branches-and-commits) for worktrees.
-- First commit: Initial[#1]: <short explanation>.
 - See [Branches and commits](../delivery/workflow.md#branches-and-commits) for later commit subjects.
-- See [Branches and commits](../delivery/workflow.md#branches-and-commits) for the Dependabot subject. Always run a read-only review of every Dependabot PR using the diff, CI result and pasted dependency release notes to check workflows and code. Post exactly `No issues.` when clean; otherwise post findings as in [Review](../delivery/review.md).
+- See [Branches and commits](../delivery/workflow.md#branches-and-commits) for the Dependabot subject. Dependabot PRs are reviewed as in [Dependabot PRs](../delivery/review.md#dependabot-prs).
 - See [Commit size](../delivery/workflow.md#commit-size).
 - See [Commit body](../delivery/workflow.md#commit-body).
 - See [Branches and commits](../delivery/workflow.md#branches-and-commits) and [Pull requests](../delivery/workflow.md#pull-requests).
