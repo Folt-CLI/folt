@@ -9,12 +9,12 @@ use crate::config::limits::{
     COMPRESSION_PROBE_MIN_SIZE, COMPRESSION_SAMPLE_SIZE, COMPRESSION_SAMPLES, STREAM_BUFFER_SIZE,
 };
 use crate::config::names::{BLOB_EXTENSION, BLOBS_DIR, TEMP_PREFIX_INPUT, TEMP_PREFIX_OBJECT};
-use crate::folio_dir::{self, FolioDir};
+use crate::folio::format::{FolioFormat, FormatError, check_format};
+use crate::folio_dir::FolioDir;
 use crate::home::{HomeLock, is_regular_file};
 use crate::id::ObjectId;
 use crate::layout::LayoutVersion;
 use crate::object::{self, ObjectError, ObjectHasher, ObjectKind, ObjectReader, ObjectWriter};
-use crate::registry::FolioFormat;
 
 trait ReadSeek: Read + Seek {}
 impl<T: Read + Seek> ReadSeek for T {}
@@ -27,16 +27,10 @@ pub struct ObjectStore {
 
 impl ObjectStore {
     pub fn open(folio: &FolioDir, format: &FolioFormat) -> Result<Self, StoreError> {
-        folio_dir::check_format(format).map_err(|error| match error {
-            folio_dir::FormatError::Newer { found, supported } => {
-                StoreError::NewerFormat { found, supported }
-            }
-            folio_dir::FormatError::Older { found, supported } => {
-                StoreError::OlderFormat { found, supported }
-            }
-            folio_dir::FormatError::UnsupportedAlgorithm(value) => {
-                StoreError::UnsupportedAlgorithm(value)
-            }
+        check_format(format).map_err(|error| match error {
+            FormatError::Newer { found, supported } => StoreError::NewerFormat { found, supported },
+            FormatError::Older { found, supported } => StoreError::OlderFormat { found, supported },
+            FormatError::UnsupportedAlgorithm(value) => StoreError::UnsupportedAlgorithm(value),
         })?;
         Ok(Self {
             root: folio.path().join(BLOBS_DIR),
