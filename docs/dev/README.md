@@ -33,5 +33,6 @@ See [Dependencies and grouped work](issues/ticket-planning.md#dependencies-and-g
 | [GitHub CLI](delivery/github-cli.md) | Issues, native relationships, Markdown uploads and PR commands |
 | [Registration](library/register.md) | folt-core explicit-path registration behaviour |
 | [Prune](library/prune.md) | folt-core prune behaviour |
+| [Layers](library/layers.md) | folt-core layer table and the layer check |
 
 [AGENTS.md](../../AGENTS.md) points each agent to its role file. [CONTRIBUTING.md](../../CONTRIBUTING.md) is the contributor entry point. The [working templates](issues/rules.md) hold the size, status and closing rules. Use the other guides for their specific procedures.
