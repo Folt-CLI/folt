@@ -2,6 +2,7 @@
 # Usage: scripts/check-layers.sh [--enforce] [--root <src-dir>] [--table <layers.md>]
 # Parse single-line or multi-line use crate:: statements, including visibility
 # and brace lists, reporting their starting line and top-level target modules.
+# Strip line and nested block comments without changing source line numbers.
 # Skip exactly #[cfg(test)] items through their semicolon or balanced braces,
 # stripping // comments; other cfg forms remain checked. Skip tests.rs, tests/
 # and test_support. A file belongs to its first path component (without .rs);
@@ -9,7 +10,7 @@
 # table; otherwise listed imports and exceptions pass, and remaining imports
 # are upward, sideways or not listed according to their layer numbers.
 # Text heuristic only: inline crate:: paths, super:: paths and macros are not
-# checked; braces or // inside strings can confuse test-item skipping.
+# checked; comment delimiters or braces inside strings can confuse parsing.
 set -euo pipefail
 
 usage() {
@@ -107,6 +108,22 @@ while IFS= read -r -d '' file; do
       to = (target in layer) ? layer[target] : "?"
       printf "%s:%d: %s (L%s) imports %s (L%s): %s\n", ENVIRON["LAYER_CHECK_PATH"], start, importer, from, target, to, kind
     }
+    function strip_comments(s, pos, pair, result) {
+      result = ""
+      for (pos = 1; pos <= length(s); pos++) {
+        pair = substr(s, pos, 2)
+        if (block_depth) {
+          if (pair == "/*") { block_depth++; pos++ }
+          else if (pair == "*/") { block_depth--; pos++ }
+        } else if (pair == "//") break
+        else if (pair == "/*") {
+          block_depth = 1
+          result = result " "
+          pos++
+        } else result = result substr(s, pos, 1)
+      }
+      return result
+    }
     function item(s) {
       s = trim(s)
       if (match(s, /^[a-zA-Z_][a-zA-Z_0-9]*/)) report(substr(s, RSTART, RLENGTH))
@@ -129,7 +146,7 @@ while IFS= read -r -d '' file; do
     }
     {
       importer = ENVIRON["LAYER_CHECK_MODULE"]
-      line = $0; sub(/\/\/.*/, "", line)
+      line = strip_comments($0)
       clean = trim(line)
       if (!skip && clean == "#[cfg(test)]") { skip = 1; next }
       if (skip) {

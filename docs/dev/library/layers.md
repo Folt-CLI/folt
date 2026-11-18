@@ -88,14 +88,14 @@ The check is not part of the gate or CI yet; ticket H3 of [Folt-CLI/folt#203](ht
 
 ## What the script checks
 
-1. Parse a statement starting on a line with optional indentation, optional `pub` or `pub(...)` visibility, then `use crate::`, through its first `;`, including multi-line statements. A path such as `config::names::X` targets `config`; a brace list such as `{id::FolioId, store::ObjectStore}` targets the first identifier of each top-level list item. Report the line where the statement starts.
+1. Parse a statement starting on a line with optional indentation, optional `pub` or `pub(...)` visibility, then `use crate::`, through its first `;`, including multi-line statements. Strip line and nested block comments before extracting targets, preserving the source line where each statement starts. A path such as `config::names::X` targets `config`; a brace list such as `{id::FolioId, store::ObjectStore}` targets the first identifier of each top-level list item. Report the line where the statement starts.
 2. Skip an item following a line that is exactly `#[cfg(test)]` after trimming. Further attributes belong to that item. It ends at a `;` before any `{`, or at the `}` closing its first `{`. Strip `//` comments before counting braces. Other forms such as `#[cfg(any(test, feature = "test-support"))]` remain checked because they are not test-only.
 3. Skip every file named `tests.rs`, every file under a directory named `tests`, and the whole `test_support` module. The importing module is the first path component below the source root, without a trailing `.rs`: `home.rs` and `home/open.rs` both belong to `home`. Skip `lib.rs`.
 4. Allow imports within the importing module’s own unit.
 5. Report an importer or target absent from the table as `not in table`.
 6. Allow targets listed in the importer’s row or in an allowed-exception bullet. Otherwise report `upward` for a higher target layer, `sideways` for an equal target layer, and `not listed` for a lower target layer omitted from the row.
 
-This is a text heuristic: it reads `use crate::` statements, not inline `crate::` paths, `super::` paths or macros. Braces or `//` inside strings can confuse test-item skipping. It checks top-level modules, not items inside a module. Table rows start with `| L` followed by a digit; module and import cells contain comma-separated names. The check reads exception bullets only in `## Allowed exceptions`.
+This is a text heuristic: it reads `use crate::` statements, not inline `crate::` paths, `super::` paths or macros. Comment delimiters or braces inside strings can confuse parsing and test-item skipping. It checks top-level modules, not items inside a module. Table rows start with `| L` followed by a digit; module and import cells contain comma-separated names. The check reads exception bullets only in `## Allowed exceptions`.
 
 ## Changing the table
 

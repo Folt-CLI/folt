@@ -102,6 +102,33 @@ check 1 'multi-line path reports starting line' --enforce
 contains 'mid.rs:1: mid (L1) imports high (L2): upward'
 
 reset_case
+printf 'use crate::{low::A, /* explanation */ high::B};\n' > "$temp/src/mid.rs"
+check 1 'block comment before a brace-list target' --enforce
+contains 'mid.rs:1: mid (L1) imports high (L2): upward'
+contains '1 violations (enforcing)'
+cat > "$temp/src/mid.rs" <<'RUST'
+/* preceding comment
+   use crate::high::Ignored;
+*/
+use crate::{low::A, /* explanation with ; } , // and a nested comment
+  /* nested */ still inside the outer comment
+*/ high::B};
+RUST
+check 1 'multi-line nested block comments preserve statement starting line' --enforce
+contains 'mid.rs:4: mid (L1) imports high (L2): upward'
+contains '1 violations (enforcing)'
+cat > "$temp/src/mid.rs" <<'RUST'
+use crate::{low::A, /* high::Ignored, */ low::B};
+/*
+use crate::high::Ignored;
+*/
+// /* line comments must not open a block comment
+use crate::low::C;
+RUST
+check 0 'imports inside block comments remain ignored' --enforce
+contains 'no violations'
+
+reset_case
 printf 'use crate::pair_b::X;\n' > "$temp/src/pair_a.rs"
 printf 'use crate::pair_a::X;\n' > "$temp/src/pair_b.rs"
 check 0 'imports in both directions within a unit' --enforce
