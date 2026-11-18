@@ -105,7 +105,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** A document managed by Folt, identified by its own registry row rather than by a path. Explicit registration supports files with arbitrary bytes and directories anchored at a marker.
-- **Code:** `crates/folt-core/src/registry.rs:87` (`FolioRow`); `crates/folt-core/src/registry.rs:419` (`folio_exists`)
+- **Code:** `crates/folt-core/src/folio/row.rs:11` (`FolioRow`); `crates/folt-core/src/registry.rs:419` (`folio_exists`)
 - **Related:** [Folio id](#folio-id), [folio-name](#folio-name), [placement](#placement), [directory Folio](#directory-folio).
 - **Not:** A placement or an automatically discovered Markdown file; missing, moved and deleted Folio lifecycle rules remain open in [#15](https://github.com/Folt-CLI/folt/issues/15).
 - **Status:** decided
@@ -114,7 +114,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The identity assigned to a Folio, generated as a random version 4 UUID and displayed in lowercase hyphenated form. It names the Folio directory in the home.
-- **Code:** `crates/folt-core/src/id/folio.rs:7` (`FolioId`); `crates/folt-core/src/placement_fs.rs:21` (`internal_path`)
+- **Code:** `crates/folt-core/src/id/folio.rs:7` (`FolioId`); `crates/folt-core/src/folio/dir/path.rs:8` (`content_path`)
 - **Related:** [Folio](#folio), [folio-name](#folio-name), [owned key](#owned-key).
 - **Not:** A content hash or a readable name; `folio-id` is an owned front matter key that Folt does not write today.
 - **Status:** decided
@@ -132,7 +132,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The layout version and hash algorithm of one Folio, recorded in the registry as `layout` and `algorithm`.
-- **Code:** `crates/folt-core/src/registry.rs:75` (`FolioFormat`)
+- **Code:** `crates/folt-core/src/folio/format.rs:8` (`FolioFormat`)
 - **Related:** [Folio](#folio), [registry](#registry), [Folio directory](#folio-directory), [object store](#object-store).
 - **Not:** The home format version (`format_version` in `folt_metadata`) or the retired home format marker.
 - **Status:** decided

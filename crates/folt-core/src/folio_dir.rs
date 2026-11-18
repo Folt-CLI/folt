@@ -7,13 +7,14 @@ use std::io::{self, Write};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
-use crate::config::formats::OBJECT_ALGORITHM;
 use crate::config::names::{
     BLOBS_DIR, CONTENT_FILE, FOLIOS_DIR, NEW_DIR, REFS_DIR, TEMP_PREFIX_COPY,
 };
+use crate::folio::format::{FormatError, check_format};
+use crate::folio::refs_dir::inspect_refs;
+use crate::folio::row::FolioRow;
 use crate::id::FolioId;
-use crate::layout::{FOLIO_LAYOUT_VERSION, LayoutSupport, LayoutVersion};
-use crate::registry::{FolioFormat, FolioRow};
+use crate::layout::LayoutVersion;
 
 /// Content used to create a Folio directory.
 pub struct FolioSpec {
@@ -219,7 +220,7 @@ pub fn inspect(home: &Path, name: &OsStr, row: Option<&FolioRow>) -> Inspection 
             Err(e) => problems.push(problem(OsStr::new(entry), e)),
         }
     }
-    if let Err(error) = crate::refs::inspect_refs(&path) {
+    if let Err(error) = inspect_refs(&path) {
         problems.push(Problem {
             entry: REFS_DIR.into(),
             message: error.to_string(),
@@ -336,58 +337,6 @@ fn problem(entry: &OsStr, error: io::Error) -> Problem {
         message: error.to_string(),
     }
 }
-/// Checks whether a registry format can be read by this build.
-pub fn check_format(format: &FolioFormat) -> Result<(), FormatError> {
-    match format.layout.support_as_folio_layout() {
-        LayoutSupport::Supported => {}
-        LayoutSupport::Newer => {
-            return Err(FormatError::Newer {
-                found: format.layout,
-                supported: FOLIO_LAYOUT_VERSION,
-            });
-        }
-        LayoutSupport::Older => {
-            return Err(FormatError::Older {
-                found: format.layout,
-                supported: FOLIO_LAYOUT_VERSION,
-            });
-        }
-    }
-    if format.algorithm != OBJECT_ALGORITHM {
-        return Err(FormatError::UnsupportedAlgorithm(format.algorithm.clone()));
-    }
-    Ok(())
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum FormatError {
-    Newer {
-        found: LayoutVersion,
-        supported: LayoutVersion,
-    },
-    Older {
-        found: LayoutVersion,
-        supported: LayoutVersion,
-    },
-    UnsupportedAlgorithm(String),
-}
-impl fmt::Display for FormatError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Newer { found, supported } => write!(
-                f,
-                "Folio layout {found} is newer than supported layout {supported}"
-            ),
-            Self::Older { found, supported } => write!(
-                f,
-                "Folio layout {found} is older than supported layout {supported}"
-            ),
-            Self::UnsupportedAlgorithm(value) => write!(f, "unsupported object algorithm: {value}"),
-        }
-    }
-}
-impl Error for FormatError {}
-
 /// Errors returned by Folio directory operations.
 #[derive(Debug)]
 pub enum FolioDirError {

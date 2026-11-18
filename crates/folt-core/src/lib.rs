@@ -2,6 +2,7 @@
 
 pub mod checkout;
 pub mod config;
+pub mod folio;
 pub mod folio_dir;
 pub mod folio_name;
 pub mod front_matter;

@@ -1,6 +1,7 @@
 use std::fs;
 
 use folt_core::config::limits::SCAN_LIMIT;
+use folt_core::folio::row::{FolioRow, NewFolio};
 use folt_core::folio_name::FolioName;
 use folt_core::front_matter::{FrontMatterError, Reference};
 use folt_core::history;
@@ -12,8 +13,7 @@ use folt_core::placement_fs::PlacementFs;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::register::{apply_register, plan_register};
 use folt_core::registry::{
-    FolioRow, NewFolio, NewPlacement, Placement, PlacementPath, ReferenceRow, Registry,
-    RegistryError,
+    NewPlacement, Placement, PlacementPath, ReferenceRow, Registry, RegistryError,
 };
 use folt_core::store::ObjectStore;
 use folt_core::working_state;

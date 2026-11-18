@@ -79,9 +79,9 @@ mod relocation {
             }
             registry
                 .write(&lock, |tx| {
-                    tx.add_folio(&registry::NewFolio {
+                    tx.add_folio(&crate::folio::row::NewFolio {
                         id: row.id,
-                        format: registry::FolioFormat {
+                        format: crate::folio::format::FolioFormat {
                             layout: crate::layout::FOLIO_LAYOUT_VERSION,
                             algorithm: crate::config::formats::OBJECT_ALGORITHM.into(),
                         },

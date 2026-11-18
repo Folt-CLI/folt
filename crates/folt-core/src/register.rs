@@ -23,6 +23,8 @@ use crate::config::formats::OBJECT_ALGORITHM;
 use crate::config::limits::SUMMARY_LARGEST;
 use crate::config::names::{DEFAULT_BRANCH, MARKDOWN_EXTENSIONS, MARKER_FILE};
 use crate::config::settings::Settings;
+use crate::folio::format::FolioFormat;
+use crate::folio::row::NewFolio;
 use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
 use crate::folio_name::{FolioName, FolioNameError, StemError};
 use crate::front_matter::{self, Edit, FrontMatterError};
@@ -33,9 +35,7 @@ use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
 use crate::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use crate::placement_fs::PlacementFs;
-use crate::registry::{
-    self, FolioFormat, NewFolio, NewPlacement, PlacementPath, Registry, RegistryError,
-};
+use crate::registry::{self, NewPlacement, PlacementPath, Registry, RegistryError};
 
 /// One path and its optional explicit name.
 #[derive(Clone, Debug, Eq, PartialEq)]
