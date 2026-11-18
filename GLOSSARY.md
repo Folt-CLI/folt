@@ -42,6 +42,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [link](#link)
 - [marker](#marker)
 - [milestone](#milestone)
+- [Node (syntax tree node)](#node-syntax-tree-node)
 - [object](#object)
 - [object store](#object-store)
 - [observation](#observation)
@@ -67,6 +68,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [review agent](#review-agent)
 - [role file](#role-file)
 - [Rollback](#rollback)
+- [scan](#scan)
 - [scan limit](#scan-limit)
 - [Settings](#settings)
 - [signature](#signature)
@@ -76,6 +78,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [TempFile](#tempfile)
 - [test_support](#test_support)
 - [tip](#tip)
+- [tree](#tree)
 - [unresolved reference](#unresolved-reference)
 - [unstage](#unstage)
 - [work item](#work-item)
@@ -363,16 +366,43 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The optional YAML-subset block at the start of Markdown content, after an optional UTF-8 BOM, opens with a `---` line and closes with a `---` or `...` line. Its closing delimiter must start before byte 65536; Folt edits owned keys while preserving foreign content.
-- **Code:** `crates/folt-core/src/front_matter.rs:118` (`locate`); `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`)
+- **Code:** `crates/folt-core/src/front_matter.rs:75` (`locate`); `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`)
 - **Related:** [owned key](#owned-key), [folio-name](#folio-name), [reference](#reference), [marker](#marker).
 - **Not:** General YAML support or a separate metadata file.
+- **Status:** decided
+
+### scan
+
+- **Layer:** Front matter and references
+- **Definition:** The private `front_matter::scan` module containing line, whitespace, punctuation, explicit-key and flow-boundary helpers used to inspect front matter bytes without building nodes.
+- **Code:** `crates/folt-core/src/front_matter/scan.rs:2` (`Line`)
+- **Related:** [front matter](#front-matter), [scan limit](#scan-limit), [tree](#tree), [explicit key](#explicit-key).
+- **Not:** The scan limit or a general YAML parser.
+- **Status:** decided
+
+### tree
+
+- **Layer:** Front matter and references
+- **Definition:** The private `front_matter::tree` module containing `Block`, `Node` and `build`, which builds the front matter syntax tree from scan helpers while retaining original byte spans and resolving explicit keys.
+- **Code:** `crates/folt-core/src/front_matter/tree.rs:32` (`build`)
+- **Related:** [front matter](#front-matter), [scan](#scan), [Node (syntax tree node)](#node-syntax-tree-node).
+- **Not:** A general YAML representation, a directory hierarchy or a history object.
+- **Status:** decided
+
+### Node (syntax tree node)
+
+- **Layer:** Front matter and references
+- **Definition:** A top-level front matter syntax tree node carrying its decoded key, ambiguity flag and original byte ranges for the key spelling, value, comment, continuation and entire node. All ranges are offsets into the input within the block body; foreign values remain opaque.
+- **Code:** `crates/folt-core/src/front_matter/tree.rs:12` (`Node`)
+- **Related:** [front matter](#front-matter), [tree](#tree), [owned key](#owned-key), [explicit key](#explicit-key).
+- **Not:** A Folio, a declared reference entry or a decoded general YAML value.
 - **Status:** decided
 
 ### scan limit
 
 - **Layer:** Front matter and references
 - **Definition:** The number of leading bytes scanned for a front matter block: 65,536 (`64 * 1024`). The closing delimiter must start before this boundary; readers can take eight extra bytes to recognize a delimiter crossing it.
-- **Code:** `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`); `crates/folt-core/src/front_matter.rs:118` (`locate`)
+- **Code:** `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`); `crates/folt-core/src/front_matter.rs:75` (`locate`)
 - **Related:** [front matter](#front-matter), [Folio](#folio).
 - **Not:** A size limit on a Folio.
 - **Status:** decided
@@ -399,7 +429,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A YAML key introduced by the `? key` syntax, with `?` followed by a space, a tab or the end of the line. The front matter parser recognizes this syntax separately from an ordinary key.
-- **Code:** `crates/folt-core/src/front_matter.rs:254` (`explicit_key`)
+- **Code:** `crates/folt-core/src/front_matter/scan.rs:91` (`explicit_key`)
 - **Related:** [front matter](#front-matter), [owned key](#owned-key).
 - **Not:** A user-given name (explicit name) or registration confirmation (explicit confirmation).
 - **Status:** decided
@@ -408,7 +438,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A declared relationship from one Folio to another under `folio-references`, keyed by an alias and naming exactly one target name or id, with an optional pin field. Staging caches declared references per parent Folio and branch.
-- **Code:** `crates/folt-core/src/front_matter.rs:442` (`Reference`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/front_matter.rs:246` (`Reference`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
 - **Related:** [alias](#alias), [pin (reference field)](#pin-reference-field), [unresolved reference](#unresolved-reference), [refs table](#refs-table).
 - **Not:** An on-disk history ref or a computed Markdown-body link; local path selection remains open in [#28](https://github.com/Folt-CLI/folt/issues/28).
 - **Status:** decided
@@ -417,7 +447,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The key assigned to a declared reference inside one parent’s `folio-references` block. It is unique within that block and is stored as the reference row’s key.
-- **Code:** `crates/folt-core/src/front_matter.rs:443` (`alias`); `crates/folt-core/src/registry.rs:38` (`key`)
+- **Code:** `crates/folt-core/src/front_matter.rs:247` (`alias`); `crates/folt-core/src/registry.rs:38` (`key`)
 - **Related:** [reference](#reference), [refs table](#refs-table), [folio-name](#folio-name).
 - **Not:** A Folio name, symbolic link or the older local-path alias concept.
 - **Status:** decided
@@ -426,7 +456,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The optional pin text attached to a declared reference. The parser and registry currently preserve it as opaque text; resolving tags and storing validated commit hashes is pending work.
-- **Code:** `crates/folt-core/src/front_matter.rs:446` (`pin`); `crates/folt-core/src/registry.rs:42` (`pin`)
+- **Code:** `crates/folt-core/src/front_matter.rs:250` (`pin`); `crates/folt-core/src/registry.rs:42` (`pin`)
 - **Related:** [reference](#reference), [pin (retention ref)](#pin-retention-ref), [commit](#commit).
 - **Not:** A retention ref or a commit hash already validated by the current stage operation; [#13](https://github.com/Folt-CLI/folt/issues/13) supplies the intended model and [#152](https://github.com/Folt-CLI/folt/issues/152) owns its implementation.
 - **Status:** decided

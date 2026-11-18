@@ -8,6 +8,7 @@ mod owned_keys;
 mod reference_edits;
 mod references;
 mod scalars;
+mod syntax_tree;
 
 const ID: &str = "12345678-1234-4234-8234-123456789abc";
 
