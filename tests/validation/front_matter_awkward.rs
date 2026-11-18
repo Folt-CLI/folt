@@ -554,6 +554,11 @@ fn structured_awkward_inputs() {
         ("anchored owned key", "&a folio-name: v\n"),
         ("explicit tab owned key", "?\tfolio-name\n: v\n"),
         ("explicit line end owned key", "? folio-name\n: v\n"),
+        ("explicit commented owned key", "? folio-name # c\n: old\n"),
+        (
+            "explicit block scalar owned key",
+            "? |-\n  folio-name\n: old\n",
+        ),
         ("explicit CRLF owned key", "? folio-name\r\n: v\r\n"),
         ("explicit null owned key", "? folio-name\n"),
         ("explicit tab null owned key", "?\tfolio-name\n"),
@@ -623,6 +628,10 @@ fn structured_awkward_inputs() {
             "---\n?\n  other\n  key\n: value\nfolio-name: old\n---\n",
         ),
         (
+            "foreign folded explicit key starting with owned spelling",
+            "---\n? folio-name\n  suffix\n: value\nfolio-name: old\n---\n",
+        ),
+        (
             "foreign null explicit key",
             "---\n? other\nfolio-name: old\n---\n",
         ),
@@ -690,6 +699,11 @@ fn structured_awkward_inputs() {
             "reference header comment",
             "folio-references: # header\n  logo:\n    name: a\n",
             Ok(vec![logo("a", None)]),
+        ),
+        (
+            "empty reference alias",
+            "folio-references:\n  '':\n    name: image\n",
+            Err(InvalidValue),
         ),
         (
             "empty nested name",
