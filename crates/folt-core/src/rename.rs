@@ -19,7 +19,8 @@ use crate::object::{Commit, ObjectError, ObjectKind, hash_blob};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementOps, Signature};
 use crate::placement_fs::{PlacementFs, atomic_rewrite};
-use crate::registry::{Placement, Registry, RegistryError};
+use crate::placement_path::RegistryError;
+use crate::registry::{Placement, Registry};
 use crate::store::StoreError;
 use crate::working_state;
 

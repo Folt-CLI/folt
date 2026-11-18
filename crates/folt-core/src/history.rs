@@ -13,10 +13,11 @@ use crate::ops::rules_error::RulesError;
 use crate::placement::{
     Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
 };
+use crate::placement_path::RegistryError;
 use crate::placement_rules::{self, MovePlan, MoveTarget};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{Expect, RefError, RefStore};
-use crate::registry::{Placement, Registry, RegistryError};
+use crate::registry::{Placement, Registry};
 use crate::store::{ObjectStore, StoreError};
 use crate::working_state::{self, Edit};
 

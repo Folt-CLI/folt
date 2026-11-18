@@ -10,7 +10,8 @@ use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
-use crate::registry::{Placement, PlacementPath, PlacementPrefix, Registry, RegistryError};
+use crate::placement_path::{PlacementPath, PlacementPrefix, RegistryError};
+use crate::registry::{Placement, Registry};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PruneOptions {

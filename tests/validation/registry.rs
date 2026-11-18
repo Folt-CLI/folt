@@ -1,4 +1,4 @@
-use folt_core::registry::{PlacementPath, PlacementPrefix, RegistryError};
+use folt_core::placement_path::{PlacementPath, PlacementPrefix, RegistryError};
 
 use crate::common::TempHome;
 use crate::support::TestFolio;

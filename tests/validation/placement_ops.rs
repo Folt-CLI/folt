@@ -7,8 +7,9 @@ use folt_core::ops::rules_error::RulesError;
 use folt_core::placement::PlacementKind;
 use folt_core::placement::{Observation, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
+use folt_core::placement_path::PlacementPath;
 use folt_core::placement_rules;
-use folt_core::registry::{Placement, PlacementPath};
+use folt_core::registry::Placement;
 
 use crate::common::TempHome;
 use crate::support::TestFolio;

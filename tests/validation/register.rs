@@ -9,12 +9,13 @@ use folt_core::object::hash_blob;
 use folt_core::ops::facts::Behind;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
+use folt_core::placement_path::PlacementPath;
 use folt_core::placement_rules;
 use folt_core::refs::RefStore;
 use folt_core::register::{
     self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
 };
-use folt_core::registry::{PlacementPath, Registry};
+use folt_core::registry::Registry;
 
 use crate::common::TempHome;
 

@@ -46,7 +46,8 @@ fn directory_plan_refuses_inside_source_and_unrelated_destination_rows() {
     let (fixture, lock, mut registry) = RelocateFixture::new(true);
     let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
     let path =
-        registry::PlacementPath::resolve(fixture.row.path.to_path_buf().join("child")).unwrap();
+        crate::placement_path::PlacementPath::resolve(fixture.row.path.to_path_buf().join("child"))
+            .unwrap();
     let target = gather_relocate_target(&fixture.row, &path, &fs, &registry).unwrap();
     assert_eq!(
         judge_relocate(&fixture.facts(), &target)
@@ -78,7 +79,8 @@ fn a_registered_copy_replaced_by_a_directory_is_refused() {
     std::fs::remove_file(fixture.row.path.to_path_buf()).unwrap();
     std::fs::create_dir(fixture.row.path.to_path_buf()).unwrap();
     let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
-    let to = registry::PlacementPath::resolve(fixture.root.join("destination")).unwrap();
+    let to =
+        crate::placement_path::PlacementPath::resolve(fixture.root.join("destination")).unwrap();
     let target = gather_relocate_target(&fixture.row, &to, &fs, &registry).unwrap();
     assert_eq!(
         judge_relocate(&fixture.facts(), &target)

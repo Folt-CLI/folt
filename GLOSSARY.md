@@ -87,7 +87,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The Folt home is the directory holding the registry, Folio directories, configuration, lock and temporary files. It defaults to `.folt` in the OS home directory; `FOLT_HOME` overrides that path.
-- **Code:** `crates/folt-core/src/home.rs:27` (`Home`); `crates/folt-core/src/home.rs:379` (`resolve_home`)
+- **Code:** `crates/folt-core/src/home.rs:29` (`Home`); `crates/folt-core/src/home.rs:334` (`resolve_home`)
 - **Related:** [registry](#registry), [Folio directory](#folio-directory), [home lock](#home-lock).
 - **Not:** The OS home directory or a workspace marker; portability and multi-user rules remain open in [#17](https://github.com/Folt-CLI/folt/issues/17).
 - **Status:** decided
@@ -96,7 +96,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The SQLite database `registry.db` in the home records Folio existence, names, placements and cached references. Its tables are `folios`, `placements`, `refs` and `folt_metadata`.
-- **Code:** `crates/folt-core/src/registry.rs:215` (`Registry`)
+- **Code:** `crates/folt-core/src/registry.rs:107` (`Registry`)
 - **Related:** [home](#home), [Folio](#folio), [placement](#placement), [refs table](#refs-table).
 - **Not:** Just the placements table, a tracked-roots list or the on-disk history refs.
 - **Status:** decided
@@ -105,7 +105,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** A document managed by Folt, identified by its own registry row rather than by a path. Explicit registration supports files with arbitrary bytes and directories anchored at a marker.
-- **Code:** `crates/folt-core/src/folio/row.rs:11` (`FolioRow`); `crates/folt-core/src/registry.rs:419` (`folio_exists`)
+- **Code:** `crates/folt-core/src/folio/row.rs:11` (`FolioRow`); `crates/folt-core/src/registry.rs:311` (`folio_exists`)
 - **Related:** [Folio id](#folio-id), [folio-name](#folio-name), [placement](#placement), [directory Folio](#directory-folio).
 - **Not:** A placement or an automatically discovered Markdown file; missing, moved and deleted Folio lifecycle rules remain open in [#15](https://github.com/Folt-CLI/folt/issues/15).
 - **Status:** decided
@@ -123,7 +123,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The readable, unique Folio label: 1 to 64 ASCII letters, digits, dots, underscores or hyphens, with no leading or trailing dot or hyphen and no 64-digit hexadecimal value. The code accepts upper case, preserves case when slugging and indexes names with binary collation; Markdown content carries the `folio-name` key.
-- **Code:** `crates/folt-core/src/folio_name.rs:9` (`FolioName`); `crates/folt-core/src/folio_name.rs:46` (`parse`); `crates/folt-core/src/registry.rs:262` (`folios_name`)
+- **Code:** `crates/folt-core/src/folio_name.rs:9` (`FolioName`); `crates/folt-core/src/folio_name.rs:46` (`parse`); `crates/folt-core/src/registry.rs:154` (`folios_name`)
 - **Related:** [Folio id](#folio-id), [front matter](#front-matter), [rename](#rename).
 - **Not:** A file name, title, branch name or cached child label; the lowercase-only wording in [#47](https://github.com/Folt-CLI/folt/issues/47) is unconfirmed.
 - **Status:** open: #47
@@ -244,7 +244,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base and optional stage. The path is the key, and the kind is link, copy or internal.
-- **Code:** `crates/folt-core/src/registry.rs:48` (`Placement`); `crates/folt-core/src/placement.rs:9` (`PlacementKind`); `crates/folt-core/src/placement.rs:57` (`PlacementSpec`)
+- **Code:** `crates/folt-core/src/registry.rs:47` (`Placement`); `crates/folt-core/src/placement.rs:9` (`PlacementKind`); `crates/folt-core/src/placement.rs:57` (`PlacementSpec`)
 - **Related:** [link](#link), [copy](#copy), [internal row](#internal-row), [base](#base), [stage](#stage).
 - **Not:** The file itself or `PlacementSpec`, the in-memory record the file-system layer reads, which has no Folio id or stage.
 - **Status:** decided
@@ -253,7 +253,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A path whose filesystem spelling is resolved before registry access. Resolution produces an absolute key, canonicalizes the parent and resolves the final component’s on-disk spelling without following that component. A directory Folio resolves to its marker. “Resolved path” means the same.
-- **Code:** `crates/folt-core/src/registry.rs:119` (`PlacementPath`); `crates/folt-core/src/registry.rs:191` (`resolve_path`)
+- **Code:** `crates/folt-core/src/placement_path.rs:17` (`PlacementPath`); `crates/folt-core/src/placement_path.rs:82` (`resolve_path`)
 - **Related:** [placement](#placement), [registry](#registry), [directory Folio](#directory-folio), [marker](#marker).
 - **Not:** An unresolved input spelling or the target obtained by following the final symbolic link.
 - **Status:** decided
@@ -280,7 +280,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The registry placement of kind internal for `<home>/folios/<Folio id>/folio.main`, constrained to branch `main`. It holds that file’s working state, shared by links, and is never a user-selected placement kind.
-- **Code:** `crates/folt-core/src/registry.rs:105` (`internal_placement`); `crates/folt-core/src/placement.rs:12` (`Internal`)
+- **Code:** `crates/folt-core/src/registry.rs:87` (`internal_placement`); `crates/folt-core/src/placement.rs:12` (`Internal`)
 - **Related:** [placement](#placement), [link](#link), [branch](#branch), [Folio directory](#folio-directory).
 - **Not:** The file itself: call the file `folio.main` and the row the internal row on `main`.
 - **Status:** decided
@@ -408,7 +408,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A declared relationship from one Folio to another under `folio-references`, keyed by an alias and naming exactly one target name or id, with an optional pin field. Staging caches declared references per parent Folio and branch.
-- **Code:** `crates/folt-core/src/front_matter.rs:442` (`Reference`); `crates/folt-core/src/registry.rs:668` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/front_matter.rs:442` (`Reference`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
 - **Related:** [alias](#alias), [pin (reference field)](#pin-reference-field), [unresolved reference](#unresolved-reference), [refs table](#refs-table).
 - **Not:** An on-disk history ref or a computed Markdown-body link; local path selection remains open in [#28](https://github.com/Folt-CLI/folt/issues/28).
 - **Status:** decided
@@ -435,7 +435,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A cached reference whose name does not resolve to a registered Folio. Its row keeps the target name in child_label and an empty child id; edge is an informal synonym for reference.
-- **Code:** `crates/folt-core/src/registry.rs:37` (`ReferenceRow`); `crates/folt-core/src/registry.rs:668` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/registry.rs:37` (`ReferenceRow`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
 - **Related:** [reference](#reference), [alias](#alias), [refs table](#refs-table).
 - **Not:** An undecodable front matter key, which the parser calls an unresolved key.
 - **Status:** decided
@@ -444,7 +444,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The registry table caching declared references, keyed by parent Folio id, branch and alias key. Staging replaces that branch’s rows with parsed targets, labels and optional pin text.
-- **Code:** `crates/folt-core/src/registry.rs:265` (`refs`); `crates/folt-core/src/registry.rs:668` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/registry.rs:157` (`refs`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
 - **Related:** [registry](#registry), [reference](#reference), [stage](#stage), [unresolved reference](#unresolved-reference).
 - **Not:** The `refs/` directory or the history ref store of branches, tags and retention pins.
 - **Status:** decided
@@ -518,7 +518,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The exclusive file-lock guard coordinating Folt writers in one home. It must cover each operation’s required reads, decisions and writes, with exclusive guard access for operations that require it.
-- **Code:** `crates/folt-core/src/home.rs:253` (`HomeLock`)
+- **Code:** `crates/folt-core/src/home.rs:207` (`HomeLock`)
 - **Related:** [home](#home), [plan and apply](#plan-and-apply), [register](#register), [prune](#prune).
 - **Not:** A filesystem lock against external editors or permission to share one implementation worktree.
 - **Status:** decided

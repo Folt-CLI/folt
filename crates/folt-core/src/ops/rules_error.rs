@@ -1,7 +1,7 @@
 use crate::ops::refusal::Refusal;
 use crate::placement::PlacementError;
+use crate::placement_path::RegistryError;
 use crate::refs::RefError;
-use crate::registry::RegistryError;
 use std::error::Error;
 use std::fmt;
 

@@ -9,10 +9,11 @@ use folt_core::placement::{
     Observation, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
 use folt_core::placement_fs::PlacementFs;
+use folt_core::placement_path::PlacementPath;
 use folt_core::placement_rules;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
-use folt_core::registry::{NewPlacement, PlacementPath};
+use folt_core::registry::NewPlacement;
 use folt_core::store::ObjectStore;
 use folt_core::working_state::{self, Edit, Staged};
 

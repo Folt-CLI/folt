@@ -8,9 +8,10 @@ use crate::ops::facts::{Behind, PlacementFacts, needs_hash};
 use crate::ops::refusal::{Refusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps, StagedBlob};
+use crate::placement_path::RegistryError;
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
-use crate::registry::{Placement, Registry, RegistryError};
+use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

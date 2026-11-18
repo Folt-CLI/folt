@@ -4,9 +4,10 @@ use crate::id::FolioId;
 use crate::object::hash_blob;
 use crate::ops::facts::PlacementFacts;
 use crate::placement::{Observation, PlacementBase, PlacementKind, Signature};
+use crate::placement_path::PlacementPath;
 use crate::placement_rules::MoveTarget;
 use crate::ref_name::RefName;
-use crate::registry::{self, PlacementPath};
+use crate::registry;
 
 pub(crate) fn facts() -> PlacementFacts {
     let hash = hash_blob(b"base");
@@ -72,7 +73,7 @@ mod relocation {
             let lock = home.try_lock().unwrap();
             let mut registry = Registry::open_or_create(&home, &lock).unwrap();
             let mut row = facts().placement;
-            row.path = registry::PlacementPath::resolve(root.join("source")).unwrap();
+            row.path = PlacementPath::resolve(root.join("source")).unwrap();
             let fs = crate::placement_fs::PlacementFs::new(&home);
             if directory {
                 std::fs::create_dir(row.path.to_path_buf()).unwrap();
@@ -89,7 +90,7 @@ mod relocation {
                     for index in 0..if directory { 3 } else { 1 } {
                         let mut child = row.clone();
                         if directory {
-                            child.path = registry::PlacementPath::resolve(
+                            child.path = PlacementPath::resolve(
                                 row.path.to_path_buf().join(format!("file-{index}")),
                             )?;
                         }
@@ -137,8 +138,7 @@ mod relocation {
 
         pub(crate) fn plan(&self, registry: &Registry) -> RelocatePlan {
             let fs = crate::placement_fs::PlacementFs::new(&self.home);
-            let to =
-                registry::PlacementPath::resolve_directory(self.root.join("destination")).unwrap();
+            let to = PlacementPath::resolve_directory(self.root.join("destination")).unwrap();
             let target = gather_relocate_target(&self.row, &to, &fs, registry).unwrap();
             judge_relocate(&self.facts(), &target).unwrap()
         }
