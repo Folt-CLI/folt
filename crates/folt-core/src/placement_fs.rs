@@ -716,17 +716,11 @@ fn ensure_single(count: u64) -> io::Result<()> {
 }
 
 fn hard_links_unsupported(error: &io::Error) -> bool {
-    if error.kind() == io::ErrorKind::Unsupported {
-        return true;
-    }
     #[cfg(windows)]
-    {
-        error.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD)
-    }
+    let privilege_missing = error.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD);
     #[cfg(not(windows))]
-    {
-        false
-    }
+    let privilege_missing = false;
+    error.kind() == io::ErrorKind::Unsupported || privilege_missing
 }
 
 fn symlink_failure(path: &Path, source: io::Error) -> PlacementError {
