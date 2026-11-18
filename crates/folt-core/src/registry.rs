@@ -9,11 +9,13 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction};
 use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
 use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE, REGISTRY_FILE, RENAME_PENDING_PREFIX};
+use crate::folio::format::FolioFormat;
+use crate::folio::row::{FolioRow, NewFolio};
 use crate::folio_name::FolioName;
 use crate::home::{Home, HomeLock, is_regular_file};
 use crate::id::FolioId;
 use crate::id::ObjectId;
-use crate::layout::{HOME_FORMAT_VERSION, LayoutVersion};
+use crate::layout::HOME_FORMAT_VERSION;
 pub use crate::placement::PlacementBase;
 use crate::placement::{PlacementKind, Signature, StagedBlob};
 use std::time::Duration;
@@ -73,24 +75,6 @@ impl Placement {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FolioFormat {
-    pub layout: LayoutVersion,
-    pub algorithm: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NewFolio {
-    pub id: FolioId,
-    pub format: FolioFormat,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FolioRow {
-    pub id: FolioId,
-    pub format: FolioFormat,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NewPlacement {
     pub path: PlacementPath,
     pub id: FolioId,
@@ -105,7 +89,7 @@ pub struct NewPlacement {
 /// Builds the initial internal row without registering it or capturing a base.
 pub fn internal_placement(home: &Home, id: FolioId) -> Result<NewPlacement, RegistryError> {
     Ok(NewPlacement {
-        path: PlacementPath::resolve(crate::placement_fs::internal_path(home, id))?,
+        path: PlacementPath::resolve(crate::folio::dir::path::content_path(home, id))?,
         id,
         kind: PlacementKind::Internal,
         head: Some(DEFAULT_BRANCH.into()),

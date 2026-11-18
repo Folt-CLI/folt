@@ -1,11 +1,11 @@
-use crate::config::names::CONTENT_FILE;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
-use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
+use crate::config::names::DEFAULT_BRANCH;
+use crate::folio::dir::path::former_home;
 use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
@@ -915,14 +915,6 @@ fn apply_remove_after_row(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RepairLinkPlan {
     facts: PlacementFacts,
-}
-
-fn former_home(target: &std::path::Path, id: FolioId) -> Option<PathBuf> {
-    let suffix = PathBuf::from(FOLIOS_DIR)
-        .join(id.to_string())
-        .join(CONTENT_FILE);
-    let home = target.parent()?.parent()?.parent()?;
-    (target.is_absolute() && home.join(suffix) == target).then(|| home.to_path_buf())
 }
 
 fn former_link_home(facts: &PlacementFacts) -> Option<PathBuf> {
