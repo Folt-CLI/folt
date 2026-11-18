@@ -13,6 +13,12 @@ use crate::config::limits::{SCAN_LIMIT, SCAN_WINDOW};
 use crate::config::names::{OWNED, OWNED_ID, OWNED_NAME, OWNED_REFERENCES};
 use crate::id::FolioId;
 
+mod scan;
+mod tree;
+
+use scan::{colon, explicit_key, flow_end, line, punctuation, scan_punctuation, trim_end};
+pub use tree::{Block, Node};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FrontMatterError {
     Unterminated,
@@ -43,29 +49,6 @@ impl fmt::Display for FrontMatterError {
 impl Error for FrontMatterError {}
 type Result<T> = std::result::Result<T, FrontMatterError>;
 
-/// A top-level node. Spans include original spelling and whitespace; `value`
-/// excludes spacing after the colon and a trailing comment on its final line.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Node {
-    pub key: String,
-    pub range: Range<usize>,
-    pub key_range: Range<usize>,
-    pub value: Range<usize>,
-    pub comment: Range<usize>,
-    pub continuation: Range<usize>,
-    ambiguous: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Block {
-    pub range: Range<usize>,
-    pub body: Range<usize>,
-    pub nodes: Vec<Node>,
-    /// Bytes before the first key (comments and blank lines).
-    pub preamble: Range<usize>,
-    pub line_ending: &'static str,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Edit {
     pub range: Range<usize>,
@@ -84,35 +67,9 @@ pub fn apply_edit(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>> {
     Ok(result)
 }
 
-#[derive(Clone)]
-struct Line {
-    end: usize,
-    next: usize,
-}
-fn line(bytes: &[u8], start: usize, end: usize) -> Line {
-    let next = bytes[start..end]
-        .iter()
-        .position(|b| *b == b'\n')
-        .map_or(end, |n| start + n + 1);
-    let mut content = next;
-    if content > start && bytes[content - 1] == b'\n' {
-        content -= 1;
-        if content > start && bytes[content - 1] == b'\r' {
-            content -= 1;
-        }
-    }
-    Line { end: content, next }
-}
 fn text(bytes: &[u8]) -> Result<&str> {
     std::str::from_utf8(bytes).map_err(|_| FrontMatterError::InvalidValue)
 }
-fn trim_end(bytes: &[u8], mut end: usize, start: usize) -> usize {
-    while end > start && bytes[end - 1].is_ascii_whitespace() {
-        end -= 1;
-    }
-    end
-}
-
 /// Finds a block only at the start (after an optional UTF-8 BOM). The closing
 /// delimiter must start before byte 65536; its own bytes may cross that bound.
 pub fn locate(bytes: &[u8]) -> Result<Option<Block>> {
@@ -152,7 +109,7 @@ pub fn locate(bytes: &[u8]) -> Result<Option<Block>> {
                 preamble: opening.next..pos,
                 line_ending: ending,
             };
-            tokenize(bytes, &mut block)?;
+            tree::build(bytes, &mut block)?;
             audit(bytes, &block)?;
             return Ok(Some(block));
         }
@@ -168,7 +125,7 @@ fn owned_spelling(spelling: &str) -> Option<usize> {
 fn audit(bytes: &[u8], block: &Block) -> Result<()> {
     let mut counts = [0i32; OWNED.len()];
     for raw in text(&bytes[block.body.clone()])?.lines() {
-        let top = !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ");
+        let top = scan::top_level(raw);
         if top
             && let Some(i) = colon(raw)
             && let Some(index) = owned_spelling(&raw[..i])
@@ -185,158 +142,6 @@ fn audit(bytes: &[u8], block: &Block) -> Result<()> {
         return Err(FrontMatterError::Hidden);
     }
     Ok(())
-}
-
-// Scan punctuation only outside quotes/comments. This also lets wrapped flow
-// mappings stay inside their node even when their lines start at column zero.
-fn punctuation(s: &str, wanted: char) -> Vec<usize> {
-    scan_punctuation(s, wanted, false)
-}
-
-fn scan_punctuation(s: &str, wanted: char, nested_comments: bool) -> Vec<usize> {
-    let mut result = Vec::new();
-    let mut quote = None;
-    let mut escape = false;
-    let mut depth = 0i32;
-    let mut comment = false;
-    let chars: Vec<_> = s.char_indices().collect();
-    let mut index = 0;
-    while index < chars.len() {
-        let (i, c) = chars[index];
-        if comment {
-            if c == '\n' {
-                comment = false;
-            }
-            index += 1;
-            continue;
-        }
-        if let Some(q) = quote {
-            if escape {
-                escape = false;
-            } else if q == '"' && c == '\\' {
-                escape = true;
-            } else if c == q {
-                if q == '\'' && chars.get(index + 1).is_some_and(|(_, c)| *c == '\'') {
-                    index += 1;
-                } else {
-                    quote = None;
-                }
-            }
-        } else if c == '#' && (i == 0 || s.as_bytes()[i - 1].is_ascii_whitespace()) {
-            if wanted == '#' && (depth == 0 || nested_comments) {
-                result.push(i);
-            }
-            comment = true;
-        } else if c == '\'' || c == '"' {
-            quote = Some(c);
-        } else {
-            if c == wanted && depth == 0 {
-                result.push(i);
-            }
-            if c == '{' || c == '[' {
-                depth += 1;
-            }
-            if c == '}' || c == ']' {
-                depth -= 1;
-            }
-        }
-        index += 1;
-    }
-    result
-}
-fn colon(s: &str) -> Option<usize> {
-    punctuation(s, ':').into_iter().find(|i| {
-        s.as_bytes()
-            .get(i + 1)
-            .is_none_or(|b| b.is_ascii_whitespace() || *b == b'{' || *b == b'[')
-    })
-}
-fn explicit_key(s: &str) -> Option<&str> {
-    s.strip_prefix('?')
-        .filter(|tail| tail.is_empty() || tail.starts_with([' ', '\t']))
-}
-fn tokenize(bytes: &[u8], block: &mut Block) -> Result<()> {
-    let mut pos = block.body.start;
-    while pos < block.body.end {
-        let current = line(bytes, pos, block.body.end);
-        let raw = text(&bytes[pos..current.end])?;
-        let top = !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ");
-        if top {
-            let key_end = colon(raw);
-            let complex = explicit_key(raw);
-            if key_end.is_some() || complex.is_some() {
-                if let Some(previous) = block.nodes.last_mut() {
-                    previous.range.end = pos;
-                    previous.continuation.end = pos;
-                } else {
-                    block.preamble.end = pos;
-                }
-                let end = key_end
-                    .unwrap_or_else(|| punctuation(raw, '#').first().copied().unwrap_or(raw.len()));
-                let spelling = raw[..end].trim_end();
-                let key = if let Some(key) = explicit_key(spelling) {
-                    scalar(key.trim())
-                        .map(Cow::into_owned)
-                        .unwrap_or_else(|_| key.trim().into())
-                } else {
-                    scalar(spelling)
-                        .map(Cow::into_owned)
-                        .unwrap_or_else(|_| spelling.into())
-                };
-                let mut value_start = pos + key_end.map_or(raw.len(), |n| n + 1);
-                while value_start < current.end && matches!(bytes[value_start], b' ' | b'\t') {
-                    value_start += 1;
-                }
-                let comments = punctuation(text(&bytes[value_start..current.end])?, '#');
-                let comment = comments.first().map_or(current.end, |n| value_start + n);
-                let value_end = trim_end(bytes, comment, value_start);
-                block.nodes.push(Node {
-                    key,
-                    key_range: pos..pos + end,
-                    range: pos..block.body.end,
-                    value: value_start..value_end,
-                    comment: comment..current.end,
-                    continuation: current.next..block.body.end,
-                    ambiguous: complex.is_some() || spelling.starts_with(['\'', '"']),
-                });
-                // A flow value may wrap over several lines. Its final closing
-                // brace, rather than its first line, determines the value end.
-                if matches!(bytes.get(value_start), Some(b'{' | b'[')) {
-                    let tail = text(&bytes[value_start..block.body.end])?;
-                    if let Some(end) = flow_end(tail) {
-                        let absolute = value_start + end;
-                        let final_line = line(bytes, absolute, block.body.end);
-                        let node = block
-                            .nodes
-                            .last_mut()
-                            .ok_or(FrontMatterError::InvalidValue)?;
-                        node.value.end = absolute;
-                        node.comment = absolute..final_line.end;
-                        node.continuation.start = final_line.next;
-                        pos = final_line.next;
-                        continue;
-                    }
-                }
-            }
-        }
-        pos = current.next;
-    }
-    // Continuation spans are now complete. Use each resolved explicit key for
-    // all lookups, including duplicate checks and owned-key insertion order.
-    // Unresolved keys retain their spelling and are refused by the key checks.
-    for index in 0..block.nodes.len() {
-        let n = &block.nodes[index];
-        if explicit_key(text(&bytes[n.key_range.clone()])?).is_some()
-            && let Ok(key) = resolved_explicit_key(bytes, n, block)
-        {
-            block.nodes[index].key = key;
-        }
-    }
-    Ok(())
-}
-fn flow_end(s: &str) -> Option<usize> {
-    let closing = if s.starts_with('{') { '}' } else { ']' };
-    punctuation(&s[1..], closing).first().map(|n| n + 2)
 }
 
 fn node<'a>(block: &'a Block, key: &str) -> Result<Option<&'a Node>> {
@@ -412,13 +217,12 @@ fn read_scalar<'a>(bytes: &'a [u8], key: &str) -> Result<Option<Cow<'a, str>>> {
         return Ok(None);
     };
     supported(bytes, n)?;
-    if text(&bytes[n.continuation.clone()])?
-        .lines()
-        .any(meaningful)
-    {
+    let continuation = text(&bytes[n.continuation.clone()])?;
+    if continuation.lines().any(meaningful) {
         return Err(FrontMatterError::Unsupported);
     }
-    let value = scalar(text(&bytes[n.value.clone()])?)?;
+    let spelling = text(&bytes[n.value.clone()])?;
+    let value = scalar(spelling)?;
     if value.is_empty() {
         return Err(FrontMatterError::InvalidValue);
     }
