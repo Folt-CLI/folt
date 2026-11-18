@@ -2,8 +2,9 @@ use std::error::Error;
 use std::fmt;
 
 use crate::home::HomeLock;
+use crate::ops::rules_error::RulesError;
 use crate::placement::PlacementOps;
-use crate::placement_rules::{self, MoveTarget, RulesError};
+use crate::placement_rules::{self, MoveTarget};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry};

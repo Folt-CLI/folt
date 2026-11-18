@@ -6,10 +6,11 @@ use folt_core::config::limits::DEFAULT_LARGE_FILE_BYTES;
 use folt_core::config::names::CONTENT_FILE;
 use folt_core::config::settings::Settings;
 use folt_core::object::hash_blob;
+use folt_core::ops::facts::Behind;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::placement_rules::{self, Behind};
+use folt_core::placement_rules;
 use folt_core::refs::RefStore;
 use folt_core::register::{
     self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,

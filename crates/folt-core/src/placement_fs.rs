@@ -30,11 +30,6 @@ impl<'a> PlacementFs<'a> {
         Self { home }
     }
 
-    /// Returns the canonical derived link target spelling used by create and read.
-    pub fn link_target(&self, id: FolioId) -> PathBuf {
-        content_path(self.home, id)
-    }
-
     /// Checks whether the path's filesystem permits creating a symbolic link.
     /// Runs only when a link is explicitly requested; a copy never calls it.
     pub fn probe_link(&self, path: &Path) -> Result<(), PlacementError> {
@@ -199,6 +194,10 @@ impl<'a> PlacementFs<'a> {
 }
 
 impl PlacementOps for PlacementFs<'_> {
+    fn link_target(&self, id: FolioId) -> PathBuf {
+        content_path(self.home, id)
+    }
+
     fn create(
         &self,
         id: FolioId,

@@ -89,8 +89,10 @@ mod conversion {
     use folt_core::home::HomeLock;
     use folt_core::id::ObjectId;
     use folt_core::object::hash_blob;
+    use folt_core::ops::refusal::RefusalReason;
+    use folt_core::ops::rules_error::RulesError;
     use folt_core::placement::{PlacementError, PlacementKind, StagedBlob};
-    use folt_core::placement_rules::{self, ConvertPlan, RefusalReason, RulesError};
+    use folt_core::placement_rules::{self, ConvertPlan};
     use folt_core::ref_name::RefName;
     use folt_core::registry::Placement;
 
