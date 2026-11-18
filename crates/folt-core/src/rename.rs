@@ -18,8 +18,9 @@ use crate::id::ObjectId;
 use crate::object::{Commit, ObjectError, ObjectKind, hash_blob};
 use crate::placement::{Observation, PlacementOps, Signature};
 use crate::placement_fs::{PlacementFs, atomic_rewrite};
+use crate::placement_path::RegistryError;
 use crate::placement_rules::RulesError;
-use crate::registry::{Placement, Registry, RegistryError};
+use crate::registry::{Placement, Registry};
 use crate::store::StoreError;
 use crate::working_state;
 

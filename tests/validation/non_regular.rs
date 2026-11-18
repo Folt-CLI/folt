@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use folt_core::home::{Home, HomeError};
 use folt_core::object::{ObjectKind, hash_blob};
-use folt_core::registry::RegistryError;
+use folt_core::placement_path::RegistryError;
 use folt_core::store::StoreError;
 
 use crate::common::TempHome;

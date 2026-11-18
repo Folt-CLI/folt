@@ -6,18 +6,18 @@ use std::io::{self, Read};
 #[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, SQLITE_HEADER};
 use crate::config::names::{HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR};
-use crate::config::settings::{FileSettings, Settings, SettingsError};
-use crate::layout::{HOME_FORMAT_VERSION, LayoutSupport, LayoutVersion};
-use crate::registry::{Registry, RegistryError};
+use crate::config::settings::SettingsError;
+use crate::layout::LayoutVersion;
+use crate::placement_path::RegistryError;
 
 pub mod config_file;
+mod open;
 
 /// A resolved Folt home directory.
 ///
@@ -41,66 +41,6 @@ impl Home {
     /// Windows profiles are not handled.
     pub fn locate() -> Result<PathBuf, HomeError> {
         resolve_home(&Environment::capture())
-    }
-
-    /// Opens or creates a home directory and validates its contents and format.
-    ///
-    /// Concurrent first runs are not serialised until the home lock exists.
-    pub fn open_or_create(path: PathBuf, environment: &Environment) -> Result<Self, HomeError> {
-        let settings = Settings::resolve(environment, FileSettings::default())?;
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|source| HomeError::CannotCreate {
-                path: parent.to_path_buf(),
-                source,
-            })?;
-        }
-        match private_directory_builder().create(&path) {
-            Ok(()) => {}
-            Err(source) if source.kind() == io::ErrorKind::AlreadyExists && path.is_dir() => {}
-            Err(source) => {
-                return Err(HomeError::CannotCreate {
-                    path: path.clone(),
-                    source,
-                });
-            }
-        }
-
-        recognize_home(&path)?;
-        let home = Self {
-            environment: environment.clone(),
-            busy_timeout: settings.busy_timeout,
-            warnings: home_warnings(&path)?,
-            path: path.clone(),
-        };
-        let registry = Registry::open_existing(&home)?;
-        if let Some(text) = registry.format_version()? {
-            let version =
-                LayoutVersion::from_str(&text).map_err(|_| HomeError::InvalidFormatVersion {
-                    path: path.join(REGISTRY_FILE),
-                    found: text,
-                })?;
-            match version.support_as_home_format() {
-                LayoutSupport::Supported => {}
-                LayoutSupport::Newer => {
-                    return Err(HomeError::NewerFormatVersion {
-                        found: version,
-                        supported: HOME_FORMAT_VERSION,
-                    });
-                }
-                LayoutSupport::Older => {
-                    return Err(HomeError::OlderFormatVersion {
-                        found: version,
-                        supported: HOME_FORMAT_VERSION,
-                    });
-                }
-            }
-        } else if path.join(REGISTRY_FILE).exists() {
-            return Err(HomeError::MissingFormatVersion {
-                path: path.join(REGISTRY_FILE),
-            });
-        }
-
-        Ok(home)
     }
 
     pub(crate) fn environment(&self) -> &Environment {

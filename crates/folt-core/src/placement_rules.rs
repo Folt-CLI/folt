@@ -11,9 +11,10 @@ use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_fs::resolved_path;
+use crate::placement_path::{self, RegistryError};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
-use crate::registry::{self, Registry, RegistryError};
+use crate::registry::{self, Registry};
 use crate::store::ObjectStore;
 
 /// Read-only facts used by status and move decisions.
@@ -527,7 +528,7 @@ pub fn converted_row(
 /// Destination and registry facts collected while the home lock is held.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelocateTarget {
-    pub path: registry::PlacementPath,
+    pub path: placement_path::PlacementPath,
     pub observation: Observation,
     pub registered: bool,
     pub pending: bool,
@@ -538,7 +539,7 @@ pub struct RelocateTarget {
 /// `PlacementPath::resolve_directory`; its kind is Copy and its base is absent.
 pub fn gather_relocate_target(
     row: &registry::Placement,
-    to: &registry::PlacementPath,
+    to: &placement_path::PlacementPath,
     fs: &impl PlacementOps,
     registry: &Registry,
 ) -> Result<RelocateTarget, RulesError> {
@@ -564,7 +565,8 @@ pub fn gather_relocate_target(
     let (id, mut placement) = row.to_placement();
     placement.path = destination;
     let observation = fs.read(id, &placement)?;
-    let mut originals = registry.placements_under(&registry::PlacementPrefix::resolve(&from)?)?;
+    let mut originals =
+        registry.placements_under(&placement_path::PlacementPrefix::resolve(&from)?)?;
     if registry.placement_at(&row.path)?.is_some() {
         originals = vec![row.clone()];
     } else if originals.is_empty() && fs.read(id, &row.to_placement().1)? != Observation::Directory
@@ -588,7 +590,7 @@ pub fn gather_relocate_target(
     }
     // A prefix cannot absorb rows outside this move's pending set.
     let destination_rows =
-        registry.placements_under(&registry::PlacementPrefix::resolve(to.to_path_buf())?)?;
+        registry.placements_under(&placement_path::PlacementPrefix::resolve(to.to_path_buf())?)?;
     registered |= destination_rows
         .iter()
         .any(|row| !rows.iter().any(|(_, new)| new == row));
@@ -1009,7 +1011,7 @@ pub fn rehome(
             .into());
         }
         prefix = Some(home);
-        let new_path = registry::PlacementPath::resolve(current)?;
+        let new_path = placement_path::PlacementPath::resolve(current)?;
         if row.path != new_path {
             if registry.placement_at(&new_path)?.is_some() {
                 return Err(Refusal {
