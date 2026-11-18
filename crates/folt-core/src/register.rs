@@ -35,7 +35,8 @@ use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
 use crate::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use crate::placement_fs::PlacementFs;
-use crate::registry::{self, NewPlacement, PlacementPath, Registry, RegistryError};
+use crate::placement_path::{PlacementPath, RegistryError};
+use crate::registry::{self, NewPlacement, Registry};
 
 /// One path and its optional explicit name.
 #[derive(Clone, Debug, Eq, PartialEq)]

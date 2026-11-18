@@ -5,12 +5,13 @@ use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
 use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps, StagedBlob};
+use crate::placement_path::RegistryError;
 use crate::placement_rules::{
     Behind, PlacementFacts, Refusal, RefusalReason, RulesError, needs_hash,
 };
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
-use crate::registry::{Placement, Registry, RegistryError};
+use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

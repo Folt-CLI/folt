@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::env::Environment;
+use crate::placement_path::path_bytes;
 use crate::test_support::TempDir;
 
 #[test]

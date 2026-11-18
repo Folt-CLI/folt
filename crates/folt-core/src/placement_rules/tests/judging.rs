@@ -113,8 +113,10 @@ fn clean_move_preserves_target_and_row() {
 fn relocation_and_removal_refusal_table() {
     let original = facts();
     let target = RelocateTarget {
-        path: registry::PlacementPath::resolve(std::env::temp_dir().join("folt-unit-destination"))
-            .unwrap(),
+        path: crate::placement_path::PlacementPath::resolve(
+            std::env::temp_dir().join("folt-unit-destination"),
+        )
+        .unwrap(),
         observation: Observation::Missing,
         registered: false,
         pending: false,

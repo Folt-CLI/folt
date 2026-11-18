@@ -10,9 +10,10 @@ use folt_core::id::ObjectId;
 use folt_core::object::{Commit, hash_blob};
 use folt_core::placement::{PlacementKind, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
+use folt_core::placement_path::{PlacementPath, RegistryError};
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
-use folt_core::registry::{NewPlacement, Placement, PlacementPath, RegistryError};
+use folt_core::registry::{NewPlacement, Placement};
 use folt_core::rename::{self, RenameError};
 use folt_core::working_state;
 

@@ -9,8 +9,9 @@ use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::object::{Author, Commit, CommitTime, ObjectKind, hash_blob};
 use folt_core::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
+use folt_core::placement_path::PlacementPath;
 use folt_core::refs::RefStore;
-use folt_core::registry::{self, NewPlacement, Placement, PlacementPath, Registry};
+use folt_core::registry::{self, NewPlacement, Placement, Registry};
 use folt_core::store::ObjectStore;
 use folt_core::working_state;
 
