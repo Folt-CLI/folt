@@ -1208,12 +1208,14 @@ fn name_sources_and_exact_edits_are_planned_without_writing() {
         };
         assert_eq!(
             Some(edit.clone()),
-            folt_core::front_matter::set_name(
-                contents[i],
-                Some(plan.entries[i].name.as_ref().unwrap().as_str()),
-                true
-            )
-            .unwrap()
+            folt_core::front_matter::locate(contents[i])
+                .and_then(|block| folt_core::front_matter::Block::set_name(
+                    block.as_ref(),
+                    contents[i],
+                    Some(plan.entries[i].name.as_ref().unwrap().as_str()),
+                    true
+                ))
+                .unwrap()
         );
     }
     let text = plan.to_string();

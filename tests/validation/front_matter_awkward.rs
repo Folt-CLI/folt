@@ -1,7 +1,7 @@
 use folt_core::config::limits::SCAN_LIMIT;
 use folt_core::front_matter::{
     Block, Edit, FrontMatterError, Reference, apply_edit, locate, read_id, read_name,
-    read_references, set_id, set_name, set_reference, set_references,
+    read_references,
 };
 use folt_core::id::FolioId;
 
@@ -75,23 +75,38 @@ impl Operation {
 
     fn plan_with_create(self, bytes: &[u8], create: bool) -> Result<Option<Edit>> {
         match self {
-            Self::Name(set) => set_name(bytes, set.then_some("new"), create),
-            Self::Id(set) => set_id(bytes, set.then(|| FolioId::parse(NEW_ID).unwrap()), create),
-            Self::References(set) => set_references(
-                bytes,
-                &if set {
-                    vec![logo("new", Some("pin"))]
-                } else {
-                    vec![]
-                },
-                create,
-            ),
-            Self::Alias(set) => set_reference(
-                bytes,
-                "logo",
-                set.then(|| logo("new", Some("pin"))).as_ref(),
-                create,
-            ),
+            Self::Name(set) => locate(bytes).and_then(|block| {
+                Block::set_name(block.as_ref(), bytes, set.then_some("new"), create)
+            }),
+            Self::Id(set) => locate(bytes).and_then(|block| {
+                Block::set_id(
+                    block.as_ref(),
+                    bytes,
+                    set.then(|| FolioId::parse(NEW_ID).unwrap()),
+                    create,
+                )
+            }),
+            Self::References(set) => locate(bytes).and_then(|block| {
+                Block::set_references(
+                    block.as_ref(),
+                    bytes,
+                    &if set {
+                        vec![logo("new", Some("pin"))]
+                    } else {
+                        vec![]
+                    },
+                    create,
+                )
+            }),
+            Self::Alias(set) => locate(bytes).and_then(|block| {
+                Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    "logo",
+                    set.then(|| logo("new", Some("pin"))).as_ref(),
+                    create,
+                )
+            }),
         }
     }
 
@@ -828,7 +843,15 @@ fn name_edits_preserve_preamble_and_standalone_lines() {
         for ending in ["\n", "\r\n"] {
             let render = |text: &str| format!("{bom}{}", text.replace('\n', ending));
             let input = render("---\n# comment\n\n---\nbody\n");
-            assert_eq!(set_name(input.as_bytes(), None, false), Ok(None));
+            assert_eq!(
+                locate(input.as_bytes()).and_then(|block| Block::set_name(
+                    block.as_ref(),
+                    input.as_bytes(),
+                    None,
+                    false
+                )),
+                Ok(None)
+            );
             let mut case = name_case("comment-only preamble", &input, None);
             case.edits = edits(&[Operation::Name(true)], None);
             case.edits[0].output =

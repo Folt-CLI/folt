@@ -35,7 +35,15 @@ fn reference_target_mapping_rules_apply_to_block_and_flow() {
     let input = b"# body";
     let output = apply_edit(
         input,
-        &set_references(input, std::slice::from_ref(&reference), true)
+        &locate(input)
+            .and_then(|block| {
+                Block::set_references(
+                    block.as_ref(),
+                    input,
+                    std::slice::from_ref(&reference),
+                    true,
+                )
+            })
             .unwrap()
             .unwrap(),
     )
@@ -68,7 +76,16 @@ fn reads_all_reference_forms() {
                     refs[0].pin.as_deref(),
                     (!pin.is_empty()).then_some("abc123")
                 );
-                let edit = set_reference(input.as_bytes(), "logo", Some(&logo()), false)
+                let edit = locate(input.as_bytes())
+                    .and_then(|block| {
+                        Block::set_reference(
+                            block.as_ref(),
+                            input.as_bytes(),
+                            "logo",
+                            Some(&logo()),
+                            false,
+                        )
+                    })
                     .unwrap()
                     .unwrap();
                 let output = apply_edit(input.as_bytes(), &edit).unwrap();
@@ -142,15 +159,32 @@ fn nested_block_entries_reject_empty_aliases() {
             let bytes = input.as_bytes();
             assert_eq!(read_references(bytes), Err(FrontMatterError::InvalidValue));
             assert_eq!(
-                set_references(bytes, &[logo()], false),
+                locate(bytes).and_then(|block| Block::set_references(
+                    block.as_ref(),
+                    bytes,
+                    &[logo()],
+                    false
+                )),
                 Err(FrontMatterError::InvalidValue)
             );
             assert_eq!(
-                set_reference(bytes, "logo", Some(&logo()), false),
+                locate(bytes).and_then(|block| Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    "logo",
+                    Some(&logo()),
+                    false
+                )),
                 Err(FrontMatterError::InvalidValue)
             );
             assert_eq!(
-                set_reference(bytes, "logo", None, false),
+                locate(bytes).and_then(|block| Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    "logo",
+                    None,
+                    false
+                )),
                 Err(FrontMatterError::InvalidValue)
             );
         }
@@ -163,7 +197,10 @@ fn wrapped_flow_comments_and_indentation_are_understood() {
     assert_eq!(read_references(bytes).unwrap().len(), 2);
     let output = apply_edit(
         bytes,
-        &set_reference(bytes, "logo", Some(&logo()), false)
+        &locate(bytes)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), bytes, "logo", Some(&logo()), false)
+            })
             .unwrap()
             .unwrap(),
     )
@@ -178,7 +215,10 @@ fn wrapped_flow_comments_and_indentation_are_understood() {
     let bytes = b"---\nfolio-references:\n    other: {name: other-image}\n# tail\n---\n";
     let output = apply_edit(
         bytes,
-        &set_reference(bytes, "logo", Some(&logo()), false)
+        &locate(bytes)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), bytes, "logo", Some(&logo()), false)
+            })
             .unwrap()
             .unwrap(),
     )
@@ -191,7 +231,10 @@ fn wrapped_flow_comments_and_indentation_are_understood() {
     );
     let output = apply_edit(
         &output,
-        &set_references(&output, &[], false).unwrap().unwrap(),
+        &locate(&output)
+            .and_then(|block| Block::set_references(block.as_ref(), &output, &[], false))
+            .unwrap()
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(output, b"---\n# tail\n---\n");
@@ -270,7 +313,13 @@ fn malformed_references_are_refused_without_partial_edits() {
         let bytes = format!("---\n{body}---\n");
         assert_eq!(read_references(bytes.as_bytes()), Err(error), "{body}");
         assert_eq!(
-            set_reference(bytes.as_bytes(), "logo", Some(&logo()), true),
+            locate(bytes.as_bytes()).and_then(|block| Block::set_reference(
+                block.as_ref(),
+                bytes.as_bytes(),
+                "logo",
+                Some(&logo()),
+                true
+            )),
             Err(error),
             "{body}"
         );
@@ -359,12 +408,23 @@ fn reference_spellings_preserve_field_error_variants() {
                     "{input:?}"
                 );
                 assert_eq!(
-                    set_references(input.as_bytes(), &[logo()], false),
+                    locate(input.as_bytes()).and_then(|block| Block::set_references(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        &[logo()],
+                        false
+                    )),
                     Err(expected),
                     "{input:?}"
                 );
                 assert_eq!(
-                    set_reference(input.as_bytes(), "logo", None, false),
+                    locate(input.as_bytes()).and_then(|block| Block::set_reference(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        "logo",
+                        None,
+                        false
+                    )),
                     Err(expected),
                     "{input:?}"
                 );
