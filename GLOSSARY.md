@@ -292,7 +292,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The content hash and file signature captured when a copy or internal working file is created or refreshed. The signature contains size, modification time, change time and inode, with unavailable metadata represented as absent.
-- **Code:** `crates/folt-core/src/placement.rs:94` (`PlacementBase`); `crates/folt-core/src/placement.rs:48` (`Signature`)
+- **Code:** `crates/folt-core/src/placement.rs:86` (`PlacementBase`); `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
 - **Related:** [copy](#copy), [internal row](#internal-row), [drift](#drift), [stage](#stage).
 - **Not:** A merge base, PR base branch or name prefix before a numeric suffix; links have no base.
 - **Status:** decided
@@ -310,7 +310,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** File metadata captured with a base and checked before applying a move: size, modification time, change time and inode. Unavailable metadata is represented as absent.
-- **Code:** `crates/folt-core/src/placement.rs:48` (`Signature`)
+- **Code:** `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
 - **Related:** [base](#base), [observation](#observation), [copy](#copy).
 - **Not:** A content hash or cryptographic signature.
 - **Status:** decided
@@ -539,7 +539,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:100` (`build_and_publish`); `crates/folt-core/src/placement_fs.rs:571` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:116` (`copy_content`)
+- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:105` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
@@ -559,7 +559,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Code structure
 - **Definition:** The single module that owns file-system writes (temporary files, atomic rename, directory sync and mode setting) and the `FileSystem` trait with a real and a fault-injecting implementation.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/fsx/mod.rs:22` (`FileSystem`)
 - **Related:** [publish](#publish).
 - **Not:** Raw `std::fs` mutations elsewhere.
 - **Status:** decided

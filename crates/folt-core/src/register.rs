@@ -28,6 +28,7 @@ use crate::folio::row::NewFolio;
 use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
 use crate::folio_name::{FolioName, FolioNameError, StemError};
 use crate::front_matter::{self, Block, Edit, FrontMatterError};
+use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::config_file::ConfigError;
 use crate::home::{Home, HomeError, HomeLock};
 use crate::id::FolioId;
@@ -153,7 +154,7 @@ pub struct RegisterEntry {
     pub name: Option<FolioName>,
     pub name_source: Option<NameSource>,
     pub name_write: NameWrite,
-    signature: Option<crate::placement::Signature>,
+    signature: Option<crate::fsx::Signature>,
     prefix: Option<Vec<u8>>,
 }
 
@@ -528,7 +529,7 @@ fn inspect_entry(
     if File::open(&path).is_err() {
         return Ok(refuse(entry, RegisterRefusalReason::Unreadable));
     }
-    entry.signature = Some(crate::placement_fs::signature(&metadata));
+    entry.signature = Some(crate::fsx::signature(&metadata));
     entry.size = metadata.len();
     if entry.size >= settings.large_file_bytes {
         entry.status = RegisterStatus::NeedsConfirmation { size: entry.size };
@@ -867,12 +868,12 @@ fn apply_locked(
                     .open(&entry.path)
                 {
                     Ok(file) => {
-                        let signature = crate::placement_fs::signature(&file.metadata()?);
+                        let signature = crate::fsx::signature(&file.metadata()?);
                         markers.push((entry.path.clone(), signature));
                         file.sync_all()?;
                         drop(file);
                         if let Some(parent) = entry.path.parent() {
-                            crate::fs::sync_directory(parent)?;
+                            RealFileSystem.sync_directory(parent)?;
                         }
                         hook(Step::MarkerSynced)?;
                     }
@@ -910,7 +911,7 @@ fn apply_locked(
             };
             if let Some(expected) = &entry.signature {
                 let metadata = fs::metadata(&entry.path)?;
-                if &crate::placement_fs::signature(&metadata) != expected
+                if &crate::fsx::signature(&metadata) != expected
                     || entry.prefix.as_ref().is_some_and(|prefix| {
                         content.get(..content.len().min(SCAN_WINDOW)) != Some(prefix.as_slice())
                     })
@@ -977,19 +978,15 @@ fn apply_locked(
                     );
                     return Ok(false);
                 };
-                let write = crate::placement_fs::atomic_rewrite(
-                    &entry.path,
-                    &updated,
-                    expected,
-                    |signature| {
+                let write =
+                    crate::fsx::atomic_rewrite(&entry.path, &updated, expected, |signature| {
                         rewritten.push((entry.path.clone(), content.clone(), signature.clone()));
                         if let Some((_, marker_signature)) =
                             markers.iter_mut().find(|(path, _)| path == &entry.path)
                         {
                             *marker_signature = signature;
                         }
-                    },
-                );
+                    });
                 if let Err(error) = write {
                     if error.kind() == io::ErrorKind::InvalidData {
                         refuse_name(
@@ -1075,7 +1072,7 @@ fn apply_locked(
             return Ok(true);
         }
         // Persist the home entry too when create_folio first created folios/.
-        crate::fs::sync_directory(home.path())?;
+        RealFileSystem.sync_directory(home.path())?;
         hook(Step::Transaction)?;
         let mut registry = Registry::open_or_create(home, lock)?;
         registry.write(lock, |tx| {
@@ -1101,9 +1098,9 @@ fn apply_locked(
     if !matches!(result, Ok(true)) {
         let mut failures = Vec::new();
         for (path, original, signature) in rewritten.into_iter().rev() {
-            if !fs::symlink_metadata(&path).is_ok_and(|meta| {
-                meta.is_file() && crate::placement_fs::signature(&meta) == signature
-            }) {
+            if !fs::symlink_metadata(&path)
+                .is_ok_and(|meta| meta.is_file() && crate::fsx::signature(&meta) == signature)
+            {
                 failures.push(format!(
                     "{} keeps the name: file changed after our write",
                     path.display()
@@ -1112,7 +1109,7 @@ fn apply_locked(
             }
             let mut restoration_published = false;
             if let Err(error) =
-                crate::placement_fs::atomic_rewrite(&path, &original, &signature, |restored| {
+                crate::fsx::atomic_rewrite(&path, &original, &signature, |restored| {
                     restoration_published = true;
                     if let Some((_, marker_signature)) =
                         markers.iter_mut().find(|(marker, _)| marker == &path)
@@ -1140,9 +1137,9 @@ fn apply_locked(
             }
         }
         for (marker, signature) in markers {
-            if fs::symlink_metadata(&marker).is_ok_and(|meta| {
-                meta.is_file() && crate::placement_fs::signature(&meta) == signature
-            }) && let Err(error) = fs::remove_file(&marker)
+            if fs::symlink_metadata(&marker)
+                .is_ok_and(|meta| meta.is_file() && crate::fsx::signature(&meta) == signature)
+                && let Err(error) = fs::remove_file(&marker)
             {
                 failures.push(format!("{}: {error}", marker.display()));
             }

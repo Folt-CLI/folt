@@ -11,14 +11,16 @@ use std::path::PathBuf;
 
 use crate::folio_name::FolioName;
 use crate::front_matter::{self, Block, FrontMatterError};
+use crate::fsx::Signature;
+use crate::fsx::atomic_rewrite;
 use crate::history::{self, CommitMetadata, HistoryError, HistoryStores};
 use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{Commit, ObjectError, ObjectKind, hash_blob};
 use crate::ops::rules_error::RulesError;
-use crate::placement::{Observation, PlacementOps, Signature};
-use crate::placement_fs::{PlacementFs, atomic_rewrite};
+use crate::placement::{Observation, PlacementOps};
+use crate::placement_fs::PlacementFs;
 use crate::placement_path::RegistryError;
 use crate::registry::{Placement, Registry};
 use crate::store::StoreError;
@@ -239,9 +241,7 @@ pub fn plan_rename(
         history::judge_commit(&history::gather_commit(&row, fs, stores, registry)?)
             .map_err(HistoryError::from)?;
     }
-    if fs::metadata(row.path.to_path_buf()).map(|m| crate::placement_fs::signature(&m))?
-        != signature
-    {
+    if fs::metadata(row.path.to_path_buf()).map(|m| crate::fsx::signature(&m))? != signature {
         return Err(RenameError::PlanChanged);
     }
     Ok(RenamePlan {

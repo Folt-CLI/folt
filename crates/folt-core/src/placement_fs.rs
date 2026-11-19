@@ -1,24 +1,21 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::limits::STREAM_BUFFER_SIZE;
-use crate::config::names::{
-    FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE, TEMP_TAG_NAME,
-};
+use crate::config::names::{FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE};
 use crate::folio::dir::path::content_path;
+use crate::fsx::{
+    FileSystem, RealFileSystem, copy_new, hard_links_unsupported, signature, temp_name,
+};
 use crate::home::Home;
 use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{ObjectHasher, ObjectKind};
 use crate::placement::{
-    Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, PlacementSpec,
-    Signature, Written,
+    Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
 use crate::store::ObjectStore;
-
-static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
 /// Filesystem implementation of link and copy placement operations.
 pub struct PlacementFs<'a> {
@@ -35,7 +32,8 @@ impl<'a> PlacementFs<'a> {
     pub fn probe_link(&self, path: &Path) -> Result<(), PlacementError> {
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
         let probe = temporary_path(parent, TEMP_TAG_LINK_PROBE);
-        create_symlink(&self.home.path().join(FOLIOS_DIR), &probe)
+        RealFileSystem
+            .create_symlink(&self.home.path().join(FOLIOS_DIR), &probe)
             .map_err(|source| symlink_failure(path, source))?;
         fs::remove_file(&probe).map_err(|source| failure(&probe, source))
     }
@@ -73,7 +71,9 @@ impl<'a> PlacementFs<'a> {
             placement.path.parent().unwrap_or_else(|| Path::new(".")),
             "folt-link",
         );
-        create_symlink(&target, &temporary).map_err(|e| failure(&temporary, e))?;
+        RealFileSystem
+            .create_symlink(&target, &temporary)
+            .map_err(|e| failure(&temporary, e))?;
         if let Some(expected) = expected
             && self.read(id, placement)? != *expected
         {
@@ -209,7 +209,8 @@ impl PlacementOps for PlacementFs<'_> {
         match placement.kind {
             PlacementKind::Link => {
                 fs::metadata(&target).map_err(|e| failure(&target, e))?;
-                create_symlink(&target, &placement.path)
+                RealFileSystem
+                    .create_symlink(&target, &placement.path)
                     .map_err(|e| failure(&placement.path, e))?;
                 Ok(Written { base: None })
             }
@@ -293,7 +294,9 @@ impl PlacementOps for PlacementFs<'_> {
 
     fn sync_parent(&self, placement: &PlacementSpec) -> Result<(), PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
-        crate::fs::sync_directory(parent).map_err(|error| failure(parent, error))
+        RealFileSystem
+            .sync_directory(parent)
+            .map_err(|error| failure(parent, error))
     }
 
     fn convert(
@@ -330,10 +333,13 @@ impl PlacementOps for PlacementFs<'_> {
                     require_single_link(&placement.path)?;
                     let target = self.link_target(id);
                     fs::metadata(&target).map_err(|error| failure(&target, error))?;
-                    create_symlink(&target, &temporary)
+                    RealFileSystem
+                        .create_symlink(&target, &temporary)
                         .map_err(|error| symlink_failure(&placement.path, error))?;
                     prepared = true;
-                    crate::fs::sync_directory(parent).map_err(|error| failure(parent, error))?;
+                    RealFileSystem
+                        .sync_directory(parent)
+                        .map_err(|error| failure(parent, error))?;
                 }
                 _ => {
                     return Err(failure(
@@ -353,7 +359,9 @@ impl PlacementOps for PlacementFs<'_> {
             // failed replacement must leave the original entry available for retry.
             fs::rename(&temporary, &placement.path)
                 .map_err(|error| failure(&placement.path, error))?;
-            crate::fs::sync_directory(parent).map_err(|error| failure(parent, error))?;
+            RealFileSystem
+                .sync_directory(parent)
+                .map_err(|error| failure(parent, error))?;
             let base = if to_kind == PlacementKind::Copy {
                 let metadata = fs::symlink_metadata(&placement.path)
                     .map_err(|error| failure(&placement.path, error))?;
@@ -379,7 +387,9 @@ impl PlacementOps for PlacementFs<'_> {
         to: &Path,
         expected: &Observation,
     ) -> Result<Written, PlacementError> {
-        self.relocate_with_rename(id, placement, to, expected, rename_no_replace)
+        self.relocate_with_rename(id, placement, to, expected, |from, to| {
+            RealFileSystem.rename_no_replace(from, to)
+        })
     }
 
     fn unlink(
@@ -426,22 +436,6 @@ pub(crate) fn resolved_path(path: &Path) -> Result<PathBuf, PlacementError> {
             Err(error) => return Err(failure(path, error)),
         }
     }
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn rename_no_replace(source: &Path, destination: &Path) -> io::Result<()> {
-    use rustix::fs::{CWD, RenameFlags, renameat_with};
-    renameat_with(CWD, source, CWD, destination, RenameFlags::NOREPLACE).map_err(io::Error::from)
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-fn rename_no_replace(source: &Path, destination: &Path) -> io::Result<()> {
-    match fs::symlink_metadata(destination) {
-        Ok(_) => return Err(io::ErrorKind::AlreadyExists.into()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-        Err(error) => return Err(error),
-    }
-    fs::rename(source, destination)
 }
 
 fn move_failure(path: &Path, source: io::Error) -> PlacementError {
@@ -518,210 +512,16 @@ fn hash_file(path: &Path) -> Result<ObjectId, PlacementError> {
     Ok(hasher.finish())
 }
 
-/// Nanoseconds per second (nanoseconds).
-#[cfg(unix)]
-const NANOS_PER_SECOND: i128 = 1_000_000_000;
-/// Windows-to-Unix epoch offset in FILETIME ticks.
-#[cfg(windows)]
-const WINDOWS_TO_UNIX_EPOCH_TICKS: i128 = 116_444_736_000_000_000;
-/// Nanoseconds per FILETIME tick (nanoseconds).
-#[cfg(windows)]
-const NANOS_PER_TICK: i128 = 100;
-/// Windows privilege-not-held error code (dimensionless).
-const ERROR_PRIVILEGE_NOT_HELD: i32 = 1314;
-
-pub(crate) fn signature(metadata: &fs::Metadata) -> Signature {
-    #[cfg(unix)]
-    use std::os::unix::fs::MetadataExt;
-    #[cfg(unix)]
-    let (mtime, ctime, inode) = (
-        Some(metadata.mtime() as i128 * NANOS_PER_SECOND + metadata.mtime_nsec() as i128),
-        Some(metadata.ctime() as i128 * NANOS_PER_SECOND + metadata.ctime_nsec() as i128),
-        Some(metadata.ino()),
-    );
-    #[cfg(windows)]
-    let (mtime, ctime, inode) = {
-        use std::os::windows::fs::MetadataExt;
-        // FILETIME uses 100 ns ticks since 1601; registry timestamps use Unix ns.
-        let unix_ns = |ticks| (i128::from(ticks) - WINDOWS_TO_UNIX_EPOCH_TICKS) * NANOS_PER_TICK;
-        (
-            Some(unix_ns(metadata.last_write_time())),
-            Some(unix_ns(metadata.creation_time())),
-            None,
-        )
-    };
-    Signature {
-        size: metadata.len(),
-        mtime,
-        ctime,
-        inode,
-    }
-}
-
-/// Replace an unchanged regular file through a synced sibling temporary file.
-/// `published` runs immediately after rename, before the directory sync, so
-/// callers can roll back even when the final durability step fails.
-pub(crate) fn atomic_rewrite(
-    path: &Path,
-    bytes: &[u8],
-    expected: &Signature,
-    published: impl FnOnce(Signature),
-) -> io::Result<()> {
-    let check = || {
-        let metadata = fs::symlink_metadata(path)?;
-        if !metadata.is_file() || signature(&metadata) != *expected {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "file changed"));
-        }
-        if metadata.permissions().readonly() {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "read-only file",
-            ));
-        }
-        require_single_link(path).map_err(io::Error::other)?;
-        Ok(metadata)
-    };
-    let metadata = check()?;
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = temporary_path(parent, TEMP_TAG_NAME);
-    let mut output = create_rewrite_temp(&temporary, &metadata.permissions())?;
-    let result = (|| {
-        output.write_all(bytes)?;
-        output.sync_all()?;
-        check()?;
-        let fallback_signature = signature(&output.metadata()?);
-        // Known limit: a rename cannot be conditional on content, so an edit made
-        // between the check above and this rename is replaced. See "Known limit:
-        // the write window" in docs/dev/library/register.md.
-        fs::rename(&temporary, path)?;
-        let metadata = rewrite_metadata(&output, path);
-        // Rename may change ctime. Prefer the post-rename signature, but always
-        // record publication before propagating a metadata failure. The fallback
-        // lets rollback restore the file or report its path if the signature no
-        // longer matches; a published name must never be silently forgotten.
-        published(
-            metadata
-                .as_ref()
-                .map(signature)
-                .unwrap_or(fallback_signature),
-        );
-        metadata?;
-        crate::fs::sync_directory(parent)
-    })();
-    drop(output);
-    let _ = fs::remove_file(temporary);
-    result
-}
-
-fn rewrite_metadata(output: &File, path: &Path) -> io::Result<fs::Metadata> {
-    #[cfg(not(test))]
-    let _ = path;
-    #[cfg(test)]
-    if REWRITE_METADATA_FAILURE.with(|failure| {
-        let mut failure = failure.borrow_mut();
-        if failure.as_deref() == Some(path) {
-            failure.take();
-            true
-        } else {
-            false
-        }
-    }) {
-        return Err(io::Error::other("injected rewrite metadata failure"));
-    }
-    output.metadata()
-}
-
-#[cfg(test)]
-thread_local! {
-    static REWRITE_METADATA_FAILURE: std::cell::RefCell<Option<PathBuf>> = const {
-        std::cell::RefCell::new(None)
-    };
-}
-
-#[cfg(test)]
-pub(crate) fn with_rewrite_metadata_failure<T>(path: &Path, run: impl FnOnce() -> T) -> T {
-    struct Reset;
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            REWRITE_METADATA_FAILURE.with(|failure| *failure.borrow_mut() = None);
-        }
-    }
-    REWRITE_METADATA_FAILURE.with(|failure| {
-        assert!(failure.borrow().is_none());
-        *failure.borrow_mut() = Some(path.to_path_buf());
-    });
-    let _reset = Reset;
-    run()
-}
-
-fn create_rewrite_temp(path: &Path, permissions: &fs::Permissions) -> io::Result<File> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-        options.mode(permissions.mode());
-    }
-    let output = options.open(path)?;
-    if let Err(error) = output.set_permissions(permissions.clone()) {
-        drop(output);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
-    Ok(output)
-}
-
 fn temporary_path(parent: &Path, tag: &str) -> PathBuf {
-    parent.join(format!(
-        ".{tag}-{}-{}",
-        std::process::id(),
-        NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
-    ))
-}
-
-fn copy_new(source: &Path, destination: &Path) -> io::Result<()> {
-    let mut input = File::open(source)?;
-    let mut output = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(destination)?;
-    io::copy(&mut input, &mut output)?;
-    output.sync_all()
+    parent.join(temp_name(&format!(".{tag}-"), '-'))
 }
 
 pub(crate) fn require_single_link(path: &Path) -> Result<(), PlacementError> {
-    link_count(path)
-        .and_then(ensure_single)
-        .map_err(|error| failure(path, error))
+    crate::fsx::require_single_link(path).map_err(|error| failure(path, error))
 }
 
-#[cfg(unix)]
-fn link_count(path: &Path) -> io::Result<u64> {
-    use std::os::unix::fs::MetadataExt;
-    Ok(fs::symlink_metadata(path)?.nlink())
-}
-
-#[cfg(windows)]
-fn link_count(path: &Path) -> io::Result<u64> {
-    let file = File::open(path)?;
-    Ok(winapi_util::file::information(&file)?.number_of_links())
-}
-
-fn ensure_single(count: u64) -> io::Result<()> {
-    if count == 1 {
-        Ok(())
-    } else {
-        Err(io::Error::other("source has other hard links"))
-    }
-}
-
-fn hard_links_unsupported(error: &io::Error) -> bool {
-    #[cfg(windows)]
-    let privilege_missing = error.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD);
-    #[cfg(not(windows))]
-    let privilege_missing = false;
-    error.kind() == io::ErrorKind::Unsupported || privilege_missing
-}
+/// Windows privilege-not-held error code (dimensionless).
+const ERROR_PRIVILEGE_NOT_HELD: i32 = 1314;
 
 fn symlink_failure(path: &Path, source: io::Error) -> PlacementError {
     let unavailable = source.kind() == io::ErrorKind::Unsupported
@@ -744,14 +544,5 @@ fn failure(path: &Path, source: io::Error) -> PlacementError {
         source,
     }
 }
-#[cfg(unix)]
-fn create_symlink(target: &Path, link: &Path) -> io::Result<()> {
-    std::os::unix::fs::symlink(target, link)
-}
-#[cfg(windows)]
-fn create_symlink(target: &Path, link: &Path) -> io::Result<()> {
-    std::os::windows::fs::symlink_file(target, link)
-}
-
 #[cfg(test)]
 mod tests;

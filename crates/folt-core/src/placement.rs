@@ -1,3 +1,4 @@
+use crate::fsx::Signature;
 use crate::id::ObjectId;
 use crate::store::{ObjectStore, StoreError};
 use std::error::Error;
@@ -41,15 +42,6 @@ impl PlacementKind {
             _ => None,
         }
     }
-}
-
-/// File metadata captured with a copy's base and checked before applying a move.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Signature {
-    pub size: u64,
-    pub mtime: Option<i128>,
-    pub ctime: Option<i128>,
-    pub inode: Option<u64>,
 }
 
 /// The in-memory placement record (`PlacementSpec`). Persistence is handled by the caller.
