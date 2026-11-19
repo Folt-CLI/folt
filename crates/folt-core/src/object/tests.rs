@@ -34,6 +34,7 @@ fn prefix_reader_never_requests_the_uncompressed_tail() {
 }
 
 use super::*;
+use crate::id::InvalidObjectId;
 
 fn commit(body: Option<&str>) -> Commit {
     Commit {
