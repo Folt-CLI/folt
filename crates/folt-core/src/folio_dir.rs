@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -12,7 +12,7 @@ use crate::folio::format::{FormatError, check_format};
 use crate::folio::refs_dir::inspect_refs;
 use crate::folio::row::FolioRow;
 use crate::fsx::{FileSystem, RealFileSystem};
-use crate::fsx::{private_directory_builder, private_file_options};
+use crate::fsx::{TempFile, TempMode, private_directory_builder};
 use crate::id::FolioId;
 use crate::layout::LayoutVersion;
 
@@ -108,15 +108,15 @@ fn build_and_publish(
     durability: Durability,
 ) -> Result<FolioDir, FolioDirError> {
     let content_path = temporary.join(CONTENT_FILE);
-    let mut file = create_file(&content_path)?;
-    file.write_all(&spec.content)
+    let mut file = TempFile::create_at(&content_path, TempMode::Private)
+        .map_err(|source| io_error(&content_path, source))?;
+    file.file_mut()
+        .write_all(&spec.content)
         .map_err(|source| io_error(&content_path, source))?;
     if durability == Durability::DataAndDirectories {
-        file.sync_all()
+        file.sync()
             .map_err(|source| io_error(&content_path, source))?;
     }
-    // Windows cannot rename the staging directory while its content file is open.
-    drop(file);
     ensure_directory(&temporary.join(BLOBS_DIR))?;
     ensure_directory(&temporary.join(REFS_DIR))?;
     if durability == Durability::DataAndDirectories {
@@ -128,6 +128,8 @@ fn build_and_publish(
     if fs::symlink_metadata(&destination).is_ok() {
         return Err(FolioDirError::AlreadyExists(destination));
     }
+    // Windows cannot rename the staging directory while its content file is open.
+    file.keep();
     fs::rename(temporary, &destination).map_err(|source| io_error(&destination, source))?;
     if durability == Durability::DataAndDirectories
         && let Err(source) = RealFileSystem.sync_directory(folios)
@@ -305,14 +307,6 @@ fn ensure_directory(path: &Path) -> Result<(), FolioDirError> {
     private_directory_builder()
         .recursive(true)
         .create(path)
-        .map_err(|source| io_error(path, source))
-}
-fn create_file(path: &Path) -> Result<File, FolioDirError> {
-    let mut options = private_file_options();
-    options
-        .write(true)
-        .create_new(true)
-        .open(path)
         .map_err(|source| io_error(path, source))
 }
 fn io_error(path: &Path, source: io::Error) -> FolioDirError {

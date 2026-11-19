@@ -17,7 +17,7 @@ pub(crate) use private::{private_directory_builder, private_file_options};
 pub use signature::{Signature, signature};
 #[cfg(test)]
 pub(crate) use sync::{with_sync_failure, with_sync_failure_after};
-pub(crate) use temp::temp_name;
+pub(crate) use temp::{TempFile, TempMode, temp_name};
 
 pub(crate) trait FileSystem {
     fn sync_directory(&self, path: &Path) -> io::Result<()>;
