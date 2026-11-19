@@ -1,5 +1,6 @@
 use std::fs;
 
+use folt_core::folio::row::NewFolio;
 use folt_core::folio_name::FolioName;
 use folt_core::front_matter;
 use folt_core::history::{self, HistoryStores};
@@ -9,9 +10,10 @@ use folt_core::id::ObjectId;
 use folt_core::object::{Commit, hash_blob};
 use folt_core::placement::{PlacementKind, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
+use folt_core::placement_path::{PlacementPath, RegistryError};
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
-use folt_core::registry::{NewFolio, NewPlacement, Placement, PlacementPath, RegistryError};
+use folt_core::registry::{NewPlacement, Placement};
 use folt_core::rename::{self, RenameError};
 use folt_core::working_state;
 
@@ -1013,7 +1015,15 @@ fn malformed_references_refuse_in_planning_without_changes_including_retries() {
             if step > 0 {
                 let replacement = front_matter::apply_edit(
                     bytes.as_bytes(),
-                    &front_matter::set_name(bytes.as_bytes(), Some("new"), false)
+                    &front_matter::locate(bytes.as_bytes())
+                        .and_then(|block| {
+                            front_matter::Block::set_name(
+                                block.as_ref(),
+                                bytes.as_bytes(),
+                                Some("new"),
+                                false,
+                            )
+                        })
                         .unwrap()
                         .unwrap(),
                 )

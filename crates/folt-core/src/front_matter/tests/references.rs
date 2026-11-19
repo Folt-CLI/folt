@@ -35,7 +35,15 @@ fn reference_target_mapping_rules_apply_to_block_and_flow() {
     let input = b"# body";
     let output = apply_edit(
         input,
-        &set_references(input, std::slice::from_ref(&reference), true)
+        &locate(input)
+            .and_then(|block| {
+                Block::set_references(
+                    block.as_ref(),
+                    input,
+                    std::slice::from_ref(&reference),
+                    true,
+                )
+            })
             .unwrap()
             .unwrap(),
     )
@@ -68,7 +76,16 @@ fn reads_all_reference_forms() {
                     refs[0].pin.as_deref(),
                     (!pin.is_empty()).then_some("abc123")
                 );
-                let edit = set_reference(input.as_bytes(), "logo", Some(&logo()), false)
+                let edit = locate(input.as_bytes())
+                    .and_then(|block| {
+                        Block::set_reference(
+                            block.as_ref(),
+                            input.as_bytes(),
+                            "logo",
+                            Some(&logo()),
+                            false,
+                        )
+                    })
                     .unwrap()
                     .unwrap();
                 let output = apply_edit(input.as_bytes(), &edit).unwrap();
@@ -142,15 +159,32 @@ fn nested_block_entries_reject_empty_aliases() {
             let bytes = input.as_bytes();
             assert_eq!(read_references(bytes), Err(FrontMatterError::InvalidValue));
             assert_eq!(
-                set_references(bytes, &[logo()], false),
+                locate(bytes).and_then(|block| Block::set_references(
+                    block.as_ref(),
+                    bytes,
+                    &[logo()],
+                    false
+                )),
                 Err(FrontMatterError::InvalidValue)
             );
             assert_eq!(
-                set_reference(bytes, "logo", Some(&logo()), false),
+                locate(bytes).and_then(|block| Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    "logo",
+                    Some(&logo()),
+                    false
+                )),
                 Err(FrontMatterError::InvalidValue)
             );
             assert_eq!(
-                set_reference(bytes, "logo", None, false),
+                locate(bytes).and_then(|block| Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    "logo",
+                    None,
+                    false
+                )),
                 Err(FrontMatterError::InvalidValue)
             );
         }
@@ -163,7 +197,10 @@ fn wrapped_flow_comments_and_indentation_are_understood() {
     assert_eq!(read_references(bytes).unwrap().len(), 2);
     let output = apply_edit(
         bytes,
-        &set_reference(bytes, "logo", Some(&logo()), false)
+        &locate(bytes)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), bytes, "logo", Some(&logo()), false)
+            })
             .unwrap()
             .unwrap(),
     )
@@ -178,7 +215,10 @@ fn wrapped_flow_comments_and_indentation_are_understood() {
     let bytes = b"---\nfolio-references:\n    other: {name: other-image}\n# tail\n---\n";
     let output = apply_edit(
         bytes,
-        &set_reference(bytes, "logo", Some(&logo()), false)
+        &locate(bytes)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), bytes, "logo", Some(&logo()), false)
+            })
             .unwrap()
             .unwrap(),
     )
@@ -191,7 +231,10 @@ fn wrapped_flow_comments_and_indentation_are_understood() {
     );
     let output = apply_edit(
         &output,
-        &set_references(&output, &[], false).unwrap().unwrap(),
+        &locate(&output)
+            .and_then(|block| Block::set_references(block.as_ref(), &output, &[], false))
+            .unwrap()
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(output, b"---\n# tail\n---\n");
@@ -270,9 +313,136 @@ fn malformed_references_are_refused_without_partial_edits() {
         let bytes = format!("---\n{body}---\n");
         assert_eq!(read_references(bytes.as_bytes()), Err(error), "{body}");
         assert_eq!(
-            set_reference(bytes.as_bytes(), "logo", Some(&logo()), true),
+            locate(bytes.as_bytes()).and_then(|block| Block::set_reference(
+                block.as_ref(),
+                bytes.as_bytes(),
+                "logo",
+                Some(&logo()),
+                true
+            )),
             Err(error),
             "{body}"
+        );
+    }
+}
+
+#[test]
+fn reference_spellings_have_equal_targets_and_pins() {
+    for ending in ["\n", "\r\n"] {
+        for (target, mut expected) in [
+            ("name: logo-image".to_owned(), logo()),
+            (
+                format!("id: {ID}"),
+                Reference {
+                    alias: "logo".into(),
+                    name: None,
+                    id: Some(FolioId::parse(ID).unwrap()),
+                    pin: Some("abc123".into()),
+                },
+            ),
+        ] {
+            for body in [
+                format!("folio-references:\n  logo:\n    {target}\n    pin: abc123\n"),
+                format!(
+                    "folio-references:\n    logo: # entry\n      {target} # target\n      pin: abc123\n"
+                ),
+                format!("folio-references:\n  logo: {{{target}, pin: abc123}}\n"),
+                format!(
+                    "folio-references: {{\n# collection\nlogo: {{\n{target}, # target\npin: abc123\n}} # entry\n}}\n"
+                ),
+            ] {
+                let input = format!("---\n{body}---\n").replace('\n', ending);
+                assert_eq!(
+                    read_references(input.as_bytes()).unwrap(),
+                    vec![expected.clone()],
+                    "{input:?}"
+                );
+            }
+            // Target equality also covers references without the optional pin.
+            expected.pin = None;
+            let input = format!("---\nfolio-references: {{logo: {{{target}}}}}\n---\n")
+                .replace('\n', ending);
+            assert_eq!(read_references(input.as_bytes()).unwrap(), vec![expected]);
+        }
+    }
+}
+
+#[test]
+fn reference_spellings_preserve_field_error_variants() {
+    for ending in ["\n", "\r\n"] {
+        for (alias, fields, expected) in [
+            (
+                "logo",
+                vec!["name: one", "name: two"],
+                FrontMatterError::Duplicate,
+            ),
+            ("logo", vec!["pin: abc123"], FrontMatterError::InvalidValue),
+            (
+                "logo",
+                vec!["name: one", "id: 12345678-1234-4234-8234-123456789abc"],
+                FrontMatterError::InvalidValue,
+            ),
+            ("logo", vec!["other: one"], FrontMatterError::Unsupported),
+            ("''", vec!["name: one"], FrontMatterError::InvalidValue),
+            ("\"\"", vec!["name: one"], FrontMatterError::InvalidValue),
+            ("logo", vec!["name: ''"], FrontMatterError::InvalidValue),
+        ] {
+            let block_fields = fields
+                .iter()
+                .map(|field| format!("    {field}\n"))
+                .collect::<String>();
+            let flow_fields = fields.join(", ");
+            for body in [
+                format!("folio-references:\n  {alias}:\n{block_fields}"),
+                format!("folio-references:\n  {alias}: {{{flow_fields}}}\n"),
+                format!("folio-references: {{{alias}: {{{flow_fields}}}}}\n"),
+                format!(
+                    "folio-references: {{\n{alias}: {{\n{}\n}}\n}}\n",
+                    fields.join(",\n")
+                ),
+            ] {
+                let input = format!("---\n{body}---\n").replace('\n', ending);
+                assert_eq!(
+                    read_references(input.as_bytes()),
+                    Err(expected),
+                    "{input:?}"
+                );
+                assert_eq!(
+                    locate(input.as_bytes()).and_then(|block| Block::set_references(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        &[logo()],
+                        false
+                    )),
+                    Err(expected),
+                    "{input:?}"
+                );
+                assert_eq!(
+                    locate(input.as_bytes()).and_then(|block| Block::set_reference(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        "logo",
+                        None,
+                        false
+                    )),
+                    Err(expected),
+                    "{input:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn earlier_reference_errors_precede_later_entry_structure_errors() {
+    for first in [
+        "  logo: {unknown: value}\n",
+        "  logo:\n    unknown: value\n",
+    ] {
+        let input = format!("---\nfolio-references:\n{first}  later-without-colon\n---\n");
+        assert_eq!(
+            read_references(input.as_bytes()),
+            Err(FrontMatterError::Unsupported)
         );
     }
 }

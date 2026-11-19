@@ -1,35 +1,22 @@
-use crate::config::names::CONTENT_FILE;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
 use std::path::PathBuf;
 
-use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
+use crate::config::names::DEFAULT_BRANCH;
+use crate::folio::dir::path::former_home;
 use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
+use crate::ops::facts::{Behind, PlacementFacts, needs_hash};
+use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_fs::resolved_path;
+use crate::placement_path::{self, RegistryError};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
-use crate::registry::{self, Registry, RegistryError};
+use crate::registry::{self, Registry};
 use crate::store::ObjectStore;
-
-/// Read-only facts used by status and move decisions.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PlacementFacts {
-    pub placement: registry::Placement,
-    pub observation: Observation,
-    pub placement_hash: Option<ObjectId>,
-    pub tip: Option<ObjectId>,
-}
-
-pub(crate) fn needs_hash(row: &registry::Placement, observation: &Observation) -> bool {
-    placement::needs_hash(&row.to_placement().1, observation)
-        || matches!((observation, row.staged),
-            (Observation::File { signature }, Some(staged)) if signature.size == staged.size)
-}
 
 /// Collects only the supplied rows, reading each distinct Folio/branch tip once.
 /// The caller selects rows with `placement_at` for one path or its own set query.
@@ -106,19 +93,6 @@ pub fn gather_convert<R: Borrow<RefStore>>(
         facts.placement_hash = Some(fs.hash_placement(&placement.to_placement().1)?);
     }
     Ok(facts)
-}
-
-/// Tip comparison only; this does not inspect commit ancestry.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Behind {
-    UpToDate,
-    Behind {
-        tip: ObjectId,
-    },
-    NoHistory,
-    Unrecorded,
-    /// A recorded commit remains, but its branch ref is missing.
-    MissingTip,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -527,7 +501,7 @@ pub fn converted_row(
 /// Destination and registry facts collected while the home lock is held.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelocateTarget {
-    pub path: registry::PlacementPath,
+    pub path: placement_path::PlacementPath,
     pub observation: Observation,
     pub registered: bool,
     pub pending: bool,
@@ -538,7 +512,7 @@ pub struct RelocateTarget {
 /// `PlacementPath::resolve_directory`; its kind is Copy and its base is absent.
 pub fn gather_relocate_target(
     row: &registry::Placement,
-    to: &registry::PlacementPath,
+    to: &placement_path::PlacementPath,
     fs: &impl PlacementOps,
     registry: &Registry,
 ) -> Result<RelocateTarget, RulesError> {
@@ -564,7 +538,8 @@ pub fn gather_relocate_target(
     let (id, mut placement) = row.to_placement();
     placement.path = destination;
     let observation = fs.read(id, &placement)?;
-    let mut originals = registry.placements_under(&registry::PlacementPrefix::resolve(&from)?)?;
+    let mut originals =
+        registry.placements_under(&placement_path::PlacementPrefix::resolve(&from)?)?;
     if registry.placement_at(&row.path)?.is_some() {
         originals = vec![row.clone()];
     } else if originals.is_empty() && fs.read(id, &row.to_placement().1)? != Observation::Directory
@@ -588,7 +563,7 @@ pub fn gather_relocate_target(
     }
     // A prefix cannot absorb rows outside this move's pending set.
     let destination_rows =
-        registry.placements_under(&registry::PlacementPrefix::resolve(to.to_path_buf())?)?;
+        registry.placements_under(&placement_path::PlacementPrefix::resolve(to.to_path_buf())?)?;
     registered |= destination_rows
         .iter()
         .any(|row| !rows.iter().any(|(_, new)| new == row));
@@ -917,14 +892,6 @@ pub struct RepairLinkPlan {
     facts: PlacementFacts,
 }
 
-fn former_home(target: &std::path::Path, id: FolioId) -> Option<PathBuf> {
-    let suffix = PathBuf::from(FOLIOS_DIR)
-        .join(id.to_string())
-        .join(CONTENT_FILE);
-    let home = target.parent()?.parent()?.parent()?;
-    (target.is_absolute() && home.join(suffix) == target).then(|| home.to_path_buf())
-}
-
 fn former_link_home(facts: &PlacementFacts) -> Option<PathBuf> {
     let Observation::OtherLink { target } = &facts.observation else {
         return None;
@@ -982,7 +949,7 @@ pub fn apply_repair_link(
 /// Repeating with the same old home resumes the link pass after interruption.
 pub fn rehome(
     old_home: &std::path::Path,
-    fs: &crate::placement_fs::PlacementFs<'_>,
+    fs: &impl PlacementOps,
     objects: &ObjectStore,
     registry: &mut Registry,
     lock: &HomeLock,
@@ -1017,7 +984,7 @@ pub fn rehome(
             .into());
         }
         prefix = Some(home);
-        let new_path = registry::PlacementPath::resolve(current)?;
+        let new_path = placement_path::PlacementPath::resolve(current)?;
         if row.path != new_path {
             if registry.placement_at(&new_path)?.is_some() {
                 return Err(Refusal {
@@ -1069,143 +1036,6 @@ pub fn rehome(
         apply_repair_link(&plan, fs, objects, registry, lock)?;
     }
     Ok(())
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RefusalReason {
-    DestinationExists,
-    DestinationRegistered,
-    InsideSource,
-    MixedHomes,
-    Internal,
-    MissingInternal,
-    LinkReplaced,
-    SameKind,
-    CopyBranch,
-    ConvertGone,
-    OtherLink,
-    Staged,
-    InternalEdited,
-    Link,
-    InternalBranch,
-    Edited,
-    Gone,
-    NotAFile,
-    Unusable,
-    PlacementChanged,
-    RegistryChanged,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Refusal {
-    pub path: PathBuf,
-    pub reason: RefusalReason,
-}
-
-impl fmt::Display for Refusal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let reason = match self.reason {
-            RefusalReason::MissingInternal => "missing internal working-file row",
-            RefusalReason::LinkReplaced => {
-                "link was replaced; use the kind-change command (#33) to switch kind on purpose"
-            }
-            RefusalReason::Internal => "internal placements cannot be changed by this operation",
-            RefusalReason::DestinationExists => "destination already exists",
-            RefusalReason::DestinationRegistered => "destination is registered",
-            RefusalReason::InsideSource => "destination is inside the source",
-            RefusalReason::MixedHomes => "internal paths do not share the expected former home",
-            RefusalReason::SameKind => "placement already has the requested kind",
-            RefusalReason::CopyBranch => {
-                "conversion requires main; copies on other branches are tracked in #73"
-            }
-            RefusalReason::ConvertGone => {
-                "placement is missing; move/remove/repair is tracked in #38"
-            }
-            RefusalReason::OtherLink => {
-                "placement points elsewhere; use the kind-change command (#33) to retarget on purpose"
-            }
-            RefusalReason::Staged => {
-                "copy has a recorded stage; commit or checkout main with discard first"
-            }
-            RefusalReason::InternalEdited => {
-                "internal working file holds edits; commit or checkout main with discard first (#119)"
-            }
-            RefusalReason::Link => "links always show folio.main",
-            RefusalReason::InternalBranch => {
-                "internal working files must stay on the default branch"
-            }
-            RefusalReason::Edited => "copy has edits; discard is required to lose them",
-            RefusalReason::Gone => "placement is missing",
-            RefusalReason::NotAFile => "placement is not a regular file",
-            RefusalReason::Unusable => "placement is unusable",
-            RefusalReason::PlacementChanged => "placement changed since the move was judged",
-            RefusalReason::RegistryChanged => "registry row changed since the move was judged",
-        };
-        write!(
-            f,
-            "cannot change placement {}: {reason}",
-            self.path.display()
-        )
-    }
-}
-
-impl Error for Refusal {}
-
-#[derive(Debug)]
-pub enum RulesError {
-    Internal(&'static str),
-    Placement(PlacementError),
-    Ref(RefError),
-    Registry(RegistryError),
-    Refused(Refusal),
-}
-
-impl From<PlacementError> for RulesError {
-    fn from(error: PlacementError) -> Self {
-        Self::Placement(error)
-    }
-}
-
-impl From<RefError> for RulesError {
-    fn from(error: RefError) -> Self {
-        Self::Ref(error)
-    }
-}
-
-impl From<RegistryError> for RulesError {
-    fn from(error: RegistryError) -> Self {
-        Self::Registry(error)
-    }
-}
-
-impl From<Refusal> for RulesError {
-    fn from(error: Refusal) -> Self {
-        Self::Refused(error)
-    }
-}
-
-impl fmt::Display for RulesError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Internal(message) => write!(f, "inconsistent placement facts: {message}"),
-            Self::Placement(error) => error.fmt(f),
-            Self::Ref(error) => error.fmt(f),
-            Self::Registry(error) => error.fmt(f),
-            Self::Refused(error) => error.fmt(f),
-        }
-    }
-}
-
-impl Error for RulesError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Internal(_) => None,
-            Self::Placement(error) => Some(error),
-            Self::Ref(error) => Some(error),
-            Self::Registry(error) => Some(error),
-            Self::Refused(error) => Some(error),
-        }
-    }
 }
 
 #[cfg(test)]

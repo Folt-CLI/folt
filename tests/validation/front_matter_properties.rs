@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use folt_core::front_matter::{
     Block, Edit, FrontMatterError, Reference, apply_edit, locate, read_id, read_name,
-    read_references, set_id, set_name, set_reference, set_references,
+    read_references,
 };
 use folt_core::id::FolioId;
 use proptest::prelude::*;
@@ -160,6 +160,8 @@ const IDS: &[Shape] = &[
     known_valid(""),
     known_valid("folio-id: 12345678-1234-4234-8234-123456789abc\n"),
     known_valid("folio-id: '12345678-1234-4234-8234-123456789abc'\n"),
+    known_valid("folio-id: 12345678-1234-4234-8234-123456789abc # idc\n"),
+    known_valid("folio-id :  '12345678-1234-4234-8234-123456789abc' # idc\n"),
     may_refuse(
         "? folio-id\n: old\n",
         "explicit owned key (Ambiguous)",
@@ -230,65 +232,76 @@ fn documents() -> impl Strategy<Value = Document> {
         pool_index(NAMES),
         pool_index(IDS),
         pool_index(REFERENCES),
+        prop::sample::select(vec![
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ]),
         0..3usize,
         any::<bool>(),
         0..12usize,
         prop_oneof![38 => Just(0usize), 1 => 1..60_000usize, 1 => 65_400..66_001usize],
     )
-        .prop_map(|(foreign, name, id, refs, ending, bom, shape, padding)| {
-            let mut entries: Vec<_> = foreign.iter().map(|&i| (0, i)).collect();
-            entries.extend([(1, name), (2, id), (3, refs)]);
-            // No promise for absent/unterminated blocks or large padding that
-            // can reach SCAN_LIMIT after line-ending conversion or an edit.
-            let must_accept = shape > 1
-                && padding == 0
-                && entries
-                    .iter()
-                    .all(|&(pool, i)| POOLS[pool][i].refusal.is_none());
-            let mut doc = if bom {
-                "\u{feff}".to_owned()
-            } else {
-                String::new()
-            };
-            if shape != 0 {
-                doc.push_str("---\n");
-                for node in foreign {
-                    doc.push_str(FOREIGN[node].text);
-                }
-                doc.push_str(NAMES[name].text);
-                doc.push_str(IDS[id].text);
-                doc.push_str(REFERENCES[refs].text);
-                if padding > 0 {
-                    doc.push_str("padding: ");
-                    // Large values and closers on either side of the scan boundary.
-                    let length = padding.saturating_sub(doc.len() + 1);
-                    doc.extend(std::iter::repeat_n('x', length));
-                    doc.push('\n');
-                }
-                if shape != 1 {
+        .prop_map(
+            |(foreign, name, id, refs, order, ending, bom, shape, padding)| {
+                let mut entries: Vec<_> = foreign.iter().map(|&i| (0, i)).collect();
+                entries.extend([(1, name), (2, id), (3, refs)]);
+                // No promise for absent/unterminated blocks or large padding that
+                // can reach SCAN_LIMIT after line-ending conversion or an edit.
+                let must_accept = shape > 1
+                    && padding == 0
+                    && entries
+                        .iter()
+                        .all(|&(pool, i)| POOLS[pool][i].refusal.is_none());
+                let mut doc = if bom {
+                    "\u{feff}".to_owned()
+                } else {
+                    String::new()
+                };
+                if shape != 0 {
                     doc.push_str("---\n");
+                    for node in foreign {
+                        doc.push_str(FOREIGN[node].text);
+                    }
+                    let owned = [NAMES[name].text, IDS[id].text, REFERENCES[refs].text];
+                    for index in order {
+                        doc.push_str(owned[index]);
+                    }
+                    if padding > 0 {
+                        doc.push_str("padding: ");
+                        // Large values and closers on either side of the scan boundary.
+                        let length = padding.saturating_sub(doc.len() + 1);
+                        doc.extend(std::iter::repeat_n('x', length));
+                        doc.push('\n');
+                    }
+                    if shape != 1 {
+                        doc.push_str("---\n");
+                    }
                 }
-            }
-            doc.push_str("# Body\n---\nlater: document\n...\n");
-            match ending {
-                1 => doc = doc.replace('\n', "\r\n"),
-                2 => {
-                    doc = doc
-                        .lines()
-                        .enumerate()
-                        .map(|(i, line)| {
-                            format!("{line}{}", if i % 2 == 0 { "\r\n" } else { "\n" })
-                        })
-                        .collect()
+                doc.push_str("# Body\n---\nlater: document\n...\n");
+                match ending {
+                    1 => doc = doc.replace('\n', "\r\n"),
+                    2 => {
+                        doc = doc
+                            .lines()
+                            .enumerate()
+                            .map(|(i, line)| {
+                                format!("{line}{}", if i % 2 == 0 { "\r\n" } else { "\n" })
+                            })
+                            .collect()
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-            Document {
-                bytes: doc.into_bytes(),
-                must_accept,
-                entries: if shape == 0 { vec![] } else { entries },
-            }
-        })
+                Document {
+                    bytes: doc.into_bytes(),
+                    must_accept,
+                    entries: if shape == 0 { vec![] } else { entries },
+                }
+            },
+        )
 }
 
 #[derive(Clone, Debug)]
@@ -335,28 +348,45 @@ impl Operation {
 
     fn plan(&self, bytes: &[u8], create: bool) -> Result<Option<Edit>, FrontMatterError> {
         match self {
-            Self::Name(value) => set_name(bytes, *value, create),
-            Self::Id(set) => set_id(bytes, set.then(|| FolioId::parse(ID).unwrap()), create),
-            Self::References(set) => set_references(
-                bytes,
-                &if *set {
-                    vec![
-                        reference("logo"),
-                        Reference {
-                            alias: "second".into(),
-                            name: None,
-                            id: Some(FolioId::parse(ID).unwrap()),
-                            pin: None,
-                        },
-                    ]
-                } else {
-                    vec![]
-                },
-                create,
-            ),
-            Self::Alias(alias, set) => {
-                set_reference(bytes, alias, set.then(|| reference(alias)).as_ref(), create)
-            }
+            Self::Name(value) => locate(bytes)
+                .and_then(|block| Block::set_name(block.as_ref(), bytes, *value, create)),
+            Self::Id(set) => locate(bytes).and_then(|block| {
+                Block::set_id(
+                    block.as_ref(),
+                    bytes,
+                    set.then(|| FolioId::parse(ID).unwrap()),
+                    create,
+                )
+            }),
+            Self::References(set) => locate(bytes).and_then(|block| {
+                Block::set_references(
+                    block.as_ref(),
+                    bytes,
+                    &if *set {
+                        vec![
+                            reference("logo"),
+                            Reference {
+                                alias: "second".into(),
+                                name: None,
+                                id: Some(FolioId::parse(ID).unwrap()),
+                                pin: None,
+                            },
+                        ]
+                    } else {
+                        vec![]
+                    },
+                    create,
+                )
+            }),
+            Self::Alias(alias, set) => locate(bytes).and_then(|block| {
+                Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    alias,
+                    set.then(|| reference(alias)).as_ref(),
+                    create,
+                )
+            }),
         }
     }
 }
@@ -461,6 +491,156 @@ fn untouched_nodes(bytes: &[u8], block: &Block, target: &str) -> Vec<(String, Ve
         .filter(|node| node.key != target)
         .map(|node| (node.key.clone(), bytes[node.range.clone()].to_vec()))
         .collect()
+}
+
+// Observe entries independently of the planned alias edit. Dedenting a block
+// exposes its entries to locate; flow entries split only at unnested commas.
+fn untouched_references(bytes: &[u8], block: &Block, alias: &str) -> Vec<(String, Vec<u8>)> {
+    let Some(node) = block.nodes.iter().find(|n| n.key == "folio-references") else {
+        return vec![];
+    };
+    let value = &bytes[node.value.clone()];
+    let entries = if value.starts_with(b"{") {
+        let mut entries = vec![];
+        let mut start = 1;
+        let mut depth = 0;
+        let mut quote = None;
+        let mut escaped = false;
+        let mut comment = false;
+        for (i, &byte) in value.iter().enumerate().skip(1) {
+            if comment {
+                comment = byte != b'\n';
+            } else if escaped {
+                escaped = false;
+            } else if let Some(q) = quote {
+                if q == b'"' && byte == b'\\' {
+                    escaped = true;
+                } else if q == byte {
+                    quote = None;
+                }
+            } else {
+                match byte {
+                    b'#' => comment = true,
+                    b'\'' | b'"' => quote = Some(byte),
+                    b'{' | b'[' => depth += 1,
+                    b',' | b'}' if depth == 0 => {
+                        let mut entry = &value[start..i];
+                        loop {
+                            entry = entry.trim_ascii_start();
+                            if !entry.starts_with(b"#") {
+                                break;
+                            }
+                            entry = entry
+                                .iter()
+                                .position(|b| *b == b'\n')
+                                .map_or(&[], |i| &entry[i + 1..]);
+                        }
+                        if !entry.is_empty() {
+                            entries.push(entry.trim_ascii_end().to_vec());
+                        }
+                        start = i + 1;
+                    }
+                    b'}' | b']' => depth -= 1,
+                    _ => {}
+                }
+            }
+        }
+        entries
+    } else {
+        let lines: Vec<_> = bytes[node.continuation.clone()]
+            .split_inclusive(|b| *b == b'\n')
+            .collect();
+        let indent = lines
+            .iter()
+            .filter(|line| {
+                let clean = line.trim_ascii_start();
+                !clean.is_empty() && !clean.starts_with(b"#")
+            })
+            .map(|line| line.iter().take_while(|b| **b == b' ').count())
+            .next()
+            .unwrap_or(0);
+        let mut nested = b"---\n".to_vec();
+        let mut boundaries = vec![];
+        let mut original_offset = node.continuation.start;
+        for line in lines {
+            boundaries.push((nested.len(), original_offset));
+            original_offset += line.len();
+            nested.extend_from_slice(
+                &line[indent.min(line.iter().take_while(|b| **b == b' ').count())..],
+            );
+        }
+        boundaries.push((nested.len(), original_offset));
+        nested.extend_from_slice(b"---\n");
+        locate(&nested)
+            .unwrap()
+            .unwrap()
+            .nodes
+            .iter()
+            .map(|n| {
+                // Standalone tails can be reattached when the selected entry is
+                // removed; preserved_lines already checks those bytes separately.
+                let mut end = n.range.start;
+                let mut offset = end;
+                for line in nested[n.range.clone()].split_inclusive(|b| *b == b'\n') {
+                    offset += line.len();
+                    let clean = line.trim_ascii_start();
+                    if !clean.is_empty() && !clean.starts_with(b"#") {
+                        end = offset;
+                    }
+                }
+                let original =
+                    |position| boundaries.iter().find(|(p, _)| *p == position).unwrap().1;
+                bytes[original(n.range.start)..original(end)].to_vec()
+            })
+            .collect()
+    };
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let colon = entry.iter().position(|b| *b == b':')?;
+            let key = String::from_utf8_lossy(&entry[..colon])
+                .trim()
+                .trim_matches(['\'', '"'])
+                .to_owned();
+            (key != alias).then_some((key, entry))
+        })
+        .collect()
+}
+
+fn check_target_bytes(
+    bytes: &[u8],
+    result: &[u8],
+    old: &Block,
+    new: &Block,
+    op: &Operation,
+) -> Result<(), TestCaseError> {
+    if matches!(op, Operation::Name(Some(_)) | Operation::Id(true))
+        && let Some(before) = old.nodes.iter().find(|n| n.key == OWNED[op.key()])
+    {
+        let after = new
+            .nodes
+            .iter()
+            .find(|n| n.key == before.key)
+            .ok_or_else(|| TestCaseError::fail("target scalar disappeared"))?;
+        prop_assert_eq!(
+            &bytes[before.range.start..before.value.start],
+            &result[after.range.start..after.value.start],
+            "target scalar prefix changed"
+        );
+        prop_assert_eq!(
+            &bytes[before.value.end..before.range.end],
+            &result[after.value.end..after.range.end],
+            "target scalar suffix changed"
+        );
+    }
+    if let Operation::Alias(alias, _) = op {
+        prop_assert_eq!(
+            untouched_references(bytes, old, alias),
+            untouched_references(result, new, alias),
+            "untouched reference entry bytes changed"
+        );
+    }
+    Ok(())
 }
 
 // Preserve standalone body lines, including trailing lines owned by a node.
@@ -649,6 +829,8 @@ fn check_inner(
             edit,
             context
         );
+        check_target_bytes(bytes, &result, &old, new, op)
+            .map_err(|e| TestCaseError::fail(format!("{e}: {context}")))?;
         let target = OWNED[op.key()];
         if let Some(node) = old.nodes.iter().find(|node| node.key == target) {
             prop_assert!(
@@ -1075,6 +1257,60 @@ fn block_creation_preserves_all_original_bytes() {
                             }
                         );
                     }
+                }
+            }
+        }
+    }
+    assert_eq!(refused.get(), 0);
+}
+
+#[test]
+fn target_byte_oracle_rejects_collateral_rewrites() {
+    for (input, output, op) in [
+        (
+            "---\nfolio-name :  v # c\n---\n",
+            "---\nfolio-name: \"new\"\n---\n",
+            Operation::Name(Some("new")),
+        ),
+        (
+            "---\nfolio-name: old\r\n---\n",
+            "---\nfolio-name: \"new\"\n---\n",
+            Operation::Name(Some("new")),
+        ),
+        (
+            "---\nfolio-references: {logo: {name: old}, other: {name: other}}\n---\n",
+            "---\nfolio-references: {logo: {name: new}, other: {name: \"other\"}}\n---\n",
+            Operation::Alias("logo", true),
+        ),
+    ] {
+        check(input.as_bytes(), &op, false, &Cell::new(0), true).unwrap();
+        let old = locate(input.as_bytes()).unwrap().unwrap();
+        let new = locate(output.as_bytes()).unwrap().unwrap();
+        assert!(check_target_bytes(input.as_bytes(), output.as_bytes(), &old, &new, &op).is_err());
+    }
+}
+
+#[test]
+fn commented_ids_survive_edits_in_every_owned_node_order() {
+    let refused = Cell::new(0);
+    for order in [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ] {
+        for shape in IDS.iter().filter(|shape| shape.text.contains("# idc")) {
+            for ending in ["\n", "\r\n"] {
+                let nodes = [NAMES[1].text, shape.text, REFERENCES[5].text];
+                let body: String = order.iter().map(|&i| nodes[i]).collect();
+                let bytes = format!("---\n{body}---\n")
+                    .replace('\n', ending)
+                    .into_bytes();
+                assert_eq!(read_id(&bytes), Ok(Some(FolioId::parse(ID).unwrap())));
+                for op in operations() {
+                    check(&bytes, &op, false, &refused, true).unwrap();
                 }
             }
         }

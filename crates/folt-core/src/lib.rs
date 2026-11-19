@@ -2,6 +2,7 @@
 
 pub mod checkout;
 pub mod config;
+pub mod folio;
 pub mod folio_dir;
 pub mod folio_name;
 pub mod front_matter;
@@ -11,8 +12,10 @@ pub mod home;
 pub mod id;
 pub mod layout;
 pub mod object;
+pub mod ops;
 pub mod placement;
 pub mod placement_fs;
+pub mod placement_path;
 pub mod placement_rules;
 pub mod prune;
 pub mod ref_name;

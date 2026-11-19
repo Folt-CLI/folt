@@ -26,6 +26,7 @@ Any other prompt, including an ordinary chat, does not read it.
 - Use no emojis.
 - Keep each paragraph and list item on one line in Markdown; do not hard-wrap prose at a column.
 - Never name an agent tool, model or provider in an issue, comment, pull request or Git commit message.
+- Code must not add new line-level YAML parsing of front matter; new front matter behaviour must extend the front matter tree (`Block` and `Node` in `crates/folt-core/src/front_matter/tree.rs`) instead.
 - Do only what your role file allows.
 
 ## Where things are

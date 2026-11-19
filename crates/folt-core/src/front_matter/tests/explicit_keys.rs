@@ -18,13 +18,24 @@ fn foreign_null_explicit_keys_remain_readable_and_untouched() {
                     "folio-name" => {
                         assert_eq!(read_name(bytes).unwrap().as_deref(), Some("old"));
                         [
-                            set_name(bytes, Some("new"), false),
-                            set_name(bytes, None, false),
+                            locate(bytes).and_then(|block| {
+                                Block::set_name(block.as_ref(), bytes, Some("new"), false)
+                            }),
+                            locate(bytes).and_then(|block| {
+                                Block::set_name(block.as_ref(), bytes, None, false)
+                            }),
                         ]
                     }
                     "folio-id" => {
                         assert_eq!(read_id(bytes).unwrap(), Some(FolioId::parse(ID).unwrap()));
-                        [set_id(bytes, Some(id), false), set_id(bytes, None, false)]
+                        [
+                            locate(bytes).and_then(|block| {
+                                Block::set_id(block.as_ref(), bytes, Some(id), false)
+                            }),
+                            locate(bytes).and_then(|block| {
+                                Block::set_id(block.as_ref(), bytes, None, false)
+                            }),
+                        ]
                     }
                     _ => {
                         let refs = read_references(bytes).unwrap();
@@ -32,8 +43,12 @@ fn foreign_null_explicit_keys_remain_readable_and_untouched() {
                         assert_eq!(refs[0].alias, "logo");
                         assert_eq!(refs[0].name.as_deref(), Some("old-image"));
                         [
-                            set_references(bytes, &[logo()], false),
-                            set_references(bytes, &[], false),
+                            locate(bytes).and_then(|block| {
+                                Block::set_references(block.as_ref(), bytes, &[logo()], false)
+                            }),
+                            locate(bytes).and_then(|block| {
+                                Block::set_references(block.as_ref(), bytes, &[], false)
+                            }),
                         ]
                     }
                 };
@@ -93,14 +108,32 @@ fn foreign_multiline_explicit_keys_remain_readable_and_untouched() {
                 assert_eq!(read_id(bytes).unwrap(), Some(FolioId::parse(ID).unwrap()));
                 assert_eq!(read_references(bytes).unwrap(), vec![logo()]);
                 let edits = [
-                    set_name(bytes, Some("new"), false),
-                    set_name(bytes, None, false),
-                    set_id(bytes, Some(FolioId::parse(ID).unwrap()), false),
-                    set_id(bytes, None, false),
-                    set_references(bytes, &[logo()], false),
-                    set_references(bytes, &[], false),
-                    set_reference(bytes, "logo", Some(&logo()), false),
-                    set_reference(bytes, "logo", None, false),
+                    locate(bytes).and_then(|block| {
+                        Block::set_name(block.as_ref(), bytes, Some("new"), false)
+                    }),
+                    locate(bytes)
+                        .and_then(|block| Block::set_name(block.as_ref(), bytes, None, false)),
+                    locate(bytes).and_then(|block| {
+                        Block::set_id(
+                            block.as_ref(),
+                            bytes,
+                            Some(FolioId::parse(ID).unwrap()),
+                            false,
+                        )
+                    }),
+                    locate(bytes)
+                        .and_then(|block| Block::set_id(block.as_ref(), bytes, None, false)),
+                    locate(bytes).and_then(|block| {
+                        Block::set_references(block.as_ref(), bytes, &[logo()], false)
+                    }),
+                    locate(bytes)
+                        .and_then(|block| Block::set_references(block.as_ref(), bytes, &[], false)),
+                    locate(bytes).and_then(|block| {
+                        Block::set_reference(block.as_ref(), bytes, "logo", Some(&logo()), false)
+                    }),
+                    locate(bytes).and_then(|block| {
+                        Block::set_reference(block.as_ref(), bytes, "logo", None, false)
+                    }),
                 ];
                 for edit in edits {
                     let edited = apply_edit(bytes, &edit.unwrap().unwrap()).unwrap();
@@ -141,7 +174,7 @@ fn implicit_escaped_foreign_keys_remain_opaque_for_edits() {
 ";
     assert_eq!(read_name(bytes).unwrap(), None);
     assert_eq!(
-        set_name(bytes, Some("new"), false),
+        locate(bytes).and_then(|block| Block::set_name(block.as_ref(), bytes, Some("new"), false)),
         Err(FrontMatterError::Ambiguous)
     );
 }

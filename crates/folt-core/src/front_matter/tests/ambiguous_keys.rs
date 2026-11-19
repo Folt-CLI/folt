@@ -6,18 +6,50 @@ fn assert_ambiguous_key(bytes: &[u8]) {
     assert_eq!(read_id(bytes), Err(error));
     assert_eq!(read_references(bytes), Err(error));
     for name in [Some("new"), None] {
-        assert_eq!(set_name(bytes, name, false), Err(error));
+        assert_eq!(
+            locate(bytes).and_then(|block| Block::set_name(block.as_ref(), bytes, name, false)),
+            Err(error)
+        );
     }
     for id in [Some(FolioId::parse(ID).unwrap()), None] {
-        assert_eq!(set_id(bytes, id, false), Err(error));
+        assert_eq!(
+            locate(bytes).and_then(|block| Block::set_id(block.as_ref(), bytes, id, false)),
+            Err(error)
+        );
     }
-    assert_eq!(set_references(bytes, &[logo()], false), Err(error));
-    assert_eq!(set_references(bytes, &[], false), Err(error));
     assert_eq!(
-        set_reference(bytes, "logo", Some(&logo()), false),
+        locate(bytes).and_then(|block| Block::set_references(
+            block.as_ref(),
+            bytes,
+            &[logo()],
+            false
+        )),
         Err(error)
     );
-    assert_eq!(set_reference(bytes, "logo", None, false), Err(error));
+    assert_eq!(
+        locate(bytes).and_then(|block| Block::set_references(block.as_ref(), bytes, &[], false)),
+        Err(error)
+    );
+    assert_eq!(
+        locate(bytes).and_then(|block| Block::set_reference(
+            block.as_ref(),
+            bytes,
+            "logo",
+            Some(&logo()),
+            false
+        )),
+        Err(error)
+    );
+    assert_eq!(
+        locate(bytes).and_then(|block| Block::set_reference(
+            block.as_ref(),
+            bytes,
+            "logo",
+            None,
+            false
+        )),
+        Err(error)
+    );
 }
 
 #[test]
@@ -160,7 +192,12 @@ fn refuses_unsafe_owned_nodes() {
         let bytes = format!("---\n{body}---\n");
         assert_eq!(read_name(bytes.as_bytes()), Err(error), "{body}");
         assert_eq!(
-            set_name(bytes.as_bytes(), Some("new"), true),
+            locate(bytes.as_bytes()).and_then(|block| Block::set_name(
+                block.as_ref(),
+                bytes.as_bytes(),
+                Some("new"),
+                true
+            )),
             Err(error),
             "{body}"
         );
@@ -168,16 +205,31 @@ fn refuses_unsafe_owned_nodes() {
     for key in OWNED {
         let bytes = format!("---\n{key}: a\n{key}: b\n---\n");
         assert_eq!(
-            set_name(bytes.as_bytes(), Some("new"), true),
+            locate(bytes.as_bytes()).and_then(|block| Block::set_name(
+                block.as_ref(),
+                bytes.as_bytes(),
+                Some("new"),
+                true
+            )),
             Err(FrontMatterError::Duplicate)
         );
     }
     assert_eq!(
-        set_name(b"---\nno close", Some("new"), true),
+        locate(b"---\nno close").and_then(|block| Block::set_name(
+            block.as_ref(),
+            b"---\nno close",
+            Some("new"),
+            true
+        )),
         Err(FrontMatterError::Unterminated)
     );
     assert_eq!(
-        set_name(b"body\0", Some("new"), true),
+        locate(b"body\0").and_then(|block| Block::set_name(
+            block.as_ref(),
+            b"body\0",
+            Some("new"),
+            true
+        )),
         Err(FrontMatterError::Binary)
     );
 }
@@ -195,7 +247,12 @@ fn refuses_escaped_or_undecodable_quoted_keys_before_insertion() {
         for prefix in ["", "? "] {
             let bytes = format!("---\n{prefix}{key}: old\n---\n");
             assert_eq!(
-                set_name(bytes.as_bytes(), Some("new"), false),
+                locate(bytes.as_bytes()).and_then(|block| Block::set_name(
+                    block.as_ref(),
+                    bytes.as_bytes(),
+                    Some("new"),
+                    false
+                )),
                 Err(FrontMatterError::Ambiguous),
                 "{bytes}"
             );
@@ -208,7 +265,7 @@ fn explicit_owned_keys_with_comments_are_ambiguous() {
     let bytes = b"---\n? folio-name # keep\n: old\n---\n";
     assert_eq!(read_name(bytes), Err(FrontMatterError::Ambiguous));
     assert_eq!(
-        set_name(bytes, Some("new"), false),
+        locate(bytes).and_then(|block| Block::set_name(block.as_ref(), bytes, Some("new"), false)),
         Err(FrontMatterError::Ambiguous)
     );
 }
@@ -249,19 +306,40 @@ fn explicit_owned_keys_with_yaml_separation_refuse_edits() {
             let bytes = format!("---\n{prefix}{key} # keep\n: old\n---\n");
             let bytes = bytes.as_bytes();
             assert_eq!(
-                set_name(bytes, Some("new"), false),
+                locate(bytes).and_then(|block| Block::set_name(
+                    block.as_ref(),
+                    bytes,
+                    Some("new"),
+                    false
+                )),
                 Err(FrontMatterError::Ambiguous)
             );
             assert_eq!(
-                set_id(bytes, Some(id), false),
+                locate(bytes).and_then(|block| Block::set_id(
+                    block.as_ref(),
+                    bytes,
+                    Some(id),
+                    false
+                )),
                 Err(FrontMatterError::Ambiguous)
             );
             assert_eq!(
-                set_references(bytes, &[logo()], false),
+                locate(bytes).and_then(|block| Block::set_references(
+                    block.as_ref(),
+                    bytes,
+                    &[logo()],
+                    false
+                )),
                 Err(FrontMatterError::Ambiguous)
             );
             assert_eq!(
-                set_reference(bytes, "logo", Some(&logo()), false),
+                locate(bytes).and_then(|block| Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    "logo",
+                    Some(&logo()),
+                    false
+                )),
                 Err(FrontMatterError::Ambiguous)
             );
         }

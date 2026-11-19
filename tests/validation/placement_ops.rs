@@ -1,11 +1,15 @@
 use folt_core::config::env::Environment;
 use folt_core::object::hash_blob;
+use folt_core::ops::facts::PlacementFacts;
+use folt_core::ops::refusal::RefusalReason;
+use folt_core::ops::rules_error::RulesError;
 #[cfg(unix)]
 use folt_core::placement::PlacementKind;
 use folt_core::placement::{Observation, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
-use folt_core::placement_rules::{self, PlacementFacts, RefusalReason};
-use folt_core::registry::{Placement, PlacementPath};
+use folt_core::placement_path::PlacementPath;
+use folt_core::placement_rules;
+use folt_core::registry::Placement;
 
 use crate::common::TempHome;
 use crate::support::TestFolio;
@@ -350,7 +354,7 @@ fn relocate_refuses_sources_and_destinations_containing_internal_paths_or_home()
             .unwrap_err();
             assert!(matches!(
                 error,
-                placement_rules::RulesError::Refused(ref refusal)
+                RulesError::Refused(ref refusal)
                     if refusal.reason == RefusalReason::Internal
             ));
             assert_eq!(folio.internal(), internal);
@@ -381,7 +385,7 @@ fn relocate_refuses_sources_and_destinations_containing_internal_paths_or_home()
         };
         assert!(matches!(
             placement_rules::gather_relocate_target(&directory, destination, &fs, &registry),
-            Err(placement_rules::RulesError::Refused(ref refusal))
+            Err(RulesError::Refused(ref refusal))
                 if refusal.reason == RefusalReason::Internal
         ));
     }

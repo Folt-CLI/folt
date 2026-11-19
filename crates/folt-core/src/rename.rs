@@ -10,16 +10,17 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::folio_name::FolioName;
-use crate::front_matter::{self, FrontMatterError};
+use crate::front_matter::{self, Block, FrontMatterError};
 use crate::history::{self, CommitMetadata, HistoryError, HistoryStores};
 use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{Commit, ObjectError, ObjectKind, hash_blob};
+use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementOps, Signature};
 use crate::placement_fs::{PlacementFs, atomic_rewrite};
-use crate::placement_rules::RulesError;
-use crate::registry::{Placement, Registry, RegistryError};
+use crate::placement_path::RegistryError;
+use crate::registry::{Placement, Registry};
 use crate::store::StoreError;
 use crate::working_state;
 
@@ -116,7 +117,12 @@ from_error!(HistoryError, History);
 from_error!(ObjectError, Object);
 
 fn renamed(bytes: &[u8], name: &FolioName) -> Result<Vec<u8>, RenameError> {
-    let edit = front_matter::set_name(bytes, Some(name.as_str()), false)?;
+    let edit = Block::set_name(
+        front_matter::locate(bytes)?.as_ref(),
+        bytes,
+        Some(name.as_str()),
+        false,
+    )?;
     Ok(match edit {
         Some(edit) => front_matter::apply_edit(bytes, &edit)?,
         None => bytes.to_vec(),

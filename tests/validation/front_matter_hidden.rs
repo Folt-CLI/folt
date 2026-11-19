@@ -1,6 +1,5 @@
 use folt_core::front_matter::{
-    FrontMatterError, Reference, apply_edit, locate, read_id, read_name, read_references, set_id,
-    set_name, set_reference, set_references,
+    Block, FrontMatterError, Reference, apply_edit, locate, read_id, read_name, read_references,
 };
 use folt_core::id::FolioId;
 
@@ -60,10 +59,10 @@ fn malformed_foreign_flows_cannot_hide_owned_keys() {
                         let refs = if set { vec![reference("new")] } else { vec![] };
                         // Err contains no Edit by construction, for sets and removals.
                         for (operation, planned) in [
-                            ("set_name", set_name(bytes, set.then_some("new"), create)),
-                            ("set_id", set_id(bytes, set.then(|| FolioId::parse(NEW_ID).unwrap()), create)),
-                            ("set_references", set_references(bytes, &refs, create)),
-                            ("set_reference", set_reference(bytes, "a", set.then(|| reference("new")).as_ref(), create)),
+                            ("set_name", locate(bytes).and_then(|block| Block::set_name(block.as_ref(), bytes, set.then_some("new"), create))),
+                            ("set_id", locate(bytes).and_then(|block| Block::set_id(block.as_ref(), bytes, set.then(|| FolioId::parse(NEW_ID).unwrap()), create))),
+                            ("set_references", locate(bytes).and_then(|block| Block::set_references(block.as_ref(), bytes, &refs, create))),
+                            ("set_reference", locate(bytes).and_then(|block| Block::set_reference(block.as_ref(), bytes, "a", set.then(|| reference("new")).as_ref(), create))),
                         ] {
                             assert_eq!(planned, Err(FrontMatterError::Hidden), "{context}, operation={operation}, set={set}, create={create}");
                         }
@@ -106,17 +105,35 @@ fn well_formed_foreign_flow_counterparts_read_and_edit_normally() {
                     let new_id = set.then(|| FolioId::parse(NEW_ID).unwrap());
                     let refs = if set { vec![reference("new")] } else { vec![] };
                     for (operation, planned) in [
-                        ("set_name", set_name(bytes, set.then_some("new"), create)),
-                        ("set_id", set_id(bytes, new_id, create)),
-                        ("set_references", set_references(bytes, &refs, create)),
+                        (
+                            "set_name",
+                            locate(bytes).and_then(|block| {
+                                Block::set_name(block.as_ref(), bytes, set.then_some("new"), create)
+                            }),
+                        ),
+                        (
+                            "set_id",
+                            locate(bytes).and_then(|block| {
+                                Block::set_id(block.as_ref(), bytes, new_id, create)
+                            }),
+                        ),
+                        (
+                            "set_references",
+                            locate(bytes).and_then(|block| {
+                                Block::set_references(block.as_ref(), bytes, &refs, create)
+                            }),
+                        ),
                         (
                             "set_reference",
-                            set_reference(
-                                bytes,
-                                "a",
-                                set.then(|| reference("new")).as_ref(),
-                                create,
-                            ),
+                            locate(bytes).and_then(|block| {
+                                Block::set_reference(
+                                    block.as_ref(),
+                                    bytes,
+                                    "a",
+                                    set.then(|| reference("new")).as_ref(),
+                                    create,
+                                )
+                            }),
                         ),
                     ] {
                         let context =

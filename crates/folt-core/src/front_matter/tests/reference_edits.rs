@@ -38,13 +38,26 @@ fn wrapped_flow_alias_edits_preserve_all_comments() {
                 let expected = format!("{prefix}{replacement}{suffix}").replace('\n', ending);
                 let output = apply_edit(
                     input.as_bytes(),
-                    &set_reference(input.as_bytes(), "logo", value.as_ref(), false)
+                    &locate(input.as_bytes())
+                        .and_then(|block| {
+                            Block::set_reference(
+                                block.as_ref(),
+                                input.as_bytes(),
+                                "logo",
+                                value.as_ref(),
+                                false,
+                            )
+                        })
                         .unwrap()
                         .unwrap(),
                 )
                 .unwrap();
                 assert_eq!(text(&output).unwrap(), expected);
-                let again = set_reference(&output, "logo", value.as_ref(), false).unwrap();
+                let again = locate(&output)
+                    .and_then(|block| {
+                        Block::set_reference(block.as_ref(), &output, "logo", value.as_ref(), false)
+                    })
+                    .unwrap();
                 assert_eq!(
                     again.map_or_else(|| output.clone(), |e| apply_edit(&output, &e).unwrap()),
                     output
@@ -60,7 +73,16 @@ fn single_alias_flow_edits_preserve_trailing_separators() {
         let input = format!("---\nfolio-references: {collection}\n---\n");
         let output = apply_edit(
             input.as_bytes(),
-            &set_reference(input.as_bytes(), "logo", Some(&logo()), false)
+            &locate(input.as_bytes())
+                .and_then(|block| {
+                    Block::set_reference(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        "logo",
+                        Some(&logo()),
+                        false,
+                    )
+                })
                 .unwrap()
                 .unwrap(),
         )
@@ -72,7 +94,10 @@ fn single_alias_flow_edits_preserve_trailing_separators() {
     let input = b"---\nfolio-references: {logo: {name: old},}\n---\n";
     let output = apply_edit(
         input,
-        &set_reference(input, "logo", None, false).unwrap().unwrap(),
+        &locate(input)
+            .and_then(|block| Block::set_reference(block.as_ref(), input, "logo", None, false))
+            .unwrap()
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(output, b"---\nfolio-references: {}\n---\n");
@@ -90,7 +115,16 @@ fn single_alias_edits_preserve_other_document_bytes() {
             for value in [Some(logo()), None] {
                 let output = apply_edit(
                     input.as_bytes(),
-                    &set_reference(input.as_bytes(), "logo", value.as_ref(), false)
+                    &locate(input.as_bytes())
+                        .and_then(|block| {
+                            Block::set_reference(
+                                block.as_ref(),
+                                input.as_bytes(),
+                                "logo",
+                                value.as_ref(),
+                                false,
+                            )
+                        })
                         .unwrap()
                         .unwrap(),
                 )
@@ -105,7 +139,11 @@ fn single_alias_edits_preserve_other_document_bytes() {
                 )
                 .replace('\n', ending);
                 assert_eq!(output, expected.as_bytes());
-                let again = set_reference(&output, "logo", value.as_ref(), false).unwrap();
+                let again = locate(&output)
+                    .and_then(|block| {
+                        Block::set_reference(block.as_ref(), &output, "logo", value.as_ref(), false)
+                    })
+                    .unwrap();
                 assert_eq!(
                     again.map_or_else(|| output.clone(), |e| apply_edit(&output, &e).unwrap()),
                     output
@@ -119,7 +157,16 @@ fn single_alias_edits_preserve_other_document_bytes() {
             for value in [Some(&r), None] {
                 let output = apply_edit(
                     input.as_bytes(),
-                    &set_reference(input.as_bytes(), alias, value, false)
+                    &locate(input.as_bytes())
+                        .and_then(|block| {
+                            Block::set_reference(
+                                block.as_ref(),
+                                input.as_bytes(),
+                                alias,
+                                value,
+                                false,
+                            )
+                        })
                         .unwrap()
                         .unwrap(),
                 )
@@ -137,7 +184,11 @@ fn single_alias_edits_preserve_other_document_bytes() {
                 }
                 assert!(text(&output).unwrap().contains(&format!("# keep{ending}")));
                 assert!(text(&output).unwrap().contains(&format!("# tail{ending}")));
-                let again = set_reference(&output, alias, value, false).unwrap();
+                let again = locate(&output)
+                    .and_then(|block| {
+                        Block::set_reference(block.as_ref(), &output, alias, value, false)
+                    })
+                    .unwrap();
                 assert_eq!(
                     again.map_or_else(|| output.clone(), |e| apply_edit(&output, &e).unwrap()),
                     output
@@ -153,7 +204,16 @@ fn reference_value_replacement_preserves_yaml_separation() {
         let input = format!("---\nfolio-references:{spacing}{{logo: {{name: old}}}}\n---\n");
         let output = apply_edit(
             input.as_bytes(),
-            &set_reference(input.as_bytes(), "logo", Some(&logo()), false)
+            &locate(input.as_bytes())
+                .and_then(|block| {
+                    Block::set_reference(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        "logo",
+                        Some(&logo()),
+                        false,
+                    )
+                })
                 .unwrap()
                 .unwrap(),
         )
@@ -173,9 +233,19 @@ fn nested_reference_replacement_keeps_trailing_comments_and_blank_lines() {
         let input = format!("---\nfolio-references:\n  logo:\n    name: old\n{tail}---\n");
         for whole in [true, false] {
             let edit = if whole {
-                set_references(input.as_bytes(), &[logo()], false)
+                locate(input.as_bytes()).and_then(|block| {
+                    Block::set_references(block.as_ref(), input.as_bytes(), &[logo()], false)
+                })
             } else {
-                set_reference(input.as_bytes(), "logo", Some(&logo()), false)
+                locate(input.as_bytes()).and_then(|block| {
+                    Block::set_reference(
+                        block.as_ref(),
+                        input.as_bytes(),
+                        "logo",
+                        Some(&logo()),
+                        false,
+                    )
+                })
             }
             .unwrap()
             .unwrap();
@@ -205,6 +275,7 @@ fn wrapped_and_commented_reference_edits_preserve_surrounding_bytes() {
                     format!("---\n# before\n{collection}# tail\nforeign: untouched\n---\nbody\n")
                         .replace('\n', ending);
                 let bytes = input.as_bytes();
+                let block = &locate(bytes).unwrap().unwrap();
                 let mut other = logo();
                 other.alias = "other".into();
                 other.name = Some("other-image".into());
@@ -212,13 +283,14 @@ fn wrapped_and_commented_reference_edits_preserve_surrounding_bytes() {
                 let desired = [logo(), other.clone()];
                 for whole in [false, true] {
                     let planned = if whole {
-                        set_references(bytes, &desired, false)
+                        Block::set_references(Some(block), bytes, &desired, false)
                     } else {
-                        set_reference(bytes, "logo", Some(&logo()), false)
+                        Block::set_reference(Some(block), bytes, "logo", Some(&logo()), false)
                     }
                     .unwrap()
                     .unwrap();
                     let output = apply_edit(bytes, &planned).unwrap();
+                    let updated = &locate(&output).unwrap().unwrap();
                     assert!(
                         text(&output)
                             .unwrap()
@@ -229,51 +301,61 @@ fn wrapped_and_commented_reference_edits_preserve_surrounding_bytes() {
                     )));
                     assert_eq!(read_references(&output).unwrap(), desired);
                     let again = if whole {
-                        set_references(&output, &desired, false)
+                        Block::set_references(Some(updated), &output, &desired, false)
                     } else {
-                        set_reference(&output, "logo", Some(&logo()), false)
+                        Block::set_reference(Some(updated), &output, "logo", Some(&logo()), false)
                     }
                     .unwrap()
                     .unwrap();
                     assert_eq!(apply_edit(&output, &again).unwrap(), output);
                 }
-                let removed = apply_edit(
-                    bytes,
-                    &set_reference(bytes, "logo", None, false).unwrap().unwrap(),
-                )
-                .unwrap();
+                let edit = Block::set_reference(Some(block), bytes, "logo", None, false)
+                    .unwrap()
+                    .unwrap();
+                let removed = apply_edit(bytes, &edit).unwrap();
                 assert_eq!(read_references(&removed).unwrap(), vec![other]);
-                assert_eq!(set_reference(&removed, "logo", None, false).unwrap(), None);
+                let removed_block = &locate(&removed).unwrap().unwrap();
+                assert_eq!(
+                    Block::set_reference(Some(removed_block), &removed, "logo", None, false)
+                        .unwrap(),
+                    None
+                );
                 let empty = input.replace(&collection.replace('\n', ending), "");
-                let cleared =
-                    apply_edit(bytes, &set_references(bytes, &[], false).unwrap().unwrap())
-                        .unwrap();
+                let edit = Block::set_references(Some(block), bytes, &[], false)
+                    .unwrap()
+                    .unwrap();
+                let cleared = apply_edit(bytes, &edit).unwrap();
                 assert_eq!(text(&cleared).unwrap(), empty);
                 assert!(read_references(&cleared).unwrap().is_empty());
-                assert_eq!(set_references(&cleared, &[], false).unwrap(), None);
+                let cleared_block = &locate(&cleared).unwrap().unwrap();
+                assert_eq!(
+                    Block::set_references(Some(cleared_block), &cleared, &[], false).unwrap(),
+                    None
+                );
 
-                let only_logo = apply_edit(
-                    bytes,
-                    &set_reference(bytes, "other", None, false).unwrap().unwrap(),
-                )
-                .unwrap();
+                let edit = Block::set_reference(Some(block), bytes, "other", None, false)
+                    .unwrap()
+                    .unwrap();
+                let only_logo = apply_edit(bytes, &edit).unwrap();
                 let mut expected = logo();
                 expected.name = Some("image".into());
                 assert_eq!(read_references(&only_logo).unwrap(), vec![expected]);
+                let block = &locate(&only_logo).unwrap().unwrap();
                 assert_eq!(
-                    set_reference(&only_logo, "other", None, false).unwrap(),
+                    Block::set_reference(Some(block), &only_logo, "other", None, false).unwrap(),
                     None
                 );
-                let cleared = apply_edit(
-                    &only_logo,
-                    &set_reference(&only_logo, "logo", None, false)
-                        .unwrap()
-                        .unwrap(),
-                )
-                .unwrap();
+                let edit = Block::set_reference(Some(block), &only_logo, "logo", None, false)
+                    .unwrap()
+                    .unwrap();
+                let cleared = apply_edit(&only_logo, &edit).unwrap();
                 assert!(read_references(&cleared).unwrap().is_empty());
+                let block = &locate(&cleared).unwrap().unwrap();
                 assert!(text(&cleared).unwrap().contains("folio-references:"));
-                assert_eq!(set_reference(&cleared, "logo", None, false).unwrap(), None);
+                assert_eq!(
+                    Block::set_reference(Some(block), &cleared, "logo", None, false).unwrap(),
+                    None
+                );
             }
         }
     }

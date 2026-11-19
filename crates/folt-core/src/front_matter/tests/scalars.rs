@@ -27,7 +27,10 @@ fn name_replacements_quote_plain_and_quoted_values_and_keep_endings() {
         for old in ["old", "\"old\"", "'old'", "new", "\"new\"", "'new'"] {
             let input = format!("---{ending}folio-name: {old} # keep{ending}---{ending}body");
             let expected = format!("---{ending}folio-name: \"new\" # keep{ending}---{ending}body");
-            let planned = set_name(input.as_bytes(), Some("new"), false)
+            let planned = locate(input.as_bytes())
+                .and_then(|block| {
+                    Block::set_name(block.as_ref(), input.as_bytes(), Some("new"), false)
+                })
                 .unwrap()
                 .expect("same values still produce an edit");
             let output = apply_edit(input.as_bytes(), &planned).unwrap();
@@ -45,7 +48,10 @@ fn ids_remain_unquoted_when_inserted_or_replaced() {
         "---\n---\nbody".to_owned(),
         format!("---\nfolio-id: '{ID}'\n---\nbody"),
     ] {
-        let planned = set_id(input.as_bytes(), Some(id), true).unwrap().unwrap();
+        let planned = locate(input.as_bytes())
+            .and_then(|block| Block::set_id(block.as_ref(), input.as_bytes(), Some(id), true))
+            .unwrap()
+            .unwrap();
         let output = apply_edit(input.as_bytes(), &planned).unwrap();
         assert_eq!(output, format!("---\nfolio-id: {ID}\n---\nbody").as_bytes());
     }
@@ -55,15 +61,35 @@ fn ids_remain_unquoted_when_inserted_or_replaced() {
 fn written_plain_scalars_read_back_and_repeat_identically() {
     let empty = b"---\n---\n";
     for name in ["-logo", "--", "logo"] {
-        let output =
-            apply_edit(empty, &set_name(empty, Some(name), false).unwrap().unwrap()).unwrap();
+        let output = apply_edit(
+            empty,
+            &locate(empty)
+                .and_then(|block| Block::set_name(block.as_ref(), empty, Some(name), false))
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(read_name(&output).unwrap().as_deref(), Some(name));
         assert_eq!(rename(&output, name), output);
     }
     let id = FolioId::parse(ID).unwrap();
-    let output = apply_edit(empty, &set_id(empty, Some(id), false).unwrap().unwrap()).unwrap();
+    let output = apply_edit(
+        empty,
+        &locate(empty)
+            .and_then(|block| Block::set_id(block.as_ref(), empty, Some(id), false))
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(read_id(&output).unwrap(), Some(id));
-    let twice = apply_edit(&output, &set_id(&output, Some(id), false).unwrap().unwrap()).unwrap();
+    let twice = apply_edit(
+        &output,
+        &locate(&output)
+            .and_then(|block| Block::set_id(block.as_ref(), &output, Some(id), false))
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(twice, output);
 
     let reference = Reference {
@@ -74,7 +100,10 @@ fn written_plain_scalars_read_back_and_repeat_identically() {
     };
     let output = apply_edit(
         empty,
-        &set_reference(empty, "-logo", Some(&reference), false)
+        &locate(empty)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), empty, "-logo", Some(&reference), false)
+            })
             .unwrap()
             .unwrap(),
     )
@@ -82,20 +111,28 @@ fn written_plain_scalars_read_back_and_repeat_identically() {
     assert_eq!(read_references(&output).unwrap(), vec![reference.clone()]);
     let twice = apply_edit(
         &output,
-        &set_reference(&output, "-logo", Some(&reference), false)
+        &locate(&output)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), &output, "-logo", Some(&reference), false)
+            })
             .unwrap()
             .unwrap(),
     )
     .unwrap();
     assert_eq!(twice, output);
     assert_eq!(
-        set_name(empty, Some("-"), false),
+        locate(empty).and_then(|block| Block::set_name(block.as_ref(), empty, Some("-"), false)),
         Err(FrontMatterError::InvalidValue)
     );
     let mut invalid = reference.clone();
     invalid.alias = "-".into();
     assert_eq!(
-        set_references(empty, &[invalid], false),
+        locate(empty).and_then(|block| Block::set_references(
+            block.as_ref(),
+            empty,
+            &[invalid],
+            false
+        )),
         Err(FrontMatterError::InvalidValue)
     );
     for value in ["-", "- logo"] {
@@ -114,7 +151,10 @@ fn scalar_replacements_preserve_spacing_and_refuse_empty_values() {
         let input = format!("---\nfolio-name:{spacing}old\nfolio-id:{spacing}{ID}\n---\n");
         let output = apply_edit(
             input.as_bytes(),
-            &set_name(input.as_bytes(), Some("new"), false)
+            &locate(input.as_bytes())
+                .and_then(|block| {
+                    Block::set_name(block.as_ref(), input.as_bytes(), Some("new"), false)
+                })
                 .unwrap()
                 .unwrap(),
         )
@@ -125,7 +165,10 @@ fn scalar_replacements_preserve_spacing_and_refuse_empty_values() {
         );
         let output = apply_edit(
             input.as_bytes(),
-            &set_id(input.as_bytes(), Some(id), false).unwrap().unwrap(),
+            &locate(input.as_bytes())
+                .and_then(|block| Block::set_id(block.as_ref(), input.as_bytes(), Some(id), false))
+                .unwrap()
+                .unwrap(),
         )
         .unwrap();
         assert_eq!(output, input.as_bytes());
@@ -134,12 +177,22 @@ fn scalar_replacements_preserve_spacing_and_refuse_empty_values() {
     for spacing in ["", " ", "\t"] {
         let input = format!("---\nfolio-name:{spacing}\n---\n");
         assert_eq!(
-            set_name(input.as_bytes(), Some("new"), false),
+            locate(input.as_bytes()).and_then(|block| Block::set_name(
+                block.as_ref(),
+                input.as_bytes(),
+                Some("new"),
+                false
+            )),
             Err(FrontMatterError::InvalidValue)
         );
         let input = format!("---\nfolio-id:{spacing}\n---\n");
         assert_eq!(
-            set_id(input.as_bytes(), Some(id), false),
+            locate(input.as_bytes()).and_then(|block| Block::set_id(
+                block.as_ref(),
+                input.as_bytes(),
+                Some(id),
+                false
+            )),
             Err(FrontMatterError::InvalidValue)
         );
     }
@@ -154,9 +207,18 @@ fn scalar_rewrites_preserve_header_comment_spacing() {
                 let input =
                     format!("---{ending}{key}: {old}{spacing}# header{ending}---{ending}body");
                 let planned = if key == "folio-name" {
-                    set_name(input.as_bytes(), Some("new"), false)
+                    locate(input.as_bytes()).and_then(|block| {
+                        Block::set_name(block.as_ref(), input.as_bytes(), Some("new"), false)
+                    })
                 } else {
-                    set_id(input.as_bytes(), Some(FolioId::parse(ID).unwrap()), false)
+                    locate(input.as_bytes()).and_then(|block| {
+                        Block::set_id(
+                            block.as_ref(),
+                            input.as_bytes(),
+                            Some(FolioId::parse(ID).unwrap()),
+                            false,
+                        )
+                    })
                 }
                 .unwrap()
                 .unwrap();

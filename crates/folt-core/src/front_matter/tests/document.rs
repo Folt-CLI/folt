@@ -31,7 +31,12 @@ fn edits_keep_the_closing_delimiter_within_the_scan_limit() {
     let bytes = format!("---\n#{}\nfolio-name: \"x\"\n---\n", "a".repeat(65513));
     assert_eq!(locate(bytes.as_bytes()).unwrap().unwrap().body.end, 65535);
     assert_eq!(
-        set_name(bytes.as_bytes(), Some("xx"), false),
+        locate(bytes.as_bytes()).and_then(|block| Block::set_name(
+            block.as_ref(),
+            bytes.as_bytes(),
+            Some("xx"),
+            false
+        )),
         Err(FrontMatterError::Unterminated)
     );
     let unchanged = rename(bytes.as_bytes(), "x");
@@ -49,13 +54,18 @@ fn edits_keep_the_closing_delimiter_within_the_scan_limit() {
     for body in ["", "folio-id: 12345678-1234-4234-8234-123456789abc\n"] {
         let bytes = at_boundary(body);
         assert_eq!(
-            set_name(&bytes, Some("new"), false),
+            locate(&bytes).and_then(|block| Block::set_name(
+                block.as_ref(),
+                &bytes,
+                Some("new"),
+                false
+            )),
             Err(FrontMatterError::Unterminated)
         );
     }
     let bytes = at_boundary("");
     assert_eq!(
-        set_id(&bytes, Some(id), false),
+        locate(&bytes).and_then(|block| Block::set_id(block.as_ref(), &bytes, Some(id), false)),
         Err(FrontMatterError::Unterminated)
     );
     for body in [
@@ -67,7 +77,12 @@ fn edits_keep_the_closing_delimiter_within_the_scan_limit() {
     ] {
         let bytes = at_boundary(body);
         assert_eq!(
-            set_references(&bytes, &[logo()], false),
+            locate(&bytes).and_then(|block| Block::set_references(
+                block.as_ref(),
+                &bytes,
+                &[logo()],
+                false
+            )),
             Err(FrontMatterError::Unterminated),
             "{body}"
         );
@@ -76,7 +91,13 @@ fn edits_keep_the_closing_delimiter_within_the_scan_limit() {
                 let mut reference = logo();
                 reference.alias = alias.into();
                 assert_eq!(
-                    set_reference(&bytes, alias, Some(&reference), false),
+                    locate(&bytes).and_then(|block| Block::set_reference(
+                        block.as_ref(),
+                        &bytes,
+                        alias,
+                        Some(&reference),
+                        false
+                    )),
                     Err(FrontMatterError::Unterminated),
                     "{body}: {alias}"
                 );
@@ -84,7 +105,12 @@ fn edits_keep_the_closing_delimiter_within_the_scan_limit() {
         }
     }
     assert_eq!(
-        set_name(b"body", Some(&"x".repeat(SCAN_LIMIT)), true),
+        locate(b"body").and_then(|block| Block::set_name(
+            block.as_ref(),
+            b"body",
+            Some(&"x".repeat(SCAN_LIMIT)),
+            true
+        )),
         Err(FrontMatterError::Unterminated)
     );
 }
@@ -107,7 +133,12 @@ fn enforces_scan_boundary_and_delimiters() {
 
 #[test]
 fn creates_inserts_and_removes() {
-    assert!(set_name(b"body", Some("new"), false).unwrap().is_none());
+    assert!(
+        locate(b"body")
+            .and_then(|block| Block::set_name(block.as_ref(), b"body", Some("new"), false))
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(
         rename(b"\xef\xbb\xbfbody", "new"),
         b"\xef\xbb\xbf---\nfolio-name: \"new\"\n---\nbody"
@@ -132,7 +163,10 @@ fn creates_inserts_and_removes() {
     let id = FolioId::parse(ID).unwrap();
     let output = apply_edit(
         b"---\n---\n",
-        &set_id(b"---\n---\n", Some(id), false).unwrap().unwrap(),
+        &locate(b"---\n---\n")
+            .and_then(|block| Block::set_id(block.as_ref(), b"---\n---\n", Some(id), false))
+            .unwrap()
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(read_id(&output).unwrap(), Some(id));
@@ -146,7 +180,10 @@ fn creates_inserts_and_removes() {
     ] {
         let output = apply_edit(
             input,
-            &set_reference(input, "logo", None, false).unwrap().unwrap(),
+            &locate(input)
+                .and_then(|block| Block::set_reference(block.as_ref(), input, "logo", None, false))
+                .unwrap()
+                .unwrap(),
         )
         .unwrap();
         assert!(read_references(&output).unwrap().is_empty());

@@ -2,13 +2,14 @@ use std::hint::black_box;
 
 use criterion::Criterion;
 use folt_core::config::formats::OBJECT_ALGORITHM;
+use folt_core::folio::format::FolioFormat;
+use folt_core::folio::row::NewFolio;
 use folt_core::folio_name::FolioName;
 use folt_core::id::FolioId;
 use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::placement::PlacementKind;
-use folt_core::registry::{
-    FolioFormat, NewFolio, NewPlacement, PlacementPath, PlacementPrefix, Registry,
-};
+use folt_core::placement_path::{PlacementPath, PlacementPrefix};
+use folt_core::registry::{NewPlacement, Registry};
 
 use crate::common::TempHome;
 

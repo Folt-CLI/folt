@@ -1,7 +1,7 @@
 use std::fs;
 
 use folt_core::front_matter::{
-    FrontMatterError, Reference, apply_edit, read_name, read_references, set_name, set_reference,
+    Block, FrontMatterError, Reference, apply_edit, locate, read_name, read_references,
 };
 
 use crate::common::TempHome;
@@ -14,7 +14,10 @@ fn edits_note_bytes_without_touching_foreign_yaml_or_body() {
         b"\xef\xbb\xbf---\r\nforeign: |\r\n  ---\r\nfolio-name :  old # note\r\n---\r\n# Body\n";
     fs::write(&path, original).unwrap();
     let bytes = fs::read(&path).unwrap();
-    let edit = set_name(&bytes, Some("new"), false).unwrap().unwrap();
+    let edit = locate(&bytes)
+        .and_then(|block| Block::set_name(block.as_ref(), &bytes, Some("new"), false))
+        .unwrap()
+        .unwrap();
     fs::write(&path, apply_edit(&bytes, &edit).unwrap()).unwrap();
     let bytes = fs::read(&path).unwrap();
     assert_eq!(read_name(&bytes).unwrap().as_deref(), Some("new"));
@@ -39,13 +42,19 @@ fn creates_then_removes_a_reference_in_a_note() {
         pin: None,
     };
     let bytes = fs::read(&path).unwrap();
-    let edit = set_reference(&bytes, "logo", Some(&reference), true)
+    let edit = locate(&bytes)
+        .and_then(|block| {
+            Block::set_reference(block.as_ref(), &bytes, "logo", Some(&reference), true)
+        })
         .unwrap()
         .unwrap();
     fs::write(&path, apply_edit(&bytes, &edit).unwrap()).unwrap();
     let bytes = fs::read(&path).unwrap();
     assert_eq!(read_references(&bytes).unwrap(), vec![reference]);
-    let edit = set_reference(&bytes, "logo", None, false).unwrap().unwrap();
+    let edit = locate(&bytes)
+        .and_then(|block| Block::set_reference(block.as_ref(), &bytes, "logo", None, false))
+        .unwrap()
+        .unwrap();
     fs::write(&path, apply_edit(&bytes, &edit).unwrap()).unwrap();
     assert_eq!(
         fs::read(&path).unwrap(),
@@ -60,7 +69,12 @@ fn unterminated_note_cannot_receive_a_second_block() {
     let original = b"---\nfolio-name: old\n# Body\n";
     fs::write(&path, original).unwrap();
     assert_eq!(
-        set_name(&fs::read(&path).unwrap(), Some("new"), true),
+        locate(&fs::read(&path).unwrap()).and_then(|block| Block::set_name(
+            block.as_ref(),
+            &fs::read(&path).unwrap(),
+            Some("new"),
+            true
+        )),
         Err(FrontMatterError::Unterminated)
     );
     assert_eq!(fs::read(&path).unwrap(), original);

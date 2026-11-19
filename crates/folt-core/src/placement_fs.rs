@@ -5,8 +5,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::limits::STREAM_BUFFER_SIZE;
 use crate::config::names::{
-    CONTENT_FILE, FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE, TEMP_TAG_NAME,
+    FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE, TEMP_TAG_NAME,
 };
+use crate::folio::dir::path::content_path;
 use crate::home::Home;
 use crate::id::FolioId;
 use crate::id::ObjectId;
@@ -16,14 +17,6 @@ use crate::placement::{
     Signature, Written,
 };
 use crate::store::ObjectStore;
-
-/// Returns the working file path for a Folio's internal placement.
-pub fn internal_path(home: &Home, id: FolioId) -> PathBuf {
-    home.path()
-        .join(FOLIOS_DIR)
-        .join(id.to_string())
-        .join(CONTENT_FILE)
-}
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
@@ -35,11 +28,6 @@ pub struct PlacementFs<'a> {
 impl<'a> PlacementFs<'a> {
     pub fn new(home: &'a Home) -> Self {
         Self { home }
-    }
-
-    /// Returns the canonical derived link target spelling used by create and read.
-    pub fn link_target(&self, id: FolioId) -> PathBuf {
-        internal_path(self.home, id)
     }
 
     /// Checks whether the path's filesystem permits creating a symbolic link.
@@ -206,6 +194,10 @@ impl<'a> PlacementFs<'a> {
 }
 
 impl PlacementOps for PlacementFs<'_> {
+    fn link_target(&self, id: FolioId) -> PathBuf {
+        content_path(self.home, id)
+    }
+
     fn create(
         &self,
         id: FolioId,
@@ -724,17 +716,11 @@ fn ensure_single(count: u64) -> io::Result<()> {
 }
 
 fn hard_links_unsupported(error: &io::Error) -> bool {
-    if error.kind() == io::ErrorKind::Unsupported {
-        return true;
-    }
     #[cfg(windows)]
-    {
-        error.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD)
-    }
+    let privilege_missing = error.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD);
     #[cfg(not(windows))]
-    {
-        false
-    }
+    let privilege_missing = false;
+    error.kind() == io::ErrorKind::Unsupported || privilege_missing
 }
 
 fn symlink_failure(path: &Path, source: io::Error) -> PlacementError {

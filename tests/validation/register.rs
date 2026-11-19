@@ -6,14 +6,16 @@ use folt_core::config::limits::DEFAULT_LARGE_FILE_BYTES;
 use folt_core::config::names::CONTENT_FILE;
 use folt_core::config::settings::Settings;
 use folt_core::object::hash_blob;
+use folt_core::ops::facts::Behind;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
-use folt_core::placement_rules::{self, Behind};
+use folt_core::placement_path::PlacementPath;
+use folt_core::placement_rules;
 use folt_core::refs::RefStore;
 use folt_core::register::{
     self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
 };
-use folt_core::registry::{PlacementPath, Registry};
+use folt_core::registry::Registry;
 
 use crate::common::TempHome;
 
@@ -1206,12 +1208,14 @@ fn name_sources_and_exact_edits_are_planned_without_writing() {
         };
         assert_eq!(
             Some(edit.clone()),
-            folt_core::front_matter::set_name(
-                contents[i],
-                Some(plan.entries[i].name.as_ref().unwrap().as_str()),
-                true
-            )
-            .unwrap()
+            folt_core::front_matter::locate(contents[i])
+                .and_then(|block| folt_core::front_matter::Block::set_name(
+                    block.as_ref(),
+                    contents[i],
+                    Some(plan.entries[i].name.as_ref().unwrap().as_str()),
+                    true
+                ))
+                .unwrap()
         );
     }
     let text = plan.to_string();

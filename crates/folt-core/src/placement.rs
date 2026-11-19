@@ -148,6 +148,9 @@ pub fn classify(
 
 /// PlacementKind-specific placement operations. Implementations perform filesystem work.
 pub trait PlacementOps {
+    /// Returns the canonical derived link target spelling used by create and read.
+    fn link_target(&self, id: crate::id::FolioId) -> PathBuf;
+
     /// Creates a placement; copies read the supplied commit content blob.
     fn create(
         &self,

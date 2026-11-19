@@ -13,6 +13,13 @@ use crate::config::limits::{SCAN_LIMIT, SCAN_WINDOW};
 use crate::config::names::{OWNED, OWNED_ID, OWNED_NAME, OWNED_REFERENCES};
 use crate::id::FolioId;
 
+mod edit;
+mod scan;
+mod tree;
+
+use scan::{colon, explicit_key, line, punctuation};
+pub use tree::{Block, Node};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FrontMatterError {
     Unterminated,
@@ -43,29 +50,6 @@ impl fmt::Display for FrontMatterError {
 impl Error for FrontMatterError {}
 type Result<T> = std::result::Result<T, FrontMatterError>;
 
-/// A top-level node. Spans include original spelling and whitespace; `value`
-/// excludes spacing after the colon and a trailing comment on its final line.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Node {
-    pub key: String,
-    pub range: Range<usize>,
-    pub key_range: Range<usize>,
-    pub value: Range<usize>,
-    pub comment: Range<usize>,
-    pub continuation: Range<usize>,
-    ambiguous: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Block {
-    pub range: Range<usize>,
-    pub body: Range<usize>,
-    pub nodes: Vec<Node>,
-    /// Bytes before the first key (comments and blank lines).
-    pub preamble: Range<usize>,
-    pub line_ending: &'static str,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Edit {
     pub range: Range<usize>,
@@ -84,35 +68,9 @@ pub fn apply_edit(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>> {
     Ok(result)
 }
 
-#[derive(Clone)]
-struct Line {
-    end: usize,
-    next: usize,
-}
-fn line(bytes: &[u8], start: usize, end: usize) -> Line {
-    let next = bytes[start..end]
-        .iter()
-        .position(|b| *b == b'\n')
-        .map_or(end, |n| start + n + 1);
-    let mut content = next;
-    if content > start && bytes[content - 1] == b'\n' {
-        content -= 1;
-        if content > start && bytes[content - 1] == b'\r' {
-            content -= 1;
-        }
-    }
-    Line { end: content, next }
-}
 fn text(bytes: &[u8]) -> Result<&str> {
     std::str::from_utf8(bytes).map_err(|_| FrontMatterError::InvalidValue)
 }
-fn trim_end(bytes: &[u8], mut end: usize, start: usize) -> usize {
-    while end > start && bytes[end - 1].is_ascii_whitespace() {
-        end -= 1;
-    }
-    end
-}
-
 /// Finds a block only at the start (after an optional UTF-8 BOM). The closing
 /// delimiter must start before byte 65536; its own bytes may cross that bound.
 pub fn locate(bytes: &[u8]) -> Result<Option<Block>> {
@@ -152,7 +110,7 @@ pub fn locate(bytes: &[u8]) -> Result<Option<Block>> {
                 preamble: opening.next..pos,
                 line_ending: ending,
             };
-            tokenize(bytes, &mut block)?;
+            tree::build(bytes, &mut block)?;
             audit(bytes, &block)?;
             return Ok(Some(block));
         }
@@ -167,12 +125,8 @@ fn owned_spelling(spelling: &str) -> Option<usize> {
 
 fn audit(bytes: &[u8], block: &Block) -> Result<()> {
     let mut counts = [0i32; OWNED.len()];
-    for raw in text(&bytes[block.body.clone()])?.lines() {
-        let top = !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ");
-        if top
-            && let Some(i) = colon(raw)
-            && let Some(index) = owned_spelling(&raw[..i])
-        {
+    for range in block.key_ranges() {
+        if let Some(index) = owned_spelling(text(&bytes[range.clone()])?) {
             counts[index] += 1;
         }
     }
@@ -185,158 +139,6 @@ fn audit(bytes: &[u8], block: &Block) -> Result<()> {
         return Err(FrontMatterError::Hidden);
     }
     Ok(())
-}
-
-// Scan punctuation only outside quotes/comments. This also lets wrapped flow
-// mappings stay inside their node even when their lines start at column zero.
-fn punctuation(s: &str, wanted: char) -> Vec<usize> {
-    scan_punctuation(s, wanted, false)
-}
-
-fn scan_punctuation(s: &str, wanted: char, nested_comments: bool) -> Vec<usize> {
-    let mut result = Vec::new();
-    let mut quote = None;
-    let mut escape = false;
-    let mut depth = 0i32;
-    let mut comment = false;
-    let chars: Vec<_> = s.char_indices().collect();
-    let mut index = 0;
-    while index < chars.len() {
-        let (i, c) = chars[index];
-        if comment {
-            if c == '\n' {
-                comment = false;
-            }
-            index += 1;
-            continue;
-        }
-        if let Some(q) = quote {
-            if escape {
-                escape = false;
-            } else if q == '"' && c == '\\' {
-                escape = true;
-            } else if c == q {
-                if q == '\'' && chars.get(index + 1).is_some_and(|(_, c)| *c == '\'') {
-                    index += 1;
-                } else {
-                    quote = None;
-                }
-            }
-        } else if c == '#' && (i == 0 || s.as_bytes()[i - 1].is_ascii_whitespace()) {
-            if wanted == '#' && (depth == 0 || nested_comments) {
-                result.push(i);
-            }
-            comment = true;
-        } else if c == '\'' || c == '"' {
-            quote = Some(c);
-        } else {
-            if c == wanted && depth == 0 {
-                result.push(i);
-            }
-            if c == '{' || c == '[' {
-                depth += 1;
-            }
-            if c == '}' || c == ']' {
-                depth -= 1;
-            }
-        }
-        index += 1;
-    }
-    result
-}
-fn colon(s: &str) -> Option<usize> {
-    punctuation(s, ':').into_iter().find(|i| {
-        s.as_bytes()
-            .get(i + 1)
-            .is_none_or(|b| b.is_ascii_whitespace() || *b == b'{' || *b == b'[')
-    })
-}
-fn explicit_key(s: &str) -> Option<&str> {
-    s.strip_prefix('?')
-        .filter(|tail| tail.is_empty() || tail.starts_with([' ', '\t']))
-}
-fn tokenize(bytes: &[u8], block: &mut Block) -> Result<()> {
-    let mut pos = block.body.start;
-    while pos < block.body.end {
-        let current = line(bytes, pos, block.body.end);
-        let raw = text(&bytes[pos..current.end])?;
-        let top = !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ");
-        if top {
-            let key_end = colon(raw);
-            let complex = explicit_key(raw);
-            if key_end.is_some() || complex.is_some() {
-                if let Some(previous) = block.nodes.last_mut() {
-                    previous.range.end = pos;
-                    previous.continuation.end = pos;
-                } else {
-                    block.preamble.end = pos;
-                }
-                let end = key_end
-                    .unwrap_or_else(|| punctuation(raw, '#').first().copied().unwrap_or(raw.len()));
-                let spelling = raw[..end].trim_end();
-                let key = if let Some(key) = explicit_key(spelling) {
-                    scalar(key.trim())
-                        .map(Cow::into_owned)
-                        .unwrap_or_else(|_| key.trim().into())
-                } else {
-                    scalar(spelling)
-                        .map(Cow::into_owned)
-                        .unwrap_or_else(|_| spelling.into())
-                };
-                let mut value_start = pos + key_end.map_or(raw.len(), |n| n + 1);
-                while value_start < current.end && matches!(bytes[value_start], b' ' | b'\t') {
-                    value_start += 1;
-                }
-                let comments = punctuation(text(&bytes[value_start..current.end])?, '#');
-                let comment = comments.first().map_or(current.end, |n| value_start + n);
-                let value_end = trim_end(bytes, comment, value_start);
-                block.nodes.push(Node {
-                    key,
-                    key_range: pos..pos + end,
-                    range: pos..block.body.end,
-                    value: value_start..value_end,
-                    comment: comment..current.end,
-                    continuation: current.next..block.body.end,
-                    ambiguous: complex.is_some() || spelling.starts_with(['\'', '"']),
-                });
-                // A flow value may wrap over several lines. Its final closing
-                // brace, rather than its first line, determines the value end.
-                if matches!(bytes.get(value_start), Some(b'{' | b'[')) {
-                    let tail = text(&bytes[value_start..block.body.end])?;
-                    if let Some(end) = flow_end(tail) {
-                        let absolute = value_start + end;
-                        let final_line = line(bytes, absolute, block.body.end);
-                        let node = block
-                            .nodes
-                            .last_mut()
-                            .ok_or(FrontMatterError::InvalidValue)?;
-                        node.value.end = absolute;
-                        node.comment = absolute..final_line.end;
-                        node.continuation.start = final_line.next;
-                        pos = final_line.next;
-                        continue;
-                    }
-                }
-            }
-        }
-        pos = current.next;
-    }
-    // Continuation spans are now complete. Use each resolved explicit key for
-    // all lookups, including duplicate checks and owned-key insertion order.
-    // Unresolved keys retain their spelling and are refused by the key checks.
-    for index in 0..block.nodes.len() {
-        let n = &block.nodes[index];
-        if explicit_key(text(&bytes[n.key_range.clone()])?).is_some()
-            && let Ok(key) = resolved_explicit_key(bytes, n, block)
-        {
-            block.nodes[index].key = key;
-        }
-    }
-    Ok(())
-}
-fn flow_end(s: &str) -> Option<usize> {
-    let closing = if s.starts_with('{') { '}' } else { ']' };
-    punctuation(&s[1..], closing).first().map(|n| n + 2)
 }
 
 fn node<'a>(block: &'a Block, key: &str) -> Result<Option<&'a Node>> {
@@ -412,13 +214,12 @@ fn read_scalar<'a>(bytes: &'a [u8], key: &str) -> Result<Option<Cow<'a, str>>> {
         return Ok(None);
     };
     supported(bytes, n)?;
-    if text(&bytes[n.continuation.clone()])?
-        .lines()
-        .any(meaningful)
-    {
+    let continuation = text(&bytes[n.continuation.clone()])?;
+    if continuation.lines().any(meaningful) {
         return Err(FrontMatterError::Unsupported);
     }
-    let value = scalar(text(&bytes[n.value.clone()])?)?;
+    let spelling = text(&bytes[n.value.clone()])?;
+    let value = scalar(spelling)?;
     if value.is_empty() {
         return Err(FrontMatterError::InvalidValue);
     }
@@ -448,6 +249,8 @@ pub struct Reference<'a> {
 struct ReferenceNode<'a> {
     reference: Reference<'a>,
     range: Range<usize>,
+    key_range: Range<usize>,
+    value: Range<usize>,
 }
 // Flow whitespace may include comments through their line ending. Keep slices
 // into the original input so borrowed scalars and edit offsets stay valid.
@@ -457,7 +260,7 @@ fn skip_flow_space(mut s: &str) -> &str {
         if !s.starts_with('#') {
             return s;
         }
-        s = s.split_once('\n').map_or("", |(_, tail)| tail);
+        s = s.split_once('\n').map_or(&s[s.len()..], |(_, tail)| tail);
     }
 }
 fn flow_token(s: &str) -> Result<&str> {
@@ -468,13 +271,12 @@ fn flow_token(s: &str) -> Result<&str> {
     }
     Ok(s[..end].trim_end())
 }
-fn mapping(s: &str) -> Result<Vec<(&str, &str, usize)>> {
+fn mapping(s: &str) -> Result<Vec<(&str, &str)>> {
     let inner = s
         .trim()
         .strip_prefix('{')
         .and_then(|s| s.strip_suffix('}'))
         .ok_or(FrontMatterError::InvalidValue)?;
-    let base = s.find('{').ok_or(FrontMatterError::InvalidValue)? + 1;
     let mut starts = vec![0];
     starts.extend(punctuation(inner, ',').into_iter().map(|n| n + 1));
     let mut result = Vec::new();
@@ -486,15 +288,15 @@ fn mapping(s: &str) -> Result<Vec<(&str, &str, usize)>> {
             continue;
         }
         let c = colon(clean).ok_or(FrontMatterError::InvalidValue)?;
-        result.push((
-            flow_token(&clean[..c])?,
-            flow_token(&clean[c + 1..])?,
-            base + start,
-        ));
+        result.push((flow_token(&clean[..c])?, flow_token(&clean[c + 1..])?));
     }
     Ok(result)
 }
-fn reference<'a>(alias: &'a str, value: &'a str) -> Result<Reference<'a>> {
+fn reference<'a>(
+    alias: &'a str,
+    value: &'a str,
+    fields: Option<Vec<(&'a str, &'a str)>>,
+) -> Result<Reference<'a>> {
     let alias = scalar(alias)?;
     if alias.is_empty() {
         return Err(FrontMatterError::InvalidValue);
@@ -505,178 +307,54 @@ fn reference<'a>(alias: &'a str, value: &'a str) -> Result<Reference<'a>> {
         id: None,
         pin: None,
     };
-    if value.trim_start().starts_with('{') {
-        let mut seen = Vec::new();
-        for (key, value, _) in mapping(value)? {
-            if seen.contains(&key) {
-                return Err(FrontMatterError::Duplicate);
-            }
-            seen.push(key);
-            let value = scalar(value)?;
-            if value.is_empty() {
-                return Err(FrontMatterError::InvalidValue);
-            }
-            match key {
-                "name" => result.name = Some(value),
-                "id" => {
-                    result.id =
-                        Some(FolioId::parse(&value).map_err(|_| FrontMatterError::InvalidValue)?)
-                }
-                "pin" => result.pin = Some(value),
-                _ => return Err(FrontMatterError::Unsupported),
-            }
-        }
+    let fields = if let Some(fields) = fields {
+        fields
+    } else if value.trim_start().starts_with('{') {
+        mapping(value)?
     } else {
         scalar(value)?;
         return Err(FrontMatterError::InvalidValue);
+    };
+    let mut seen = Vec::new();
+    for (key, value) in fields {
+        if seen.contains(&key) {
+            return Err(FrontMatterError::Duplicate);
+        }
+        seen.push(key);
+        let value = scalar(value)?;
+        if value.is_empty() {
+            return Err(FrontMatterError::InvalidValue);
+        }
+        match key {
+            "name" => result.name = Some(value),
+            "id" => {
+                result.id =
+                    Some(FolioId::parse(&value).map_err(|_| FrontMatterError::InvalidValue)?)
+            }
+            "pin" => result.pin = Some(value),
+            _ => return Err(FrontMatterError::Unsupported),
+        }
     }
     if result.name.is_some() == result.id.is_some() {
         return Err(FrontMatterError::InvalidValue);
     }
     Ok(result)
 }
-// split in the folt-core refactor (#203)
-#[allow(clippy::too_many_lines)]
 fn references<'a>(bytes: &'a [u8], n: &Node) -> Result<Vec<ReferenceNode<'a>>> {
     supported(bytes, n)?;
-    let value = text(&bytes[n.value.clone()])?;
     let mut result = Vec::new();
-    if value.starts_with('{') {
-        let suffix = text(&bytes[n.comment.clone()])?.trim();
-        if !suffix.is_empty() && !suffix.starts_with('#') {
-            return Err(FrontMatterError::Unsupported);
-        }
-        if text(&bytes[n.continuation.clone()])?
-            .lines()
-            .any(meaningful)
-        {
-            return Err(FrontMatterError::Unsupported);
-        }
-        for (key, value, _) in mapping(value)? {
-            result.push(ReferenceNode {
-                reference: reference(key, value)?,
-                range: n.value.clone(),
-            });
-        }
-    } else {
-        if !value.is_empty() {
-            return Err(FrontMatterError::Unsupported);
-        }
-        let mut pos = n.continuation.start;
-        let mut indent = None;
-        while pos < n.range.end {
-            let l = line(bytes, pos, n.range.end);
-            let raw = text(&bytes[pos..l.end])?;
-            if !meaningful(raw) {
-                pos = l.next;
-                continue;
-            }
-            let spaces = raw.len() - raw.trim_start_matches(' ').len();
-            if spaces == 0 {
-                return Err(FrontMatterError::Unsupported);
-            }
-            let expected = *indent.get_or_insert(spaces);
-            if spaces != expected {
-                return Err(FrontMatterError::Unsupported);
-            }
-            let raw = &raw[spaces..];
-            let c = colon(raw).ok_or(FrontMatterError::InvalidValue)?;
-            let start = pos + spaces + c + 1;
-            let start = start
-                + bytes[start..l.end]
-                    .iter()
-                    .take_while(|b| matches!(b, b' ' | b'\t'))
-                    .count();
-            let comment = punctuation(text(&bytes[start..l.end])?, '#')
-                .first()
-                .map_or(l.end, |i| start + i);
-            let mut end = trim_end(bytes, comment, start);
-            let mut next = l.next;
-            let mut entry_end = l.next;
-            if bytes.get(start) == Some(&b'{') {
-                let tail = text(&bytes[start..n.range.end])?;
-                end = start + flow_end(tail).ok_or(FrontMatterError::InvalidValue)?;
-                let final_line = line(bytes, end, n.range.end);
-                let suffix = text(&bytes[end..final_line.end])?.trim();
-                if !suffix.is_empty() && !suffix.starts_with('#') {
-                    return Err(FrontMatterError::Unsupported);
-                }
-                next = final_line.next;
-                entry_end = next;
-            }
-            let nested = start == end;
-            let parsed = if nested {
-                let mut fields = Vec::new();
-                let mut field_indent = None;
-                while next < n.range.end {
-                    let child = line(bytes, next, n.range.end);
-                    let raw = text(&bytes[next..child.end])?;
-                    if !meaningful(raw) {
-                        next = child.next;
-                        continue;
-                    }
-                    let child_indent = raw.len() - raw.trim_start_matches(' ').len();
-                    if child_indent <= spaces {
-                        break;
-                    }
-                    if *field_indent.get_or_insert(child_indent) != child_indent {
-                        return Err(FrontMatterError::Unsupported);
-                    }
-                    let clean = raw.trim();
-                    let c = colon(clean).ok_or(FrontMatterError::InvalidValue)?;
-                    let value = clean[c + 1..].trim();
-                    let end = punctuation(value, '#')
-                        .first()
-                        .copied()
-                        .unwrap_or(value.len());
-                    fields.push((clean[..c].trim(), value[..end].trim()));
-                    next = child.next;
-                    entry_end = next;
-                }
-                let mut r = Reference {
-                    alias: scalar(raw[..c].trim())?,
-                    name: None,
-                    id: None,
-                    pin: None,
-                };
-                if r.alias.is_empty() {
-                    return Err(FrontMatterError::InvalidValue);
-                }
-                let mut seen = Vec::new();
-                for (key, value) in fields {
-                    if seen.contains(&key) {
-                        return Err(FrontMatterError::Duplicate);
-                    }
-                    seen.push(key);
-                    let value = scalar(value)?;
-                    if value.is_empty() {
-                        return Err(FrontMatterError::InvalidValue);
-                    }
-                    match key {
-                        "name" => r.name = Some(value),
-                        "id" => {
-                            r.id = Some(
-                                FolioId::parse(&value)
-                                    .map_err(|_| FrontMatterError::InvalidValue)?,
-                            )
-                        }
-                        "pin" => r.pin = Some(value),
-                        _ => return Err(FrontMatterError::Unsupported),
-                    }
-                }
-                if r.name.is_some() == r.id.is_some() {
-                    return Err(FrontMatterError::InvalidValue);
-                }
-                r
-            } else {
-                reference(raw[..c].trim(), text(&bytes[start..end])?)?
-            };
-            result.push(ReferenceNode {
-                reference: parsed,
-                range: pos..entry_end,
-            });
-            pos = next;
-        }
+    for entry in tree::entries(bytes, n)? {
+        let entry = entry?;
+        result.push(ReferenceNode {
+            reference: reference(
+                text(&bytes[entry.key_range.clone()])?,
+                text(&bytes[entry.value.clone()])?,
+                entry.fields,
+            )?,
+            range: entry.range,
+            key_range: entry.key_range,
+            value: entry.value,
+        });
     }
     let mut aliases = Vec::new();
     for entry in &result {
@@ -789,442 +467,6 @@ fn unresolved_key_checks(bytes: &[u8], block: &Block) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn edit_checks(bytes: &[u8], block: &Block) -> Result<()> {
-    unresolved_key_checks(bytes, block)?;
-    for n in &block.nodes {
-        let spelling = text(&bytes[n.key_range.clone()])?;
-        if explicit_key(spelling).is_some() {
-            continue;
-        }
-        let spelling = spelling.trim();
-        // Keep escaped quoted spellings opaque when editing foreign nodes.
-        if spelling.starts_with(['\'', '"']) && spelling.contains('\\') {
-            return Err(FrontMatterError::Ambiguous);
-        }
-    }
-    for key in OWNED {
-        if let Some(n) = node(block, key)? {
-            supported(bytes, n)?;
-        }
-    }
-    Ok(())
-}
-fn edit(range: Range<usize>, replacement: impl Into<Vec<u8>>) -> Edit {
-    Edit {
-        range,
-        replacement: replacement.into(),
-    }
-}
-// Replacing a value must retain YAML separation even when its original span
-// started immediately after the colon (for example, an empty block header).
-fn value_edit(bytes: &[u8], range: Range<usize>, value: impl AsRef<[u8]>) -> Edit {
-    let mut replacement = Vec::new();
-    if range.start > 0 && bytes[range.start - 1] == b':' {
-        replacement.push(b' ');
-    }
-    replacement.extend_from_slice(value.as_ref());
-    if bytes.get(range.end) == Some(&b'#') {
-        replacement.push(b' ');
-    }
-    edit(range, replacement)
-}
-// Validate only the bounded prefix of the virtual result, including enough
-// bytes past the scan limit to finish a closing delimiter.
-fn checked_edit(bytes: &[u8], edit: Edit) -> Result<Option<Edit>> {
-    let prefix: Vec<_> = bytes[..edit.range.start]
-        .iter()
-        .chain(&edit.replacement)
-        .chain(&bytes[edit.range.end..])
-        .take(SCAN_WINDOW)
-        .copied()
-        .collect();
-    locate(&prefix)?;
-    Ok(Some(edit))
-}
-
-fn insert(
-    bytes: &[u8],
-    block: Option<&Block>,
-    key: &str,
-    value: &str,
-    create: bool,
-) -> Result<Option<Edit>> {
-    if let Some(block) = block {
-        let position = block
-            .nodes
-            .iter()
-            .rev()
-            .find(|n| OWNED.contains(&n.key.as_str()))
-            .map_or(block.body.end, |n| n.range.end);
-        checked_edit(
-            bytes,
-            edit(
-                position..position,
-                format!("{key}: {value}{}", block.line_ending).into_bytes(),
-            ),
-        )
-    } else if create {
-        let position = if bytes.starts_with(b"\xef\xbb\xbf") {
-            3
-        } else {
-            0
-        };
-        checked_edit(
-            bytes,
-            edit(
-                position..position,
-                format!("---\n{key}: {value}\n---\n").into_bytes(),
-            ),
-        )
-    } else {
-        Ok(None)
-    }
-}
-fn plain(value: &str) -> Result<()> {
-    if value.is_empty()
-        || !value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"-._/".contains(&b))
-    {
-        return Err(FrontMatterError::InvalidValue);
-    }
-    scalar(value)?;
-    Ok(())
-}
-fn set_scalar(bytes: &[u8], key: &str, value: Option<&str>, create: bool) -> Result<Option<Edit>> {
-    if let Some(value) = value {
-        plain(value)?;
-    }
-    let value = value.map(|value| {
-        if key == OWNED_NAME {
-            Cow::Owned(format!("\"{value}\""))
-        } else {
-            Cow::Borrowed(value)
-        }
-    });
-    let value = value.as_deref();
-    let block = locate(bytes)?;
-    if let Some(block) = &block {
-        edit_checks(bytes, block)?;
-        if let Some(n) = node(block, key)? {
-            read_scalar(bytes, key)?;
-            return checked_edit(
-                bytes,
-                match value {
-                    Some(value) => value_edit(bytes, n.value.clone(), value.as_bytes()),
-                    None => edit(n.range.start..n.continuation.start, Vec::new()),
-                },
-            );
-        }
-    }
-    value.map_or(Ok(None), |value| {
-        insert(bytes, block.as_ref(), key, value, create)
-    })
-}
-/// Sets or removes the name. `None` means no edit is needed or block creation
-/// was disabled. Values are written as double-quoted strings, but must still
-/// pass the plain-token safety check; full name validation remains the caller's
-/// responsibility. An existing value produces an edit even when it is equal.
-pub fn set_name(bytes: &[u8], value: Option<&str>, create_block: bool) -> Result<Option<Edit>> {
-    set_scalar(bytes, OWNED_NAME, value, create_block)
-}
-/// Sets or removes the id, creating a missing block only when requested.
-pub fn set_id(bytes: &[u8], value: Option<FolioId>, create_block: bool) -> Result<Option<Edit>> {
-    let value = value.map(|id| id.to_string());
-    set_scalar(bytes, OWNED_ID, value.as_deref(), create_block)
-}
-fn quoted(value: &str) -> Result<String> {
-    if value.is_empty() || value.contains(['\n', '\r', '\0']) {
-        return Err(FrontMatterError::InvalidValue);
-    }
-    Ok(format!(
-        "\"{}\"",
-        value.replace('\\', "\\\\").replace('"', "\\\"")
-    ))
-}
-fn render_reference(r: &Reference<'_>, ending: &str) -> Result<String> {
-    plain(&r.alias)?;
-    if r.name.is_some() == r.id.is_some() {
-        return Err(FrontMatterError::InvalidValue);
-    }
-    let mut output = format!("  {}:{ending}", r.alias);
-    if let Some(name) = &r.name {
-        output.push_str(&format!("    name: {}{ending}", quoted(name)?));
-    }
-    if let Some(id) = r.id {
-        output.push_str(&format!("    id: \"{id}\"{ending}"));
-    }
-    if let Some(pin) = &r.pin {
-        output.push_str(&format!("    pin: {}{ending}", quoted(pin)?));
-    }
-    Ok(output)
-}
-// Standalone comments and blank lines survive removal of their surrounding key.
-fn remove_references(bytes: &[u8], node: &Node) -> Edit {
-    let mut replacement = Vec::new();
-    let mut pos = node.continuation.start;
-    while pos < node.range.end {
-        let l = line(bytes, pos, node.range.end);
-        if !meaningful(text(&bytes[pos..l.end]).unwrap_or("")) {
-            replacement.extend_from_slice(&bytes[pos..l.next]);
-        }
-        pos = l.next;
-    }
-    edit(node.range.clone(), replacement)
-}
-/// Replaces the entire references value, including nested block entries.
-pub fn set_references(
-    bytes: &[u8],
-    values: &[Reference<'_>],
-    create_block: bool,
-) -> Result<Option<Edit>> {
-    let block = locate(bytes)?;
-    let ending = block.as_ref().map_or("\n", |b| b.line_ending);
-    let mut rendered = String::new();
-    let mut seen = Vec::new();
-    for r in values {
-        if seen.contains(&r.alias.as_ref()) {
-            return Err(FrontMatterError::Duplicate);
-        }
-        seen.push(r.alias.as_ref());
-        rendered.push_str(&render_reference(r, ending)?);
-    }
-    if let Some(block) = &block {
-        edit_checks(bytes, block)?;
-        if let Some(n) = node(block, OWNED_REFERENCES)? {
-            let entries = references(bytes, n)?;
-            if values.is_empty() {
-                return checked_edit(bytes, remove_references(bytes, n));
-            }
-            let end = entries
-                .last()
-                .map_or(n.continuation.start, |e| e.range.end)
-                .max(n.continuation.start);
-            // Keep the header comment and trailing standalone comments. Entry
-            // values are rewritten together into the canonical quoted block form.
-            let mut replacement = bytes[n.value.end..n.continuation.start].to_vec();
-            replacement.extend_from_slice(rendered.as_bytes());
-            return checked_edit(bytes, edit(n.value.start..end, replacement));
-        }
-    }
-    if values.is_empty() {
-        return Ok(None);
-    }
-    // insert supplies the final line ending itself.
-    insert(
-        bytes,
-        block.as_ref(),
-        OWNED_REFERENCES,
-        &format!("{ending}{}", rendered.trim_end_matches(['\n', '\r'])),
-        create_block,
-    )
-}
-// A single entry inside a flow collection cannot contain a block mapping.
-fn render_flow_reference(r: &Reference<'_>) -> Result<String> {
-    render_reference(r, "\n")?;
-    let mut fields = Vec::new();
-    if let Some(name) = &r.name {
-        fields.push(format!("name: {}", quoted(name)?));
-    }
-    if let Some(id) = r.id {
-        fields.push(format!("id: \"{id}\""));
-    }
-    if let Some(pin) = &r.pin {
-        fields.push(format!("pin: {}", quoted(pin)?));
-    }
-    Ok(format!("{}: {{{}}}", r.alias, fields.join(", ")))
-}
-/// Sets or removes one alias, writing quoted block mappings.
-// split in the folt-core refactor (#203)
-#[allow(clippy::too_many_lines)]
-pub fn set_reference(
-    bytes: &[u8],
-    alias: &str,
-    value: Option<&Reference<'_>>,
-    create_block: bool,
-) -> Result<Option<Edit>> {
-    plain(alias)?;
-    if value.is_some_and(|r| r.alias != alias) {
-        return Err(FrontMatterError::InvalidValue);
-    }
-    let block = locate(bytes)?;
-    if let Some(block) = &block {
-        edit_checks(bytes, block)?;
-        if let Some(n) = node(block, OWNED_REFERENCES)? {
-            let entries = references(bytes, n)?;
-            let selected = entries.iter().position(|e| e.reference.alias == alias);
-            let rendered = value
-                .map(|r| render_reference(r, block.line_ending))
-                .transpose()?;
-            let collection = text(&bytes[n.value.clone()])?;
-            if collection.starts_with('{') {
-                // Flow collections must stay flow collections. Only the selected
-                // key/value and, on removal, one separator belong to the edit.
-                let parts = mapping(collection)?;
-                if let Some(index) = selected {
-                    let (key, old, _) = parts[index];
-                    let start = key.as_ptr() as usize - bytes.as_ptr() as usize;
-                    let end = old.as_ptr() as usize - bytes.as_ptr() as usize + old.len();
-                    if let Some(value) = value {
-                        return checked_edit(
-                            bytes,
-                            edit(start..end, render_flow_reference(value)?),
-                        );
-                    }
-                    let commas: Vec<_> = punctuation(&collection[1..collection.len() - 1], ',')
-                        .into_iter()
-                        .map(|n| n + 1)
-                        .collect();
-                    let (range, replacement) = if index < commas.len() {
-                        let comma = n.value.start + commas[index];
-                        (start..comma + 1, bytes[end..comma].to_vec())
-                    } else if index > 0 {
-                        let comma = n.value.start + commas[index - 1];
-                        (comma..end, bytes[comma + 1..start].to_vec())
-                    } else {
-                        (start..end, Vec::new())
-                    };
-                    return checked_edit(bytes, edit(range, replacement));
-                }
-                if let Some(value) = value {
-                    let position = n.value.end - 1;
-                    let has_separator = parts.last().is_some_and(|(_, old, _)| {
-                        let end = old.as_ptr() as usize - collection.as_ptr() as usize + old.len();
-                        !punctuation(&collection[end..collection.len() - 1], ',').is_empty()
-                    });
-                    let separator = if entries.is_empty() || has_separator {
-                        ""
-                    } else {
-                        ", "
-                    };
-                    return checked_edit(
-                        bytes,
-                        edit(
-                            position..position,
-                            format!("{separator}{}", render_flow_reference(value)?),
-                        ),
-                    );
-                }
-                return Ok(None);
-            }
-            let indent = entries.first().map_or(2, |entry| {
-                bytes[entry.range.start..]
-                    .iter()
-                    .take_while(|b| **b == b' ')
-                    .count()
-            });
-            let rendered = rendered.map(|s| {
-                s.split_inclusive(block.line_ending)
-                    .map(|line| format!("{}{}", " ".repeat(indent), &line[2..]))
-                    .collect::<String>()
-            });
-            if let Some(index) = selected {
-                let entry = &entries[index];
-                let mut rendered = rendered.unwrap_or_default();
-                let header = line(bytes, entry.range.start, entry.range.end);
-                let raw = text(&bytes[entry.range.start..header.end])?;
-                let header_value = &raw[colon(raw).ok_or(FrontMatterError::InvalidValue)? + 1..];
-                let nested =
-                    header_value.trim().is_empty() || header_value.trim_start().starts_with('#');
-                let flow_comments = if nested {
-                    Vec::new()
-                } else {
-                    scan_punctuation(text(&bytes[entry.range.clone()])?, '#', true)
-                        .into_iter()
-                        .map(|offset| entry.range.start + offset)
-                        .collect::<Vec<_>>()
-                };
-                let header_comment = if nested {
-                    punctuation(raw, '#').first().copied()
-                } else {
-                    flow_comments
-                        .first()
-                        .filter(|pos| **pos < header.end)
-                        .map(|pos| pos - entry.range.start)
-                };
-                if let Some(comment) = header_comment {
-                    let comment = &raw[comment..];
-                    if value.is_some() {
-                        let end = rendered
-                            .find(block.line_ending)
-                            .ok_or(FrontMatterError::InvalidValue)?;
-                        rendered.insert_str(end, &format!(" {comment}"));
-                    } else {
-                        rendered = format!("{}{comment}{}", " ".repeat(indent), block.line_ending);
-                    }
-                }
-                let mut preserved = Vec::new();
-                // Comments and blank lines between fields/entries are document
-                // bytes, even when they fall inside the selected entry's span.
-                let mut pos = header.next;
-                while pos < entry.range.end {
-                    let l = line(bytes, pos, entry.range.end);
-                    let raw = text(&bytes[pos..l.end])?;
-                    if !nested {
-                        if let Some(comment) = flow_comments
-                            .iter()
-                            .find(|offset| **offset >= pos && **offset < l.end)
-                        {
-                            let spaces = if value.is_some() { indent + 2 } else { indent };
-                            preserved.extend_from_slice(
-                                format!(
-                                    "{}{}{}",
-                                    " ".repeat(spaces),
-                                    text(&bytes[*comment..l.end])?,
-                                    block.line_ending
-                                )
-                                .as_bytes(),
-                            );
-                        } else if raw.trim().is_empty() {
-                            preserved.extend_from_slice(&bytes[pos..l.next]);
-                        }
-                    } else if !meaningful(raw) {
-                        preserved.extend_from_slice(&bytes[pos..l.next]);
-                    } else if let Some(comment) = punctuation(raw, '#').first() {
-                        let comment = &raw[*comment..];
-                        let key = raw[..colon(raw).ok_or(FrontMatterError::InvalidValue)?].trim();
-                        let field =
-                            format!("{}{}{key}:", block.line_ending, " ".repeat(indent + 2));
-                        if let Some(start) = rendered.find(&field) {
-                            let start = start + field.len();
-                            let end = start
-                                + rendered[start..]
-                                    .find(block.line_ending)
-                                    .ok_or(FrontMatterError::InvalidValue)?;
-                            rendered.insert_str(end, &format!(" {comment}"));
-                        } else {
-                            // Removed fields keep their original indentation;
-                            // removing the alias moves comments to entry level.
-                            let spaces = if value.is_some() {
-                                raw.len() - raw.trim_start_matches(' ').len()
-                            } else {
-                                indent
-                            };
-                            preserved.extend_from_slice(
-                                format!("{}{comment}{}", " ".repeat(spaces), block.line_ending)
-                                    .as_bytes(),
-                            );
-                        }
-                    }
-                    pos = l.next;
-                }
-                let mut replacement = rendered.into_bytes();
-                replacement.extend_from_slice(&preserved);
-                return checked_edit(bytes, edit(entry.range.clone(), replacement));
-            }
-            if let Some(rendered) = rendered {
-                let position = entries.last().map_or(n.continuation.start, |e| e.range.end);
-                return checked_edit(bytes, edit(position..position, rendered));
-            }
-            return Ok(None);
-        }
-    }
-    match value {
-        Some(value) => set_references(bytes, std::slice::from_ref(value), create_block),
-        None => Ok(None),
-    }
 }
 
 #[cfg(test)]
