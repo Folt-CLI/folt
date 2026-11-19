@@ -1,5 +1,7 @@
 use super::{FileSystem, RealFileSystem};
-use std::fs::{self, File, OpenOptions};
+#[cfg(unix)]
+use std::fs;
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::path::Path;
 
