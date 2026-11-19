@@ -33,7 +33,7 @@ The Folt project's `Estimate` field has no agreed unit or scale. Leave it blank 
 
 ## Fields after decisions
 
-Set the Component issue field after the developer selects a solution, using Build, Dev Docs, Dev Tools, Source Code, Tests or User Docs for its actual affected areas. Follow the [size template](rules.md) for limits. Set the Disposition issue field when ready to close, using Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn or Won't Do. Follow the [closing rules](rules.md#shared-steps) and [type rules](rules.md#by-issue-type) for the outcome. The [shared steps](rules.md#shared-steps) also govern `Merged`, reasons for other closures before `S5: Done`, and superseded child tickets.
+Set the Component issue field after the solution is selected (or after scoping, for XS and S), using Build, Dev Docs, Dev Tools, Source Code, Tests or User Docs for its actual affected areas. Follow the [size template](rules.md) for limits. Set the Disposition issue field when ready to close, using Abandoned, Answered, Duplicate, Invalid, Merged, Obsolete, Out of Scope, Released, Superseded, Withdrawn or Won't Do. Follow the [closing rules](rules.md#shared-steps) and [type rules](rules.md#by-issue-type) for the outcome. The [shared steps](rules.md#shared-steps) also govern `Merged`, reasons for other closures before `S5: Done`, and superseded child tickets.
 
 ## Project status through the workflow
 

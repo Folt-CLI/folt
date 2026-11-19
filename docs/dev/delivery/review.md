@@ -1,12 +1,12 @@
 # Pull request review
 
-After a pull request is opened or updated, where the [size requires review](../issues/rules.md), run a read-only review of its diff against the pull request's base. For a stack, review each pull request against its own base. CI and branch protection on the bottom base apply to every layer; see [Stacked pull requests](stacked-prs.md).
+After a pull request is opened or updated, where the [size requires review](../issues/rules.md) (M), run a read-only review of its diff against the pull request's base. For a stack, review each pull request against its own base. CI and branch protection on the bottom base apply to every layer; see [Stacked pull requests](stacked-prs.md).
 
 ## Review agent
 
 The review agent runs read-only against the pull request's diff; how it is started is not part of this document.
 
-The prompt should tell the agent to review read-only, compare the PR diff with its base, and report only actionable findings. Include an out-of-scope list. Do not ask for new tests or dependencies; do review the tests in the diff. Return findings with severity (High, Medium, or Low), what goes wrong, a concrete trigger, the fix when clear, and `file:line`. Keep findings tied to the changed diff where possible.
+The prompt should tell the agent to review read-only, compare the PR diff with its base, and report only actionable findings. Include an out-of-scope list. Do not ask for new tests or dependencies; do review the tests in the diff. Return findings with severity (High, Medium, or Low), what goes wrong, a concrete trigger, the fix when clear, and `file:line`. Cite the rule id from [Rust guidelines](../guides/rust.md) or [Standards](../guides/standards.md) when a finding rests on one. Keep findings tied to the changed diff where possible.
 
 The read-only sandbox has no network or `gh` access and cannot create the Cargo build lock. The orchestrator posts reviews and runs the gate in [Testing](testing.md#gate-before-push). Implementation runs use `-s workspace-write` in the issue's worktree and leave an uncommitted diff for the orchestrator to review and deliver through [Workflow](workflow.md#stages).
 
