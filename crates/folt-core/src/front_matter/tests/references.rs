@@ -276,3 +276,113 @@ fn malformed_references_are_refused_without_partial_edits() {
         );
     }
 }
+
+#[test]
+fn reference_spellings_have_equal_targets_and_pins() {
+    for ending in ["\n", "\r\n"] {
+        for (target, mut expected) in [
+            ("name: logo-image".to_owned(), logo()),
+            (
+                format!("id: {ID}"),
+                Reference {
+                    alias: "logo".into(),
+                    name: None,
+                    id: Some(FolioId::parse(ID).unwrap()),
+                    pin: Some("abc123".into()),
+                },
+            ),
+        ] {
+            for body in [
+                format!("folio-references:\n  logo:\n    {target}\n    pin: abc123\n"),
+                format!(
+                    "folio-references:\n    logo: # entry\n      {target} # target\n      pin: abc123\n"
+                ),
+                format!("folio-references:\n  logo: {{{target}, pin: abc123}}\n"),
+                format!(
+                    "folio-references: {{\n# collection\nlogo: {{\n{target}, # target\npin: abc123\n}} # entry\n}}\n"
+                ),
+            ] {
+                let input = format!("---\n{body}---\n").replace('\n', ending);
+                assert_eq!(
+                    read_references(input.as_bytes()).unwrap(),
+                    vec![expected.clone()],
+                    "{input:?}"
+                );
+            }
+            // Target equality also covers references without the optional pin.
+            expected.pin = None;
+            let input = format!("---\nfolio-references: {{logo: {{{target}}}}}\n---\n")
+                .replace('\n', ending);
+            assert_eq!(read_references(input.as_bytes()).unwrap(), vec![expected]);
+        }
+    }
+}
+
+#[test]
+fn reference_spellings_preserve_field_error_variants() {
+    for ending in ["\n", "\r\n"] {
+        for (alias, fields, expected) in [
+            (
+                "logo",
+                vec!["name: one", "name: two"],
+                FrontMatterError::Duplicate,
+            ),
+            ("logo", vec!["pin: abc123"], FrontMatterError::InvalidValue),
+            (
+                "logo",
+                vec!["name: one", "id: 12345678-1234-4234-8234-123456789abc"],
+                FrontMatterError::InvalidValue,
+            ),
+            ("logo", vec!["other: one"], FrontMatterError::Unsupported),
+            ("''", vec!["name: one"], FrontMatterError::InvalidValue),
+            ("\"\"", vec!["name: one"], FrontMatterError::InvalidValue),
+            ("logo", vec!["name: ''"], FrontMatterError::InvalidValue),
+        ] {
+            let block_fields = fields
+                .iter()
+                .map(|field| format!("    {field}\n"))
+                .collect::<String>();
+            let flow_fields = fields.join(", ");
+            for body in [
+                format!("folio-references:\n  {alias}:\n{block_fields}"),
+                format!("folio-references:\n  {alias}: {{{flow_fields}}}\n"),
+                format!("folio-references: {{{alias}: {{{flow_fields}}}}}\n"),
+                format!(
+                    "folio-references: {{\n{alias}: {{\n{}\n}}\n}}\n",
+                    fields.join(",\n")
+                ),
+            ] {
+                let input = format!("---\n{body}---\n").replace('\n', ending);
+                assert_eq!(
+                    read_references(input.as_bytes()),
+                    Err(expected),
+                    "{input:?}"
+                );
+                assert_eq!(
+                    set_references(input.as_bytes(), &[logo()], false),
+                    Err(expected),
+                    "{input:?}"
+                );
+                assert_eq!(
+                    set_reference(input.as_bytes(), "logo", None, false),
+                    Err(expected),
+                    "{input:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn earlier_reference_errors_precede_later_entry_structure_errors() {
+    for first in [
+        "  logo: {unknown: value}\n",
+        "  logo:\n    unknown: value\n",
+    ] {
+        let input = format!("---\nfolio-references:\n{first}  later-without-colon\n---\n");
+        assert_eq!(
+            read_references(input.as_bytes()),
+            Err(FrontMatterError::Unsupported)
+        );
+    }
+}
