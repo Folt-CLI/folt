@@ -616,7 +616,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Code structure
 - **Definition:** A guard that owns a temporary file in the home `tmp/` and removes it unless it was published.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/fsx/temp.rs` (`TempFile`)
 - **Related:** [home](#home), [publish](#publish).
 - **Not:** A published file.
 - **Status:** decided

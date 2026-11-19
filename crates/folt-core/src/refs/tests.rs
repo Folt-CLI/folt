@@ -74,3 +74,47 @@ fn ref_error_keeps_the_upper_variants() {
     ));
     assert_eq!(wrong.to_string(), format!("invalid ref target {id}: Blob"));
 }
+
+#[test]
+fn atomic_write_success_leaves_no_temporary_file() {
+    let directory = crate::test_support::TempDir::new().unwrap();
+    let target = directory.path().join("ref");
+    atomic_write(&target, b"ref bytes").unwrap();
+    assert_eq!(fs::read(&target).unwrap(), b"ref bytes");
+    let entries: Vec<_> = fs::read_dir(directory.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    assert_eq!(entries, vec![target]);
+}
+
+#[test]
+fn atomic_write_rename_failure_names_target_and_leaves_no_temporary_file() {
+    let directory = crate::test_support::TempDir::new().unwrap();
+    let target = directory.path().join("directory");
+    fs::create_dir(&target).unwrap();
+    fs::write(target.join("child"), b"existing").unwrap();
+    assert!(matches!(atomic_write(&target, b"ref bytes"),
+        Err(LowerRefError::Io { path, .. }) if path == target));
+    let entries: Vec<_> = fs::read_dir(directory.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    assert_eq!(entries, vec![target]);
+}
+
+#[cfg(unix)]
+#[test]
+fn atomic_write_uses_default_file_mode() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = crate::test_support::TempDir::new().unwrap();
+    let normal = directory.path().join("normal");
+    fs::write(&normal, b"normal").unwrap();
+    let target = directory.path().join("ref");
+    atomic_write(&target, b"ref bytes").unwrap();
+    assert_eq!(
+        fs::metadata(target).unwrap().permissions().mode() & 0o777,
+        fs::metadata(normal).unwrap().permissions().mode() & 0o777
+    );
+}

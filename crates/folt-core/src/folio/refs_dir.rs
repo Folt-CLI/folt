@@ -1,11 +1,11 @@
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 
 use crate::config::limits::REF_FILE_MAX_BYTES;
 use crate::config::names::{HEADS_DIR, PINS_DIR, REFS_DIR, TAGS_DIR, TEMP_PREFIX_REF};
-use crate::fsx::temp_name;
 use crate::fsx::{FileSystem, RealFileSystem};
+use crate::fsx::{TempFile, TempMode};
 use crate::id::ObjectId;
 use crate::ref_name::{LowerRefError, RefKind, RefName};
 
@@ -76,29 +76,18 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), LowerRefErro
         .parent()
         .ok_or_else(|| LowerRefError::InvalidRef(path.into()))?;
     fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
-    let (temporary, mut file) = loop {
-        let temporary = parent.join(temp_name(TEMP_PREFIX_REF, '.'));
-        match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
-            Ok(file) => break (temporary, file),
-            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(source) => return Err(io_error(&temporary, source)),
-        }
-    };
-    let result = (|| {
-        file.write_all(bytes)
-            .and_then(|()| file.sync_all())
-            .map_err(|source| io_error(&temporary, source))?;
-        drop(file);
-        fs::rename(&temporary, path).map_err(|source| io_error(path, source))
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result
+    let mut temporary = TempFile::create(parent, TEMP_PREFIX_REF, '.', TempMode::Default)
+        .map_err(|(path, source)| io_error(&path, source))?;
+    temporary
+        .file_mut()
+        .write_all(bytes)
+        .map_err(|source| io_error(temporary.path(), source))?;
+    temporary
+        .sync()
+        .map_err(|source| io_error(temporary.path(), source))?;
+    temporary
+        .publish(path)
+        .map_err(|source| io_error(path, source))
 }
 fn entries(path: &Path) -> Result<Vec<fs::DirEntry>, LowerRefError> {
     check_directory(path)?;

@@ -12,7 +12,7 @@ use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, SQLITE_HEADER};
 use crate::config::names::{HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR};
 use crate::config::settings::SettingsError;
-use crate::fsx::temp_name;
+use crate::fsx::{TempFile, TempMode};
 use crate::fsx::{private_directory_builder, private_file_options};
 use crate::layout::LayoutVersion;
 use crate::placement_path::RegistryError;
@@ -224,38 +224,15 @@ impl HomeLock {
     where
         F: FnOnce(&mut File) -> io::Result<()>,
     {
-        let (temporary_path, mut file) = loop {
-            let path = self.temporary_directory.join(temp_name("", '.'));
-            match private_file_options()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(file) => break (path, file),
-                Err(source) if source.kind() == io::ErrorKind::AlreadyExists => continue,
-                Err(source) => {
-                    return Err(HomeError::WriteFailed {
-                        path: destination.to_path_buf(),
-                        source,
-                    });
-                }
-            }
+        let write_failed = |source| HomeError::WriteFailed {
+            path: destination.to_path_buf(),
+            source,
         };
-        if let Err(source) = write(&mut file).and_then(|()| file.sync_all()) {
-            let _ = fs::remove_file(&temporary_path);
-            return Err(HomeError::WriteFailed {
-                path: destination.to_path_buf(),
-                source,
-            });
-        }
-        drop(file);
-        if let Err(source) = fs::rename(&temporary_path, destination) {
-            let _ = fs::remove_file(&temporary_path);
-            return Err(HomeError::WriteFailed {
-                path: destination.to_path_buf(),
-                source,
-            });
-        }
+        let mut temporary = TempFile::create(&self.temporary_directory, "", '.', TempMode::Private)
+            .map_err(|(_, source)| write_failed(source))?;
+        write(temporary.file_mut()).map_err(write_failed)?;
+        temporary.sync().map_err(write_failed)?;
+        temporary.publish(destination).map_err(write_failed)?;
         Ok(())
     }
 }
