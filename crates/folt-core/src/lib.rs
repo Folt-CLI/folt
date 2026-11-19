@@ -6,7 +6,7 @@ pub mod folio;
 pub mod folio_dir;
 pub mod folio_name;
 pub mod front_matter;
-mod fs;
+mod fsx;
 pub mod history;
 pub mod home;
 pub mod id;

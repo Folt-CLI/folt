@@ -8,12 +8,13 @@ use crate::config::names::{DEFAULT_BRANCH, REGISTRY_FILE, RENAME_PENDING_PREFIX}
 use crate::folio::format::FolioFormat;
 use crate::folio::row::{FolioRow, NewFolio};
 use crate::folio_name::FolioName;
+use crate::fsx::Signature;
 use crate::home::{Home, HomeLock, is_regular_file};
 use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::layout::HOME_FORMAT_VERSION;
 pub use crate::placement::PlacementBase;
-use crate::placement::{PlacementKind, Signature, StagedBlob};
+use crate::placement::{PlacementKind, StagedBlob};
 use crate::placement_path::{PlacementPath, PlacementPrefix, RegistryError};
 use std::time::Duration;
 

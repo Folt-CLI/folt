@@ -3,7 +3,6 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::limits::{
     COMPRESSION_PROBE_MIN_SIZE, COMPRESSION_SAMPLE_SIZE, COMPRESSION_SAMPLES, STREAM_BUFFER_SIZE,
@@ -11,6 +10,8 @@ use crate::config::limits::{
 use crate::config::names::{BLOB_EXTENSION, BLOBS_DIR, TEMP_PREFIX_INPUT, TEMP_PREFIX_OBJECT};
 use crate::folio::format::{FolioFormat, FormatError, check_format};
 use crate::folio_dir::FolioDir;
+use crate::fsx::temp_name;
+use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::{HomeLock, is_regular_file};
 use crate::id::ObjectId;
 use crate::layout::LayoutVersion;
@@ -148,12 +149,7 @@ impl ObjectStore {
         length: u64,
         mut reader: R,
     ) -> Result<ObjectId, StoreError> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let spool = self.root.join(format!(
-            "{TEMP_PREFIX_INPUT}{}.{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
+        let spool = self.root.join(temp_name(TEMP_PREFIX_INPUT, '.'));
         let result = (|| {
             let mut file = OpenOptions::new()
                 .write(true)
@@ -221,7 +217,6 @@ impl ObjectStore {
     where
         F: FnMut() -> Result<Box<dyn ReadSeek + 'a>, StoreError>,
     {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
         let mut buffer = vec![0; STREAM_BUFFER_SIZE];
         let mut first = fresh()?;
         let mut hash = ObjectHasher::new(kind, length);
@@ -267,11 +262,7 @@ impl ObjectStore {
                 path: source_path.into(),
                 source,
             })?;
-        let temp = self.root.join(format!(
-            "{TEMP_PREFIX_OBJECT}{}.{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
+        let temp = self.root.join(temp_name(TEMP_PREFIX_OBJECT, '.'));
         let out = OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -411,10 +402,12 @@ impl ObjectStore {
         Ok(out)
     }
     pub fn sync_blobs(&self) -> Result<(), StoreError> {
-        crate::fs::sync_directory(&self.root).map_err(|source| StoreError::Io {
-            path: self.root.clone(),
-            source,
-        })
+        RealFileSystem
+            .sync_directory(&self.root)
+            .map_err(|source| StoreError::Io {
+                path: self.root.clone(),
+                source,
+            })
     }
 
     /// Removes abandoned staging files with exclusive access to the home lock guard.

@@ -22,7 +22,7 @@ fn link_registration_failure_rolls_back_before_commit() {
     let directory = fixture.dir("directory");
     let plan = plan_register(&fixture.home, [&directory]).unwrap();
     let folios = fixture.home.path().join("folios");
-    let result = crate::fs::with_sync_failure(&folios, || {
+    let result = crate::fsx::with_sync_failure(&folios, || {
         apply_links_with_hook(&fixture.home, &plan, false, |_| Ok(()))
     });
     assert!(result.is_err());
@@ -111,7 +111,7 @@ fn conversion_syncs_link_creation_and_rename_and_retry_finishes_copy_row() {
         let plan = plan_register(&fixture.home, [&path]).unwrap();
         apply_register(&fixture.home, &plan, false).unwrap();
         let (result, retry) =
-            crate::fs::with_sync_failure_after(&directory, successful_syncs, || {
+            crate::fsx::with_sync_failure_after(&directory, successful_syncs, || {
                 let result = apply_register_links(&fixture.home, &plan, false).unwrap();
                 let retry = apply_register_links(&fixture.home, &plan, false).unwrap();
                 (result, retry)
