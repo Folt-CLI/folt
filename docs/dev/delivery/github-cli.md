@@ -59,7 +59,7 @@ gh extension install sudosubin/gh-attach
 Document uploads require a signed-in GitHub browser session matching the `gh` account. The extension uses that session automatically. Do not copy session cookies into commands, logs, or issue text.
 
 ```sh
-gh attach /tmp/2-code-findings.md /tmp/2-solution-1.md /tmp/2-solution-2.md \
+gh attach /tmp/2-code-findings.md /tmp/2-solution.md \
   --repo Folt-CLI/folt --json href,name
 ```
 
@@ -67,10 +67,10 @@ Use the returned `href` values as normal Markdown links in the issue body. Read 
 
 ```sh
 gh attach download '<returned-url>' --output /tmp/downloaded-solution.md
-cmp /tmp/2-solution-1.md /tmp/downloaded-solution.md
+cmp /tmp/2-solution.md /tmp/downloaded-solution.md
 ```
 
-Keep uploads linked from the issue so reviewers can access them. Do not mark a solution selected until the developer chooses it.
+Keep uploads linked from the issue so reviewers can access them. Do not mark a solution selected until the developer or the policy has selected it.
 
 ## Issue types and fields
 

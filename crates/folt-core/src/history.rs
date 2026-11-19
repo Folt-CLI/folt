@@ -3,6 +3,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use crate::config::names::{DEFAULT_BRANCH, FOLIOS_DIR};
+use crate::fsx::Signature;
 use crate::home::HomeLock;
 use crate::id::FolioId;
 use crate::id::ObjectId;
@@ -10,9 +11,7 @@ use crate::object::{Author, Commit, CommitTime, ObjectError, ObjectKind, Tag, ha
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal;
 use crate::ops::rules_error::RulesError;
-use crate::placement::{
-    Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, Signature,
-};
+use crate::placement::{Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_path::RegistryError;
 use crate::placement_rules::{self, MovePlan, MoveTarget};
 use crate::ref_name::{RefKind, RefName};

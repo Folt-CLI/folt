@@ -1,9 +1,10 @@
 //! Placement facts and targets for decision tests.
 
+use crate::fsx::Signature;
 use crate::id::FolioId;
 use crate::object::hash_blob;
 use crate::ops::facts::PlacementFacts;
-use crate::placement::{Observation, PlacementBase, PlacementKind, Signature};
+use crate::placement::{Observation, PlacementBase, PlacementKind};
 use crate::placement_path::PlacementPath;
 use crate::placement_rules::MoveTarget;
 use crate::ref_name::RefName;

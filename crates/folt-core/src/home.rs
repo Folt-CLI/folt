@@ -1,18 +1,19 @@
 use std::error::Error;
 use std::ffi::OsString;
 use std::fmt;
-use std::fs::{self, DirBuilder, File, OpenOptions, TryLockError};
+use std::fs::{self, File, TryLockError};
 use std::io::{self, Read};
 #[cfg(unix)]
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::config::env::Environment;
 use crate::config::formats::{APPLICATION_ID, SQLITE_HEADER};
 use crate::config::names::{HOME_DIR_NAME, HOME_ENTRIES, LOCK_FILE, REGISTRY_FILE, TMP_DIR};
 use crate::config::settings::SettingsError;
+use crate::fsx::temp_name;
+use crate::fsx::{private_directory_builder, private_file_options};
 use crate::layout::LayoutVersion;
 use crate::placement_path::RegistryError;
 
@@ -223,12 +224,8 @@ impl HomeLock {
     where
         F: FnOnce(&mut File) -> io::Result<()>,
     {
-        static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
         let (temporary_path, mut file) = loop {
-            let id = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
-            let path = self
-                .temporary_directory
-                .join(format!("{}.{}", std::process::id(), id));
+            let path = self.temporary_directory.join(temp_name("", '.'));
             match private_file_options()
                 .write(true)
                 .create_new(true)
@@ -261,28 +258,6 @@ impl HomeLock {
         }
         Ok(())
     }
-}
-
-fn private_directory_builder() -> DirBuilder {
-    let builder = DirBuilder::new();
-    #[cfg(unix)]
-    let builder = {
-        let mut builder = builder;
-        builder.mode(0o700);
-        builder
-    };
-    builder
-}
-
-fn private_file_options() -> OpenOptions {
-    let options = OpenOptions::new();
-    #[cfg(unix)]
-    let options = {
-        let mut options = options;
-        options.mode(0o600);
-        options
-    };
-    options
 }
 
 fn home_warnings(_path: &Path) -> Result<Vec<HomeWarning>, HomeError> {

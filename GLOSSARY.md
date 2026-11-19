@@ -55,6 +55,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [placement](#placement)
 - [placement path](#placement-path)
 - [plan and apply](#plan-and-apply)
+- [policy selection](#policy-selection)
 - [prune](#prune)
 - [publish](#publish)
 - [Question](#question)
@@ -70,6 +71,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [Rollback](#rollback)
 - [scan](#scan)
 - [scan limit](#scan-limit)
+- [scoping](#scoping)
 - [Settings](#settings)
 - [signature](#signature)
 - [size](#size)
@@ -79,6 +81,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [test_support](#test_support)
 - [tip](#tip)
 - [tree](#tree)
+- [trigger](#trigger)
 - [unresolved reference](#unresolved-reference)
 - [unstage](#unstage)
 - [work item](#work-item)
@@ -292,7 +295,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The content hash and file signature captured when a copy or internal working file is created or refreshed. The signature contains size, modification time, change time and inode, with unavailable metadata represented as absent.
-- **Code:** `crates/folt-core/src/placement.rs:94` (`PlacementBase`); `crates/folt-core/src/placement.rs:48` (`Signature`)
+- **Code:** `crates/folt-core/src/placement.rs:86` (`PlacementBase`); `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
 - **Related:** [copy](#copy), [internal row](#internal-row), [drift](#drift), [stage](#stage).
 - **Not:** A merge base, PR base branch or name prefix before a numeric suffix; links have no base.
 - **Status:** decided
@@ -310,7 +313,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** File metadata captured with a base and checked before applying a move: size, modification time, change time and inode. Unavailable metadata is represented as absent.
-- **Code:** `crates/folt-core/src/placement.rs:48` (`Signature`)
+- **Code:** `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
 - **Related:** [base](#base), [observation](#observation), [copy](#copy).
 - **Not:** A content hash or cryptographic signature.
 - **Status:** decided
@@ -539,7 +542,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:100` (`build_and_publish`); `crates/folt-core/src/placement_fs.rs:571` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:116` (`copy_content`)
+- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:105` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
@@ -559,7 +562,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Code structure
 - **Definition:** The single module that owns file-system writes (temporary files, atomic rename, directory sync and mode setting) and the `FileSystem` trait with a real and a fault-injecting implementation.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/fsx/mod.rs:22` (`FileSystem`)
 - **Related:** [publish](#publish).
 - **Not:** Raw `std::fs` mutations elsewhere.
 - **Status:** decided
@@ -632,7 +635,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### Question
 
 - **Layer:** Process
-- **Definition:** An issue whose outcome is a decision selected by the developer and whose derived work belongs in child issues. L is always a Question; it can be Done with Disposition Answered before its children close, but cannot itself close until they all close.
+- **Definition:** An issue whose outcome is a decision and whose derived work belongs in child issues. An L is always a Question and is analysed with the developer; an M Question is analysed automatically, its decision is selected by policy unless a trigger fires, and its children are created without a further request. A Question can be Done with Disposition Answered before its children close, but cannot itself close until they all close.
 - **Code:** none (process term; see [issues/rules.md](docs/dev/issues/rules.md))
 - **Related:** [work item](#work-item), [child](#child), [Disposition](#disposition), [size](#size).
 - **Not:** An unselected agent recommendation or permission to close a parent with open children.
@@ -668,7 +671,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### orchestrator
 
 - **Layer:** Process
-- **Definition:** The role that analyses work, hands findings to implementation agents, runs the gate and delivers commits and pull requests. The developer selects solutions and merges unless explicitly delegating a particular merge.
+- **Definition:** The role that analyses work, hands findings to implementation agents, runs the gate and delivers commits and pull requests. The developer selects solutions when a trigger fires (otherwise the policy selects) and merges, unless explicitly delegating a particular merge.
 - **Code:** none (process term; see [issues/rules.md](docs/dev/issues/rules.md))
 - **Related:** [gate](#gate), [worktree](#worktree), [Question](#question).
 - **Not:** The implementation agent, whose role is to implement and fix.
@@ -686,7 +689,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### analysis agent
 
 - **Layer:** Process
-- **Definition:** The read-only agent that drafts findings, options and Analysis text and never selects a solution.
+- **Definition:** The read-only agent that drafts findings, options, a recommendation with its trigger check and the scope of the selected option, and never selects a solution.
 - **Code:** none (process term; see `docs/dev/agents/`)
 - **Related:** [orchestrator](#orchestrator), [implementation scope](#implementation-scope), [Question](#question).
 - **Not:** The orchestrator or the developer.
@@ -704,10 +707,10 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### implementation scope
 
 - **Layer:** Process
-- **Definition:** The complete executable scope of work attached to a ticket as `<N>-solution-<k>.md`.
+- **Definition:** The executable scope of one ticket: the allowed files with their test files, numbered scenarios, what not to change and the verification. For M and Questions it is the scope of the selected option, attached as `<N>-solution.md`; for S it is derived by scoping and not attached.
 - **Code:** none (process term; see `docs/dev/agents/`)
 - **Related:** [implementation agent](#implementation-agent), [analysis agent](#analysis-agent), [work item](#work-item).
-- **Not:** The Scope section of a ticket.
+- **Not:** The Scope section of a ticket or the scope of an option nobody selected.
 - **Status:** decided
 
 ### role file
@@ -717,6 +720,33 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Code:** none (process term; see `docs/dev/agents/`)
 - **Related:** [analysis agent](#analysis-agent), [implementation agent](#implementation-agent), [review agent](#review-agent), [orchestrator](#orchestrator).
 - **Not:** `AGENTS.md`, which only dispatches.
+- **Status:** decided
+
+### scoping
+
+- **Layer:** Process
+- **Definition:** The short analysis of an S ticket at the start of its run. It decides nothing: it reads the ticket, the parent Question's findings and the current code, and returns the allowed files, the scenarios and the verification. It stops and re-sizes the ticket to M when the ticket does not fit the code or leaves a design question open.
+- **Code:** none (process term; see [issues/rules.md](docs/dev/issues/rules.md))
+- **Related:** [size](#size), [implementation scope](#implementation-scope), [trigger](#trigger), [policy selection](#policy-selection).
+- **Not:** The Scope section of a ticket or the full analysis of an M, which recommends a solution.
+- **Status:** decided
+
+### trigger
+
+- **Layer:** Process
+- **Definition:** One of four observable reasons to ask the developer during analysis: materially ambiguous requirements, meaningfully different user-visible behaviour, a significant architectural commitment, or a destructive or hard-to-reverse change. The analysis records for each whether it fired, with one line of evidence.
+- **Code:** none (process term; see [issues/rules.md](docs/dev/issues/rules.md))
+- **Related:** [policy selection](#policy-selection), [scoping](#scoping), [size](#size).
+- **Not:** A confidence score reported by an agent, a CI trigger or a workflow event.
+- **Status:** decided
+
+### policy selection
+
+- **Layer:** Process
+- **Definition:** The recording of an analysis recommendation as the selected solution when no trigger fired, with the reason, as made by policy and not by an agent.
+- **Code:** none (process term; see [issues/rules.md](docs/dev/issues/rules.md))
+- **Related:** [trigger](#trigger), [Question](#question), [analysis agent](#analysis-agent).
+- **Not:** The developer's selection or an agent choosing a solution.
 - **Status:** decided
 
 ### worktree
@@ -740,7 +770,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### size
 
 - **Layer:** Process
-- **Definition:** The ticket’s scope category: XS is self-descriptive, S has a decided solution, M needs analysis and review, L is a Question split into children, and XL is an Epic. XS needs neither analysis nor review; S needs review but no analysis.
+- **Definition:** The ticket’s scope category: XS is self-descriptive, S has its decision made and is scoped, M needs full analysis and review, L is a Question split into children, and XL is an Epic. XS has no analysis and no review; S has scoping and no review; M has full analysis and review; L is analysed interactively and has no review of its own.
 - **Code:** none (process term; see [issues/rules.md](docs/dev/issues/rules.md))
 - **Related:** [work item](#work-item), [Question](#question), [Epic](#epic).
 - **Not:** A time estimate or permission to implement L or XL as one change; use the working templates’ current statuses, not the older guide values.

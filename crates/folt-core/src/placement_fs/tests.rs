@@ -2,57 +2,6 @@ use super::*;
 use crate::test_support::TempHome;
 
 #[test]
-fn rewrite_publication_signature_matches_renamed_file() {
-    let home = TempHome::new().unwrap();
-    let path = home.root.join("file.md");
-    fs::write(&path, b"body").unwrap();
-    let expected = signature(&fs::metadata(&path).unwrap());
-    let mut published = None;
-    atomic_rewrite(&path, b"rewritten body", &expected, |value| {
-        published = Some(value);
-    })
-    .unwrap();
-    assert_eq!(published, Some(signature(&fs::metadata(&path).unwrap())));
-}
-
-#[cfg(unix)]
-#[test]
-fn rewrite_temp_is_private_before_writing_and_rewrite_preserves_mode() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let home = TempHome::new().unwrap();
-    let source = home.root.join("private.md");
-    fs::write(&source, b"private content\n").unwrap();
-    fs::set_permissions(&source, fs::Permissions::from_mode(0o600)).unwrap();
-    let metadata = fs::metadata(&source).unwrap();
-    let temporary = temporary_path(&home.root, "folt-name-test");
-    let output = create_rewrite_temp(&temporary, &metadata.permissions()).unwrap();
-    let created = output.metadata().unwrap();
-    assert_eq!(created.len(), 0);
-    assert_eq!(created.permissions().mode() & 0o7777, 0o600);
-    drop(output);
-    fs::remove_file(&temporary).unwrap();
-
-    let rewritten = b"---\nfolio-name: \"private\"\n---\nprivate content\n";
-    atomic_rewrite(&source, rewritten, &signature(&metadata), |_| {}).unwrap();
-    assert_eq!(fs::read(&source).unwrap(), rewritten);
-    assert_eq!(
-        fs::metadata(&source).unwrap().permissions().mode() & 0o7777,
-        0o600
-    );
-}
-
-#[test]
-fn single_link_is_required() {
-    assert!(ensure_single(1).is_ok());
-    for count in [0, 2, 3, u64::MAX] {
-        let error = ensure_single(count).unwrap_err();
-        assert_eq!(error.kind(), io::ErrorKind::Other);
-        assert_eq!(error.to_string(), "source has other hard links");
-    }
-}
-
-#[test]
 fn unreadable_link_count_refuses_conversion() {
     let home = TempHome::new().unwrap();
     let path = home.root.join("missing");
@@ -84,7 +33,7 @@ fn no_clobber_rename_refuses_destinations_created_after_absence_check() {
                 } else {
                     std::fs::write(to, b"foreign file").unwrap();
                 }
-                rename_no_replace(from, to)
+                RealFileSystem.rename_no_replace(from, to)
             });
             assert!(result.is_err());
             assert_eq!(placement.path.is_dir(), directory);
@@ -109,8 +58,10 @@ fn no_clobber_rename_refuses_a_link_created_after_absence_check() {
     let observation = fs.read(id, &placement).unwrap();
     let to = home.root.join("destination");
     let result = fs.relocate_with_rename(id, &placement, &to, &observation, |from, to| {
-        create_symlink(Path::new("foreign target"), to).unwrap();
-        rename_no_replace(from, to)
+        RealFileSystem
+            .create_symlink(Path::new("foreign target"), to)
+            .unwrap();
+        RealFileSystem.rename_no_replace(from, to)
     });
     assert!(result.is_err());
     assert_eq!(std::fs::read(&placement.path).unwrap(), b"source");
@@ -160,4 +111,20 @@ fn cross_device_and_permission_errors_are_reported_without_moving() {
                 .contains("moves across filesystems are not supported")
         );
     }
+}
+
+#[test]
+fn temporary_path_keeps_its_shape() {
+    let parent = Path::new("parent");
+    let path = temporary_path(parent, "folt-name-test");
+    assert_eq!(path.parent(), Some(parent));
+    let prefix = format!(".folt-name-test-{}-", std::process::id());
+    let counter = path
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .strip_prefix(&prefix)
+        .unwrap();
+    assert!(counter.parse::<u64>().is_ok());
 }
