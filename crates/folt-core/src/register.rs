@@ -27,7 +27,7 @@ use crate::folio::format::FolioFormat;
 use crate::folio::row::NewFolio;
 use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
 use crate::folio_name::{FolioName, FolioNameError, StemError};
-use crate::front_matter::{self, Edit, FrontMatterError};
+use crate::front_matter::{self, Block, Edit, FrontMatterError};
 use crate::home::config_file::ConfigError;
 use crate::home::{Home, HomeError, HomeLock};
 use crate::id::FolioId;
@@ -423,7 +423,9 @@ fn resolve_names(
                     entry.path.display()
                 ))
             })?;
-            let edit = match front_matter::set_name(bytes, Some(name.as_str()), true) {
+            let edit = match front_matter::locate(bytes)
+                .and_then(|block| Block::set_name(block.as_ref(), bytes, Some(name.as_str()), true))
+            {
                 Ok(Some(edit)) => edit,
                 Ok(None) => continue,
                 Err(error) => {
@@ -927,12 +929,18 @@ fn apply_locked(
                 }
             }
             if entry.name_write != NameWrite::None {
-                let edit = front_matter::set_name(
-                    &content,
-                    entry.name.as_ref().map(FolioName::as_str),
-                    true,
-                )
-                .map_err(|error| io::Error::other(format!("{}: {error}", entry.path.display())))?;
+                let edit = front_matter::locate(&content)
+                    .and_then(|block| {
+                        Block::set_name(
+                            block.as_ref(),
+                            &content,
+                            entry.name.as_ref().map(FolioName::as_str),
+                            true,
+                        )
+                    })
+                    .map_err(|error| {
+                        io::Error::other(format!("{}: {error}", entry.path.display()))
+                    })?;
                 let planned_edit = match &entry.name_write {
                     NameWrite::Insert(edit)
                     | NameWrite::InsertBlock(edit)

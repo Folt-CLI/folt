@@ -1015,7 +1015,15 @@ fn malformed_references_refuse_in_planning_without_changes_including_retries() {
             if step > 0 {
                 let replacement = front_matter::apply_edit(
                     bytes.as_bytes(),
-                    &front_matter::set_name(bytes.as_bytes(), Some("new"), false)
+                    &front_matter::locate(bytes.as_bytes())
+                        .and_then(|block| {
+                            front_matter::Block::set_name(
+                                block.as_ref(),
+                                bytes.as_bytes(),
+                                Some("new"),
+                                false,
+                            )
+                        })
                         .unwrap()
                         .unwrap(),
                 )

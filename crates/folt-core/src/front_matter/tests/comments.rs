@@ -20,13 +20,26 @@ fn selected_alias_inline_comments_survive_set_and_remove() {
                 let expected = format!("{prefix}{selected}{suffix}").replace('\n', ending);
                 let output = apply_edit(
                     input.as_bytes(),
-                    &set_reference(input.as_bytes(), "logo", value.as_ref(), false)
+                    &locate(input.as_bytes())
+                        .and_then(|block| {
+                            Block::set_reference(
+                                block.as_ref(),
+                                input.as_bytes(),
+                                "logo",
+                                value.as_ref(),
+                                false,
+                            )
+                        })
                         .unwrap()
                         .unwrap(),
                 )
                 .unwrap();
                 assert_eq!(text(&output).unwrap(), expected);
-                let repeated = set_reference(&output, "logo", value.as_ref(), false).unwrap();
+                let repeated = locate(&output)
+                    .and_then(|block| {
+                        Block::set_reference(block.as_ref(), &output, "logo", value.as_ref(), false)
+                    })
+                    .unwrap();
                 if let Some(edit) = repeated {
                     assert_eq!(apply_edit(&output, &edit).unwrap(), output);
                 }
@@ -119,15 +132,18 @@ fn nested_field_inline_comments_survive_set_and_remove() {
                 };
                 let input = adapt(input);
                 let expected = adapt(expected);
-                let output = apply_edit(
-                    input.as_bytes(),
-                    &set_reference(input.as_bytes(), "logo", desired.as_ref(), false)
+                let bytes = input.as_bytes();
+                let block = &locate(bytes).unwrap().unwrap();
+                let edit =
+                    Block::set_reference(Some(block), bytes, "logo", desired.as_ref(), false)
                         .unwrap()
-                        .unwrap(),
-                )
-                .unwrap();
+                        .unwrap();
+                let output = apply_edit(input.as_bytes(), &edit).unwrap();
                 assert_eq!(text(&output).unwrap(), expected);
-                if let Some(edit) = set_reference(&output, "logo", desired.as_ref(), false).unwrap()
+                let updated = &locate(&output).unwrap().unwrap();
+                if let Some(edit) =
+                    Block::set_reference(Some(updated), &output, "logo", desired.as_ref(), false)
+                        .unwrap()
                 {
                     assert_eq!(apply_edit(&output, &edit).unwrap(), output);
                 }
@@ -141,7 +157,10 @@ fn reference_value_edits_keep_comments_and_other_entries() {
     let input = b"---\nfolio-references: # header\n  logo: {name: old}\n  other: {name: other-image}\n# tail\nforeign: x\n---\nbody";
     let output = apply_edit(
         input,
-        &set_reference(input, "logo", Some(&logo()), false)
+        &locate(input)
+            .and_then(|block| {
+                Block::set_reference(block.as_ref(), input, "logo", Some(&logo()), false)
+            })
             .unwrap()
             .unwrap(),
     )
@@ -150,7 +169,8 @@ fn reference_value_edits_keep_comments_and_other_entries() {
     assert!(text(&output).unwrap().contains("# header\n"));
     let output = apply_edit(
         &output,
-        &set_reference(&output, "logo", None, false)
+        &locate(&output)
+            .and_then(|block| Block::set_reference(block.as_ref(), &output, "logo", None, false))
             .unwrap()
             .unwrap(),
     )
@@ -218,10 +238,23 @@ fn flow_comments_are_whitespace_in_reads_and_edits() {
             let desired = [logo(), original[1].clone()];
             for operation in 0..4 {
                 let planned = match operation {
-                    0 => set_references(bytes, &desired, false),
-                    1 => set_reference(bytes, "logo", Some(&desired[0]), false),
-                    2 => set_reference(bytes, "logo", None, false),
-                    _ => set_references(bytes, &[], false),
+                    0 => locate(bytes).and_then(|block| {
+                        Block::set_references(block.as_ref(), bytes, &desired, false)
+                    }),
+                    1 => locate(bytes).and_then(|block| {
+                        Block::set_reference(
+                            block.as_ref(),
+                            bytes,
+                            "logo",
+                            Some(&desired[0]),
+                            false,
+                        )
+                    }),
+                    2 => locate(bytes).and_then(|block| {
+                        Block::set_reference(block.as_ref(), bytes, "logo", None, false)
+                    }),
+                    _ => locate(bytes)
+                        .and_then(|block| Block::set_references(block.as_ref(), bytes, &[], false)),
                 }
                 .unwrap()
                 .unwrap();
@@ -258,9 +291,19 @@ fn reference_rewrites_separate_preserved_header_comments() {
                 .replace('\n', ending);
             for whole in [true, false] {
                 let edit = if whole {
-                    set_references(input.as_bytes(), &[logo()], false)
+                    locate(input.as_bytes()).and_then(|block| {
+                        Block::set_references(block.as_ref(), input.as_bytes(), &[logo()], false)
+                    })
                 } else {
-                    set_reference(input.as_bytes(), "logo", Some(&logo()), false)
+                    locate(input.as_bytes()).and_then(|block| {
+                        Block::set_reference(
+                            block.as_ref(),
+                            input.as_bytes(),
+                            "logo",
+                            Some(&logo()),
+                            false,
+                        )
+                    })
                 }
                 .unwrap()
                 .unwrap();

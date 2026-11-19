@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use folt_core::front_matter::{
     Block, Edit, FrontMatterError, Reference, apply_edit, locate, read_id, read_name,
-    read_references, set_id, set_name, set_reference, set_references,
+    read_references,
 };
 use folt_core::id::FolioId;
 use proptest::prelude::*;
@@ -348,28 +348,45 @@ impl Operation {
 
     fn plan(&self, bytes: &[u8], create: bool) -> Result<Option<Edit>, FrontMatterError> {
         match self {
-            Self::Name(value) => set_name(bytes, *value, create),
-            Self::Id(set) => set_id(bytes, set.then(|| FolioId::parse(ID).unwrap()), create),
-            Self::References(set) => set_references(
-                bytes,
-                &if *set {
-                    vec![
-                        reference("logo"),
-                        Reference {
-                            alias: "second".into(),
-                            name: None,
-                            id: Some(FolioId::parse(ID).unwrap()),
-                            pin: None,
-                        },
-                    ]
-                } else {
-                    vec![]
-                },
-                create,
-            ),
-            Self::Alias(alias, set) => {
-                set_reference(bytes, alias, set.then(|| reference(alias)).as_ref(), create)
-            }
+            Self::Name(value) => locate(bytes)
+                .and_then(|block| Block::set_name(block.as_ref(), bytes, *value, create)),
+            Self::Id(set) => locate(bytes).and_then(|block| {
+                Block::set_id(
+                    block.as_ref(),
+                    bytes,
+                    set.then(|| FolioId::parse(ID).unwrap()),
+                    create,
+                )
+            }),
+            Self::References(set) => locate(bytes).and_then(|block| {
+                Block::set_references(
+                    block.as_ref(),
+                    bytes,
+                    &if *set {
+                        vec![
+                            reference("logo"),
+                            Reference {
+                                alias: "second".into(),
+                                name: None,
+                                id: Some(FolioId::parse(ID).unwrap()),
+                                pin: None,
+                            },
+                        ]
+                    } else {
+                        vec![]
+                    },
+                    create,
+                )
+            }),
+            Self::Alias(alias, set) => locate(bytes).and_then(|block| {
+                Block::set_reference(
+                    block.as_ref(),
+                    bytes,
+                    alias,
+                    set.then(|| reference(alias)).as_ref(),
+                    create,
+                )
+            }),
         }
     }
 }

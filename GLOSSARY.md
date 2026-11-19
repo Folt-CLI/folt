@@ -366,7 +366,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The optional YAML-subset block at the start of Markdown content, after an optional UTF-8 BOM, opens with a `---` line and closes with a `---` or `...` line. Its closing delimiter must start before byte 65536; Folt edits owned keys while preserving foreign content.
-- **Code:** `crates/folt-core/src/front_matter.rs:75` (`locate`); `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`)
+- **Code:** `crates/folt-core/src/front_matter.rs:76` (`locate`); `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`)
 - **Related:** [owned key](#owned-key), [folio-name](#folio-name), [reference](#reference), [marker](#marker).
 - **Not:** General YAML support or a separate metadata file.
 - **Status:** decided
@@ -402,7 +402,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The number of leading bytes scanned for a front matter block: 65,536 (`64 * 1024`). The closing delimiter must start before this boundary; readers can take eight extra bytes to recognize a delimiter crossing it.
-- **Code:** `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`); `crates/folt-core/src/front_matter.rs:75` (`locate`)
+- **Code:** `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`); `crates/folt-core/src/front_matter.rs:76` (`locate`)
 - **Related:** [front matter](#front-matter), [Folio](#folio).
 - **Not:** A size limit on a Folio.
 - **Status:** decided
@@ -438,7 +438,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A declared relationship from one Folio to another under `folio-references`, keyed by an alias and naming exactly one target name or id, with an optional pin field. Staging caches declared references per parent Folio and branch.
-- **Code:** `crates/folt-core/src/front_matter.rs:242` (`Reference`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/front_matter.rs:243` (`Reference`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
 - **Related:** [alias](#alias), [pin (reference field)](#pin-reference-field), [unresolved reference](#unresolved-reference), [refs table](#refs-table).
 - **Not:** An on-disk history ref or a computed Markdown-body link; local path selection remains open in [#28](https://github.com/Folt-CLI/folt/issues/28).
 - **Status:** decided
@@ -447,7 +447,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The key assigned to a declared reference inside one parent’s `folio-references` block. It is unique within that block and is stored as the reference row’s key.
-- **Code:** `crates/folt-core/src/front_matter.rs:243` (`alias`); `crates/folt-core/src/registry.rs:38` (`key`)
+- **Code:** `crates/folt-core/src/front_matter.rs:244` (`alias`); `crates/folt-core/src/registry.rs:38` (`key`)
 - **Related:** [reference](#reference), [refs table](#refs-table), [folio-name](#folio-name).
 - **Not:** A Folio name, symbolic link or the older local-path alias concept.
 - **Status:** decided
@@ -456,7 +456,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The optional pin text attached to a declared reference. The parser and registry currently preserve it as opaque text; resolving tags and storing validated commit hashes is pending work.
-- **Code:** `crates/folt-core/src/front_matter.rs:246` (`pin`); `crates/folt-core/src/registry.rs:42` (`pin`)
+- **Code:** `crates/folt-core/src/front_matter.rs:247` (`pin`); `crates/folt-core/src/registry.rs:42` (`pin`)
 - **Related:** [reference](#reference), [pin (retention ref)](#pin-retention-ref), [commit](#commit).
 - **Not:** A retention ref or a commit hash already validated by the current stage operation; [#13](https://github.com/Folt-CLI/folt/issues/13) supplies the intended model and [#152](https://github.com/Folt-CLI/folt/issues/152) owns its implementation.
 - **Status:** decided

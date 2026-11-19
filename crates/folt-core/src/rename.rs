@@ -10,7 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::folio_name::FolioName;
-use crate::front_matter::{self, FrontMatterError};
+use crate::front_matter::{self, Block, FrontMatterError};
 use crate::history::{self, CommitMetadata, HistoryError, HistoryStores};
 use crate::home::HomeLock;
 use crate::id::FolioId;
@@ -117,7 +117,12 @@ from_error!(HistoryError, History);
 from_error!(ObjectError, Object);
 
 fn renamed(bytes: &[u8], name: &FolioName) -> Result<Vec<u8>, RenameError> {
-    let edit = front_matter::set_name(bytes, Some(name.as_str()), false)?;
+    let edit = Block::set_name(
+        front_matter::locate(bytes)?.as_ref(),
+        bytes,
+        Some(name.as_str()),
+        false,
+    )?;
     Ok(match edit {
         Some(edit) => front_matter::apply_edit(bytes, &edit)?,
         None => bytes.to_vec(),

@@ -1,3 +1,4 @@
+use super::edit::{checked_edit, edit, render_reference};
 use super::*;
 
 mod ambiguous_keys;
@@ -22,5 +23,12 @@ fn logo() -> Reference<'static> {
 }
 
 fn rename(bytes: &[u8], name: &str) -> Vec<u8> {
-    apply_edit(bytes, &set_name(bytes, Some(name), true).unwrap().unwrap()).unwrap()
+    apply_edit(
+        bytes,
+        &locate(bytes)
+            .and_then(|block| Block::set_name(block.as_ref(), bytes, Some(name), true))
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap()
 }
