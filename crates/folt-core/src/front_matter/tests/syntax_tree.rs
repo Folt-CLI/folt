@@ -217,3 +217,73 @@ fn scenario_10_ids_require_canonical_lowercase_hyphenated_form() {
         );
     }
 }
+
+#[test]
+fn physical_key_ranges_include_opaque_flow_lines_without_creating_nodes() {
+    for ending in ["\n", "\r\n"] {
+        let input = "---\n'foreign': {a: 1,\nfolio-name: hidden\n}\nscalar: |\n  folio-id: text\nnext: x\n---\n".replace('\n', ending);
+        let body_end = input.rfind("---").unwrap();
+        let mut block = Block {
+            range: 0..input.len(),
+            body: 4 + ending.len() - 1..body_end,
+            nodes: Vec::new(),
+            preamble: 4 + ending.len() - 1..body_end,
+            line_ending: ending,
+        };
+        tree::build(input.as_bytes(), &mut block).unwrap();
+        let spellings: Vec<_> = block
+            .key_ranges()
+            .map(|range| &input[range.clone()])
+            .collect();
+        assert_eq!(spellings, ["'foreign'", "folio-name", "scalar", "next"]);
+        let keys: Vec<_> = block.nodes.iter().map(|node| node.key.as_str()).collect();
+        assert_eq!(keys, ["foreign", "scalar", "next"]);
+        assert_eq!(
+            audit(input.as_bytes(), &block),
+            Err(FrontMatterError::Hidden)
+        );
+    }
+}
+
+#[test]
+fn reference_entry_spans_belong_to_each_entry_in_every_spelling() {
+    for ending in ["\n", "\r\n"] {
+        for body in [
+            "folio-references:\n  logo:\n    name: image\n  other:\n    name: other\n",
+            "folio-references:\n  logo: {name: image}\n  other: {name: other}\n",
+            "folio-references: {logo: {name: image}, other: {name: other}}\n",
+            "folio-references: {\n# first\nlogo: {name: image},\nother: {name: other}\n}\n",
+        ] {
+            let input = format!("---\n{body}---\n").replace('\n', ending);
+            let bytes = input.as_bytes();
+            let block = locate(bytes).unwrap().unwrap();
+            let node = node(&block, OWNED_REFERENCES).unwrap().unwrap();
+            let entries = references(bytes, node).unwrap();
+            assert_eq!(entries.len(), 2);
+            for (entry, alias) in entries.iter().zip(["logo", "other"]) {
+                assert_eq!(&input[entry.key_range.clone()], alias);
+                assert!(entry.range.start <= entry.key_range.start);
+                assert!(entry.key_range.end <= entry.value.start);
+                assert!(entry.value.end <= entry.range.end);
+                assert!(entry.range.end <= node.range.end);
+                assert!(input[entry.range.clone()].contains(alias));
+                assert!(!input[entry.range.clone()].contains(if alias == "logo" {
+                    "other"
+                } else {
+                    "logo"
+                }));
+            }
+            assert!(entries[0].range.end <= entries[1].range.start);
+            let source = tree::entries(bytes, node)
+                .unwrap()
+                .collect::<Result<Vec<_>>>()
+                .unwrap();
+            assert_eq!(source.len(), entries.len());
+            for (raw, parsed) in source.iter().zip(&entries) {
+                assert_eq!(raw.range, parsed.range);
+                assert_eq!(raw.key_range, parsed.key_range);
+                assert_eq!(raw.value, parsed.value);
+            }
+        }
+    }
+}

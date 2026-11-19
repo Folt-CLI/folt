@@ -100,3 +100,9 @@ pub(super) fn flow_end(s: &str) -> Option<usize> {
 pub(super) fn top_level(raw: &str) -> bool {
     !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ")
 }
+
+/// Locates a borrowed token within its original input without copying it.
+pub(super) fn span(bytes: &[u8], token: &str) -> std::ops::Range<usize> {
+    let start = token.as_ptr() as usize - bytes.as_ptr() as usize;
+    start..start + token.len()
+}

@@ -205,3 +205,35 @@ fn owned_key_audit_accepts_ordinary_and_clean_wrapped_flows() {
         }
     }
 }
+
+#[test]
+fn tree_audit_preserves_hidden_and_opaque_value_results() {
+    for ending in ["\n", "\r\n"] {
+        for key in OWNED {
+            for (body, hidden) in [
+                (format!("foreign: {{a: 1,\n{key}: hidden\n}}\n"), true),
+                (format!("'foreign': {{a: 1,\n{key}: hidden\n}}\n"), true),
+                (
+                    format!("\"foreign\": {{scalar: |\n{key}: hidden\n}}\n"),
+                    true,
+                ),
+                (format!("foreign: {{a: 1,\n  {key}: nested\n}}\n"), false),
+                (format!("foreign: |\n  {key}: scalar\n"), false),
+                (format!("foreign: >\n{key}: visible\n"), false),
+                (format!("'foreign': plain\n{key}: visible\n"), false),
+                (format!("foreign: [\n{key}:plain\n]\n"), false),
+                (
+                    format!("foreign: {{a: 1,\n# {key}: comment\nb: 2}}\n"),
+                    false,
+                ),
+            ] {
+                let input = format!("---\n{body}---\n").replace('\n', ending);
+                if hidden {
+                    assert_hidden_key(input.as_bytes());
+                } else {
+                    assert!(locate(input.as_bytes()).unwrap().is_some(), "{input:?}");
+                }
+            }
+        }
+    }
+}
