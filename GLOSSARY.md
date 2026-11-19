@@ -173,7 +173,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** An immutable blob, commit or tag with an id computed from the SHA-256 of its canonical encoding. The object kind is part of that encoding.
-- **Code:** `crates/folt-core/src/id/object.rs:7` (`ObjectId`); `crates/folt-core/src/object.rs:44` (`ObjectKind`)
+- **Code:** `crates/folt-core/src/id/object.rs:7` (`ObjectId`); `crates/folt-core/src/object/kind.rs:5` (`ObjectKind`)
 - **Related:** [object store](#object-store), [blob](#blob), [commit](#commit), [tag](#tag).
 - **Not:** A Folio id, mutable working file or ref file; object kind means the object kind enum, not a placement or ref kind.
 - **Status:** decided
@@ -182,7 +182,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** An object whose body is the exact captured content bytes. Staging stores working content as a blob for a later commit.
-- **Code:** `crates/folt-core/src/object.rs:45` (`Blob`); `crates/folt-core/src/working_state.rs:94` (`stage`)
+- **Code:** `crates/folt-core/src/object/kind.rs:6` (`Blob`); `crates/folt-core/src/working_state.rs:94` (`stage`)
 - **Related:** [object](#object), [stage](#stage), [commit](#commit).
 - **Not:** Every file ending in `.blob`: commit and tag objects use that extension too.
 - **Status:** decided
@@ -191,7 +191,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** An immutable history object recording a required content blob id, parents, author, time, message, optional body and optional group. The commit operation publishes the object, advances the branch ref and updates the affected working state.
-- **Code:** `crates/folt-core/src/object.rs:613` (`Commit`); `crates/folt-core/src/history.rs:191` (`apply_commit`)
+- **Code:** `crates/folt-core/src/object/commit.rs:10` (`Commit`); `crates/folt-core/src/history.rs:191` (`apply_commit`)
 - **Related:** [blob](#blob), [branch](#branch), [stage](#stage), [tip](#tip).
 - **Not:** A Git commit of this repository or a placement’s recorded starting commit id.
 - **Status:** decided
@@ -218,7 +218,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** A named ref under `refs/tags/` that can point to a commit directly or to a tag object carrying a target, name, tagger, time and message.
-- **Code:** `crates/folt-core/src/ref_name/kind.rs:6` (`RefKind`); `crates/folt-core/src/object.rs:699` (`Tag`)
+- **Code:** `crates/folt-core/src/ref_name/kind.rs:6` (`RefKind`); `crates/folt-core/src/object/tag.rs:9` (`Tag`)
 - **Related:** [branch](#branch), [commit](#commit), [object](#object).
 - **Not:** A branch that advances with commits or a pin reference field.
 - **Status:** decided
