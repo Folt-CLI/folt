@@ -1,5 +1,5 @@
 //! The operations tree orders refusal, facts, working, status, step_hook, placement, stage, history, register, rename, checkout, prune.
-//! Each module imports only earlier names.
+//! Each module imports only earlier names or rollback, which imports only fsx.
 
 mod step_hook;
 
@@ -16,3 +16,5 @@ pub mod rules_error;
 pub mod stage;
 pub mod status;
 pub mod working;
+
+pub(crate) mod rollback;

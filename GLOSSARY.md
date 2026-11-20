@@ -260,7 +260,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A path whose filesystem spelling is resolved before registry access. Resolution produces an absolute key, canonicalizes the parent and resolves the final component’s on-disk spelling without following that component. A directory Folio resolves to its marker. “Resolved path” means the same.
-- **Code:** `crates/folt-core/src/placement_path.rs:17` (`PlacementPath`); `crates/folt-core/src/placement_path.rs:82` (`resolve_path`)
+- **Code:** `crates/folt-core/src/placement_path.rs:17` (`PlacementPath`); `crates/folt-core/src/placement_path.rs:115` (`resolve`)
 - **Related:** [placement](#placement), [registry](#registry), [directory Folio](#directory-folio), [marker](#marker).
 - **Not:** An unresolved input spelling or the target obtained by following the final symbolic link.
 - **Status:** decided
@@ -634,8 +634,8 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### Rollback
 
 - **Layer:** Code structure
-- **Definition:** A guard that restores rewritten files when an operation fails before it completes.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Definition:** A guard that restores rewritten files and removes the markers and Folio directories this call created when an operation fails before it completes.
+- **Code:** `crates/folt-core/src/ops/rollback.rs` (`Rollback`)
 - **Related:** none.
 - **Not:** Rollback names the guard; restore names the action it performs. See the conflict row for rollback in Terms in conflict.
 - **Status:** decided

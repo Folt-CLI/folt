@@ -45,7 +45,7 @@ pub fn bench(c: &mut Criterion) {
         })
         .unwrap();
     drop(registry);
-    let prefix = PlacementPrefix::resolve(home.root()).unwrap();
+    let prefix = PlacementPrefix::from(&PlacementPath::resolve_directory(home.root()).unwrap());
     let registry = Registry::open_existing(&home.home).unwrap();
     assert_eq!(registry.placements_under(&prefix).unwrap().len(), 10_000);
     let mut group = c.benchmark_group("registry");

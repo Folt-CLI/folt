@@ -4,8 +4,7 @@ use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
-use crate::placement_fs::resolved_path;
-use crate::placement_path::{self, RegistryError};
+use crate::placement_path::{self, RegistryError, resolve_existing_ancestor};
 use crate::registry::{self, Registry};
 use crate::store::ObjectStore;
 
@@ -20,7 +19,7 @@ pub fn rehome(
     registry: &mut Registry,
     lock: &HomeLock,
 ) -> Result<(), RulesError> {
-    let old_home = resolved_path(old_home)?;
+    let old_home = resolve_existing_ancestor(old_home)?;
     let mut updates = Vec::new();
     let mut repairs = Vec::new();
     let mut prefix = None;
@@ -36,12 +35,14 @@ pub fn rehome(
             path: path.clone(),
             reason: RefusalReason::MixedHomes,
         })?;
-        let home = resolved_path(&home)?;
+        let home = resolve_existing_ancestor(&home)?;
         let current = fs.link_target(id);
         let current_home =
-            resolved_path(&former_home(&current, id).ok_or_else(|| PlacementRefusal {
-                path: current.clone(),
-                reason: RefusalReason::MixedHomes,
+            resolve_existing_ancestor(&former_home(&current, id).ok_or_else(|| {
+                PlacementRefusal {
+                    path: current.clone(),
+                    reason: RefusalReason::MixedHomes,
+                }
             })?)?;
         if (home != old_home && home != current_home)
             || prefix.as_ref().is_some_and(|prefix| prefix != &home)
@@ -81,7 +82,7 @@ pub fn rehome(
             };
             let plan = judge_repair_link(&facts)?;
             let target_home = former_link_home(&facts)
-                .map(|home| resolved_path(&home))
+                .map(|home| resolve_existing_ancestor(&home))
                 .transpose()?;
             if target_home.as_ref() != Some(&old_home) {
                 return Err(PlacementRefusal {

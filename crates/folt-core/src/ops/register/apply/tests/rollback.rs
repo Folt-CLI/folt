@@ -278,3 +278,41 @@ fn unique_name_index_failure_rolls_back_the_entire_registration() {
         );
     }
 }
+
+#[test]
+fn panic_before_transaction_restores_markdown_and_removes_new_marker_but_keeps_folios() {
+    let fixture = TempHome::new().unwrap();
+    let path = fixture.root.join("file.md");
+    let original = b"---\ntitle: keep\n---\nbody";
+    fs::write(&path, original).unwrap();
+    let directory = fixture.dir("directory");
+    let marker = directory.join(MARKER_FILE);
+    let plan = plan_register(&fixture.home, [&path, &directory]).unwrap();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                if matches!(step, Step::Transaction) {
+                    assert_ne!(fs::read(&path).unwrap(), original);
+                    assert!(marker.exists());
+                    panic!("simulated crash after name writes");
+                }
+                Ok(())
+            },
+        );
+    }));
+    assert!(result.is_err());
+    assert_eq!(fs::read(path).unwrap(), original);
+    assert!(!marker.exists());
+    assert_eq!(fixture.folio_count(), 2);
+    assert!(
+        Registry::open_existing(&fixture.home)
+            .unwrap()
+            .folios()
+            .unwrap()
+            .is_empty()
+    );
+}

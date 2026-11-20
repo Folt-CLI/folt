@@ -1,7 +1,7 @@
 use std::fmt;
-use std::path::PathBuf;
 
 use crate::config::limits::SUMMARY_LARGEST;
+use crate::placement_path::PlacementPath;
 
 use super::plan::{
     NameWrite, RegisterEntry, RegisterNote, RegisterPlan, RegisterStatus, RegisterSummary,
@@ -11,7 +11,7 @@ use super::request::RegisterRequest;
 pub(super) fn report(
     entries: Vec<RegisterEntry>,
     requests: Vec<RegisterRequest>,
-    destinations: Vec<PathBuf>,
+    destinations: Vec<PlacementPath>,
     batch_total_bytes: u64,
 ) -> RegisterPlan {
     let mut summary = RegisterSummary::default();
