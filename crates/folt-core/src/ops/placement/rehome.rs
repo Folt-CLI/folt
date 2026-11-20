@@ -1,7 +1,7 @@
 use crate::folio::dir::path::former_home;
 use crate::home::HomeLock;
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
 use crate::placement_fs::resolved_path;
@@ -25,25 +25,28 @@ pub fn rehome(
     let mut repairs = Vec::new();
     let mut prefix = None;
     for id in registry.folios()? {
-        let row = registry.internal_placement(id)?.ok_or_else(|| Refusal {
-            path: old_home.to_path_buf(),
-            reason: RefusalReason::MissingInternal,
-        })?;
+        let row = registry
+            .internal_placement(id)?
+            .ok_or_else(|| PlacementRefusal {
+                path: old_home.to_path_buf(),
+                reason: RefusalReason::MissingInternal,
+            })?;
         let path = row.path.to_path_buf();
-        let home = former_home(&path, id).ok_or_else(|| Refusal {
+        let home = former_home(&path, id).ok_or_else(|| PlacementRefusal {
             path: path.clone(),
             reason: RefusalReason::MixedHomes,
         })?;
         let home = resolved_path(&home)?;
         let current = fs.link_target(id);
-        let current_home = resolved_path(&former_home(&current, id).ok_or_else(|| Refusal {
-            path: current.clone(),
-            reason: RefusalReason::MixedHomes,
-        })?)?;
+        let current_home =
+            resolved_path(&former_home(&current, id).ok_or_else(|| PlacementRefusal {
+                path: current.clone(),
+                reason: RefusalReason::MixedHomes,
+            })?)?;
         if (home != old_home && home != current_home)
             || prefix.as_ref().is_some_and(|prefix| prefix != &home)
         {
-            return Err(Refusal {
+            return Err(PlacementRefusal {
                 path,
                 reason: RefusalReason::MixedHomes,
             }
@@ -53,7 +56,7 @@ pub fn rehome(
         let new_path = placement_path::PlacementPath::resolve(current)?;
         if row.path != new_path {
             if registry.placement_at(&new_path)?.is_some() {
-                return Err(Refusal {
+                return Err(PlacementRefusal {
                     path: new_path.to_path_buf(),
                     reason: RefusalReason::DestinationRegistered,
                 }
@@ -81,7 +84,7 @@ pub fn rehome(
                 .map(|home| resolved_path(&home))
                 .transpose()?;
             if target_home.as_ref() != Some(&old_home) {
-                return Err(Refusal {
+                return Err(PlacementRefusal {
                     path: facts.placement.path.to_path_buf(),
                     reason: RefusalReason::OtherLink,
                 }

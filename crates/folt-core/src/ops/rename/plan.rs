@@ -54,7 +54,7 @@ pub fn plan_rename(
     let (id, retry) = resolve_rename(old, new, registry)?;
     let row = registry
         .internal_placement(id)?
-        .ok_or(history::Refusal::MissingInternal)
+        .ok_or(history::HistoryRefusal::MissingInternal)
         .map_err(HistoryError::from)?;
     let facts = crate::ops::working::gather(&row, fs, stores.refs, registry)?;
     let Observation::File { ref signature } = facts.observation else {

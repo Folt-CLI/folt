@@ -1,6 +1,7 @@
 use crate::home::HomeLock;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
+use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement::{Observation, PlacementKind, PlacementOps};
 use crate::registry::Registry;
 
@@ -22,7 +23,7 @@ pub fn apply_relocate(
     registry: &mut Registry,
     lock: &HomeLock,
 ) -> Result<(), RulesError> {
-    apply_relocate_steps(plan, fs, registry, lock, |_, _| Ok(()))
+    apply_relocate_steps(plan, fs, registry, lock, NoHook)
 }
 
 pub(super) fn apply_relocate_steps(
@@ -30,25 +31,25 @@ pub(super) fn apply_relocate_steps(
     fs: &impl PlacementOps,
     registry: &mut Registry,
     lock: &HomeLock,
-    mut after: impl FnMut(RelocateStep, &Registry) -> Result<(), RulesError>,
+    mut after: impl for<'a> StepHook<(RelocateStep, &'a Registry), RulesError>,
 ) -> Result<(), RulesError> {
     let Some((source, pending)) = recheck_rows_and_source(plan, fs, registry, lock)? else {
         return Ok(());
     };
     if source != Observation::Missing {
         normalize_and_insert_rows(plan, fs, registry, lock, pending)?;
-        after(RelocateStep::Inserted, registry)?;
+        after.on_step((RelocateStep::Inserted, registry))?;
         rename_entry(plan, fs, registry, lock, &source)?;
-        after(RelocateStep::Renamed, registry)?;
+        after.on_step((RelocateStep::Renamed, registry))?;
     } else if !pending {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: plan.facts.placement.path.to_path_buf(),
             reason: RefusalReason::Gone,
         }
         .into());
     }
     delete_source_rows(plan, registry, lock)?;
-    after(RelocateStep::Deleted, registry)?;
+    after.on_step((RelocateStep::Deleted, registry))?;
     Ok(())
 }
 
@@ -82,7 +83,7 @@ fn recheck_rows_and_source(
     }
     for (actual, (old, _)) in originals.iter().zip(rows) {
         if actual.as_ref() != Some(old) {
-            return Err(Refusal {
+            return Err(PlacementRefusal {
                 path: old.path.to_path_buf(),
                 reason: RefusalReason::RegistryChanged,
             }
@@ -106,7 +107,7 @@ fn recheck_rows_and_source(
         }
         // Recheck the entire planned prefix before either registry transaction.
         if destination.rows != *rows {
-            return Err(Refusal {
+            return Err(PlacementRefusal {
                 path: placement.path,
                 reason: RefusalReason::RegistryChanged,
             }

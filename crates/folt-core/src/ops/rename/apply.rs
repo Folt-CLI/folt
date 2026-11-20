@@ -79,7 +79,7 @@ pub fn apply_rename(
     }
     let row = registry
         .internal_placement(plan.id())?
-        .ok_or(history::Refusal::MissingInternal)
+        .ok_or(history::HistoryRefusal::MissingInternal)
         .map_err(HistoryError::from)?;
     if !row
         .staged

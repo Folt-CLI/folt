@@ -2,7 +2,7 @@ use crate::config::names::DEFAULT_BRANCH;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::ref_name::RefName;
@@ -39,9 +39,9 @@ pub fn judge_move(
     facts: &PlacementFacts,
     target: &MoveTarget,
     discard: bool,
-) -> Result<MovePlan, Refusal> {
+) -> Result<MovePlan, PlacementRefusal> {
     let (_, placement) = facts.placement.to_placement();
-    let refuse = |reason| Refusal {
+    let refuse = |reason| PlacementRefusal {
         path: placement.path.clone(),
         reason,
     };
@@ -100,14 +100,14 @@ pub fn apply_move_file(
 ) -> Result<Option<crate::placement::PlacementBase>, RulesError> {
     let (id, placement) = plan.placement.to_placement();
     if registry.placement_at(&plan.placement.path)?.as_ref() != Some(&plan.placement) {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: placement.path,
             reason: RefusalReason::RegistryChanged,
         }
         .into());
     }
     if fs.read(id, &placement)? != plan.observation {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: placement.path,
             reason: RefusalReason::PlacementChanged,
         }
@@ -122,7 +122,7 @@ pub fn apply_move_file(
             Some(&plan.observation),
         )
         .map_err(|error| match error {
-            PlacementError::PlacementChanged => RulesError::Refused(Refusal {
+            PlacementError::PlacementChanged => RulesError::Refused(PlacementRefusal {
                 path: placement.path.clone(),
                 reason: RefusalReason::PlacementChanged,
             }),

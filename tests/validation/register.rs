@@ -7,14 +7,14 @@ use folt_core::config::names::CONTENT_FILE;
 use folt_core::config::settings::Settings;
 use folt_core::object::hash_blob;
 use folt_core::ops::facts::{Behind, gather};
+use folt_core::ops::register::{
+    self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
+};
 use folt_core::ops::status::judge_status;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
 use folt_core::refs::RefStore;
-use folt_core::register::{
-    self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
-};
 use folt_core::registry::Registry;
 
 use crate::common::TempHome;
@@ -458,7 +458,7 @@ fn repointed_parent_blocks_file_registration() {
 #[cfg(unix)]
 fn assert_repointed_parent_cannot_collapse_requests(links: bool) {
     use folt_core::folio_name::FolioName;
-    use folt_core::register::RegisterRequest;
+    use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
     let home = TempHome::new();
@@ -514,7 +514,7 @@ fn assert_repointed_parent_cannot_collapse_requests(links: bool) {
 #[cfg(unix)]
 fn assert_repointed_parent_cannot_collapse_marker_requests(links: bool, directory: bool) {
     use folt_core::folio_name::FolioName;
-    use folt_core::register::RegisterRequest;
+    use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
     let markers = if directory {
@@ -604,7 +604,7 @@ fn repointed_parent_cannot_collapse_existing_marker_directory_requests() {
 #[test]
 fn unchanged_parent_registers_named_marker_request() {
     use folt_core::folio_name::FolioName;
-    use folt_core::register::RegisterRequest;
+    use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
     for links in [false, true] {
@@ -654,7 +654,7 @@ fn unchanged_parent_registers_named_marker_request() {
 #[test]
 fn repointed_parent_cannot_collapse_directory_requests() {
     use folt_core::folio_name::FolioName;
-    use folt_core::register::RegisterRequest;
+    use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
     let home = TempHome::new();
@@ -741,7 +741,7 @@ fn two_path_spellings_register_one_file() {
 #[test]
 fn unchanged_parent_registers_named_file() {
     use folt_core::folio_name::FolioName;
-    use folt_core::register::RegisterRequest;
+    use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
     let home = TempHome::new();
@@ -1055,8 +1055,8 @@ fn link_registration_through_a_symlinked_home_uses_the_home_spelling() {
 }
 
 fn assert_link_registration(home: &TempHome) {
+    use folt_core::ops::register::{RegisterLinkResult, apply_register_links};
     use folt_core::placement::PlacementKind;
-    use folt_core::register::{RegisterLinkResult, apply_register_links};
     let path = home.root().join("file");
     fs::write(&path, b"content").unwrap();
     let expected_path = resolved_path(&path);
@@ -1097,7 +1097,7 @@ fn assert_link_registration(home: &TempHome) {
 #[cfg_attr(windows, ignore = "real symlinks require privileges")]
 #[test]
 fn link_request_retries_an_already_registered_copy() {
-    use folt_core::register::{RegisterLinkResult, apply_register_links};
+    use folt_core::ops::register::{RegisterLinkResult, apply_register_links};
     let home = TempHome::new();
     let path = home.root().join("file");
     fs::write(&path, b"content").unwrap();
@@ -1125,8 +1125,8 @@ fn hard_linked_source_remains_a_registered_copy_while_other_paths_convert() {
 }
 
 fn assert_hard_linked_source_remains_a_registered_copy() {
+    use folt_core::ops::register::{RegisterLinkResult, apply_register_links};
     use folt_core::placement::PlacementKind;
-    use folt_core::register::{RegisterLinkResult, apply_register_links};
     let home = TempHome::new();
     let path = home.root().join("file");
     let alias = home.root().join("alias");
@@ -1751,7 +1751,7 @@ fn markdown_name_writes_preserve_surrounding_bytes_and_store_the_new_content() {
 
 #[test]
 fn existing_name_at_scan_limit_registers_without_rewriting() {
-    use folt_core::register::{NameSource, NameWrite};
+    use folt_core::ops::register::{NameSource, NameWrite};
 
     let home = TempHome::new();
     let path = home.root().join("note.md");

@@ -1,5 +1,5 @@
 use super::super::{
-    HistoryError, HistoryStores, Refusal, gather_commit, judge_commit, require_blob,
+    HistoryError, HistoryRefusal, HistoryStores, gather_commit, judge_commit, require_blob,
     require_observation, require_row,
 };
 use super::gather::CommitFacts;
@@ -56,7 +56,7 @@ fn check_plan(
     if let Some(link) = &plan.facts.link {
         require_row(registry, link)?;
         if resolve_working(link, registry, fs)? != *row {
-            return Err(Refusal::RegistryChanged(link.path.to_path_buf()).into());
+            return Err(HistoryRefusal::RegistryChanged(link.path.to_path_buf()).into());
         }
     }
     require_observation(&plan.facts.working, fs)?;
@@ -78,7 +78,7 @@ fn build_commit(
     checked: &CommitPlan,
 ) -> Result<Commit, HistoryError> {
     let row = plan.placement();
-    let staged = row.staged.ok_or(Refusal::InvalidFacts)?;
+    let staged = row.staged.ok_or(HistoryRefusal::InvalidFacts)?;
     let commit = Commit {
         content: staged.hash,
         parents: row.commit_id.into_iter().collect(),
@@ -108,10 +108,13 @@ fn publish_objects(
     lock: &HomeLock,
     plan: &CommitPlan,
 ) -> Result<ObjectId, HistoryError> {
-    let staged = plan.placement().staged.ok_or(Refusal::InvalidFacts)?;
+    let staged = plan
+        .placement()
+        .staged
+        .ok_or(HistoryRefusal::InvalidFacts)?;
     if staged.hash == hash_blob(b"") {
         if staged.size != 0 {
-            return Err(Refusal::InvalidFacts.into());
+            return Err(HistoryRefusal::InvalidFacts.into());
         }
         objects.put(lock, ObjectKind::Blob, b"")?;
     } else {
@@ -178,7 +181,7 @@ fn move_internal(
         .working
         .placement
         .staged
-        .ok_or(Refusal::InvalidFacts)?;
+        .ok_or(HistoryRefusal::InvalidFacts)?;
     let internal = if let Some(internal) = &facts.internal {
         let target = MoveTarget {
             branch: name,
@@ -203,12 +206,12 @@ fn write_rows(
     lock: &HomeLock,
 ) -> Result<(), HistoryError> {
     let row = plan.placement();
-    let staged = row.staged.ok_or(Refusal::InvalidFacts)?;
+    let staged = row.staged.ok_or(HistoryRefusal::InvalidFacts)?;
     let mut updated = row.clone();
     updated.commit_id = Some(id);
     updated.staged = None;
     let Observation::File { signature } = &facts.working.observation else {
-        return Err(Refusal::InvalidFacts.into());
+        return Err(HistoryRefusal::InvalidFacts.into());
     };
     updated.base = Some(PlacementBase {
         hash: staged.hash,

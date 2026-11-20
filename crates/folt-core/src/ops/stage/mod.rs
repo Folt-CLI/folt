@@ -1,6 +1,6 @@
 use crate::home::HomeLock;
 use crate::object::ObjectKind;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::ops::working::{read_working, resolve_working};
 use crate::placement::{Observation, PlacementError, PlacementOps, StagedBlob};
@@ -26,14 +26,14 @@ pub fn stage(
         .put_file(lock, ObjectKind::Blob, &row.path.to_path_buf())
         .map_err(PlacementError::Store)?;
     if read_working(row, fs)? != before {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: row.path.to_path_buf(),
             reason: RefusalReason::PlacementChanged,
         }
         .into());
     }
     let Observation::File { signature } = before else {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: row.path.to_path_buf(),
             reason: RefusalReason::NotAFile,
         }

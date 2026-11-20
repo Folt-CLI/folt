@@ -17,7 +17,6 @@ pub mod placement_fs;
 pub mod placement_path;
 pub mod ref_name;
 pub mod refs;
-pub mod register;
 pub mod registry;
 pub mod store;
 

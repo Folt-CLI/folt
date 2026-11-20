@@ -1,4 +1,4 @@
-use super::{HistoryError, HistoryStores, Refusal};
+use super::{HistoryError, HistoryRefusal, HistoryStores};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::{ObjectKind, Tag};
@@ -16,12 +16,12 @@ pub fn create_tag(
     let HistoryStores { objects, refs, .. } = *stores;
     if let Some(tag) = annotation {
         if tag.name != name.as_str() || tag.target != commit {
-            return Err(Refusal::TagMismatch.into());
+            return Err(HistoryRefusal::TagMismatch.into());
         }
         tag.encode_body()?;
     }
     if refs.read(RefKind::Tag, name)?.is_some() {
-        return Err(Refusal::TagExists.into());
+        return Err(HistoryRefusal::TagExists.into());
     }
     let actual = objects.kind_of(commit)?;
     if actual != ObjectKind::Commit {

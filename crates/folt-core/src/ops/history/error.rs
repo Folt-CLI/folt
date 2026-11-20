@@ -1,4 +1,4 @@
-use super::Refusal;
+use super::HistoryRefusal;
 use crate::object::ObjectError;
 use crate::ops::{refusal as placement_refusal, rules_error::RulesError};
 use crate::placement::PlacementError;
@@ -9,7 +9,7 @@ use std::{error::Error, fmt};
 
 #[derive(Debug)]
 pub enum HistoryError {
-    Refused(Refusal),
+    Refused(HistoryRefusal),
     Object(ObjectError),
     Store(StoreError),
     Ref(RefError),
@@ -18,8 +18,8 @@ pub enum HistoryError {
     Rules(RulesError),
 }
 
-impl From<Refusal> for HistoryError {
-    fn from(error: Refusal) -> Self {
+impl From<HistoryRefusal> for HistoryError {
+    fn from(error: HistoryRefusal) -> Self {
         Self::Refused(error)
     }
 }
@@ -53,8 +53,8 @@ impl From<RulesError> for HistoryError {
         Self::Rules(error)
     }
 }
-impl From<placement_refusal::Refusal> for HistoryError {
-    fn from(error: placement_refusal::Refusal) -> Self {
+impl From<placement_refusal::PlacementRefusal> for HistoryError {
+    fn from(error: placement_refusal::PlacementRefusal) -> Self {
         Self::Refused(error.into())
     }
 }

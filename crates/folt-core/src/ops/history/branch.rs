@@ -1,4 +1,4 @@
-use super::{HistoryError, Refusal};
+use super::{HistoryError, HistoryRefusal};
 use crate::config::names::FOLIOS_DIR;
 use crate::home::HomeLock;
 use crate::id::{FolioId, ObjectId};
@@ -53,11 +53,11 @@ pub fn create_branch(
 }
 
 /// Pass `placements_of_head`, including the internal row, to this pure judge.
-pub fn judge_delete_branch(placements: &[Placement]) -> Result<(), Refusal> {
+pub fn judge_delete_branch(placements: &[Placement]) -> Result<(), HistoryRefusal> {
     if placements.is_empty() {
         Ok(())
     } else {
-        Err(Refusal::BranchInUse(
+        Err(HistoryRefusal::BranchInUse(
             placements
                 .iter()
                 .map(|row| row.path.to_path_buf())

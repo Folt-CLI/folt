@@ -1,6 +1,6 @@
 use crate::config::names::DEFAULT_BRANCH;
 use crate::ops::facts::{PlacementFacts, needs_hash};
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
@@ -64,7 +64,7 @@ fn resolve_observed(
                         && internal.head == DEFAULT_BRANCH
                 })
                 .ok_or_else(|| {
-                    Refusal {
+                    PlacementRefusal {
                         path: row.path.to_path_buf(),
                         reason: RefusalReason::MissingInternal,
                     }
@@ -75,7 +75,7 @@ fn resolve_observed(
         Observation::Directory | Observation::NotAFile => RefusalReason::NotAFile,
         Observation::File { .. } | Observation::OtherLink { .. } => RefusalReason::LinkReplaced,
     };
-    Err(Refusal {
+    Err(PlacementRefusal {
         path: row.path.to_path_buf(),
         reason,
     }
@@ -84,7 +84,7 @@ fn resolve_observed(
 
 fn require_working(row: &Placement) -> Result<(), RulesError> {
     if row.kind == PlacementKind::Link {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: row.path.to_path_buf(),
             reason: RefusalReason::Link,
         }
@@ -105,7 +105,7 @@ pub(super) fn read_working(
         Observation::Directory | Observation::NotAFile => RefusalReason::NotAFile,
         Observation::IntactLink | Observation::OtherLink { .. } => RefusalReason::Unusable,
     };
-    Err(Refusal {
+    Err(PlacementRefusal {
         path: row.path.to_path_buf(),
         reason,
     }

@@ -3,7 +3,7 @@ use crate::ops::refusal as placement_refusal;
 use std::{error::Error, fmt, path::PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Refusal {
+pub enum HistoryRefusal {
     NothingStaged,
     BranchMoved {
         tip: Option<ObjectId>,
@@ -21,16 +21,16 @@ pub enum Refusal {
     InvalidFacts,
     TagMismatch,
     TagExists,
-    Move(placement_refusal::Refusal),
+    Move(placement_refusal::PlacementRefusal),
 }
 
-impl From<placement_refusal::Refusal> for Refusal {
-    fn from(error: placement_refusal::Refusal) -> Self {
+impl From<placement_refusal::PlacementRefusal> for HistoryRefusal {
+    fn from(error: placement_refusal::PlacementRefusal) -> Self {
         Self::Move(error)
     }
 }
 
-impl fmt::Display for Refusal {
+impl fmt::Display for HistoryRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NothingStaged => write!(f, "nothing staged"),
@@ -63,4 +63,4 @@ impl fmt::Display for Refusal {
         }
     }
 }
-impl Error for Refusal {}
+impl Error for HistoryRefusal {}

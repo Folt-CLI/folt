@@ -2,7 +2,7 @@ use crate::config::names::DEFAULT_BRANCH;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::registry::{self, Registry};
@@ -40,9 +40,9 @@ pub fn judge_convert(
     to_kind: PlacementKind,
     target: Option<&MoveTarget>,
     internal: Option<&PlacementFacts>,
-) -> Result<ConvertPlan, Refusal> {
+) -> Result<ConvertPlan, PlacementRefusal> {
     let (_, placement) = facts.placement.to_placement();
-    let refuse = |reason| Refusal {
+    let refuse = |reason| PlacementRefusal {
         path: placement.path.clone(),
         reason,
     };
@@ -125,7 +125,7 @@ pub fn apply_convert(
     lock: &HomeLock,
 ) -> Result<(), RulesError> {
     let refuse = |reason| {
-        RulesError::Refused(Refusal {
+        RulesError::Refused(PlacementRefusal {
             path: plan.placement.path.to_path_buf(),
             reason,
         })

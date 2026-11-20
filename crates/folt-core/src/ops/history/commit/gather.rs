@@ -1,4 +1,4 @@
-use super::super::{HistoryError, HistoryStores, Refusal, gather_file};
+use super::super::{HistoryError, HistoryRefusal, HistoryStores, gather_file};
 use crate::config::names::DEFAULT_BRANCH;
 use crate::object::Commit;
 use crate::ops::facts::PlacementFacts;
@@ -37,7 +37,7 @@ pub fn gather_commit(
         let internal = placements
             .iter()
             .find(|row| row.kind == PlacementKind::Internal)
-            .ok_or(Refusal::MissingInternal)?;
+            .ok_or(HistoryRefusal::MissingInternal)?;
         Some(gather_file(internal, fs, refs)?)
     } else {
         None

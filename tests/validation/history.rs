@@ -173,7 +173,7 @@ fn deletes_unused_branch_but_keeps_main_with_internal_placement() {
             &mut lock
         ),
         Err(history::HistoryError::Refused(
-            history::Refusal::BranchInUse(_)
+            history::HistoryRefusal::BranchInUse(_)
         ))
     ));
 }

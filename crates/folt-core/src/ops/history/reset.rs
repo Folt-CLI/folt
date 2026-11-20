@@ -1,4 +1,6 @@
-use super::{HistoryError, HistoryStores, Refusal, gather_file, require_blob, require_observation};
+use super::{
+    HistoryError, HistoryRefusal, HistoryStores, gather_file, require_blob, require_observation,
+};
 use crate::home::HomeLock;
 use crate::id::{FolioId, ObjectId};
 use crate::ops::facts::PlacementFacts;
@@ -31,7 +33,7 @@ pub fn gather_reset(
     } = *stores;
     let old = refs
         .read(RefKind::Branch, branch)?
-        .ok_or(Refusal::MissingBranch)?;
+        .ok_or(HistoryRefusal::MissingBranch)?;
     let target = objects.get_commit(commit, object_limit)?;
     require_blob(objects, target.content)?;
     let rows = registry.placements_of_head(id, branch.as_str())?;
@@ -61,14 +63,14 @@ pub struct ResetPlan {
     moves: Vec<MovePlan>,
 }
 
-pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, Refusal> {
+pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, HistoryRefusal> {
     let mut moves = Vec::new();
     for placement in &facts.placements {
         if placement.placement.id != facts.id
             || placement.placement.head != facts.target.branch.as_str()
             || placement.tip != Some(facts.old)
         {
-            return Err(Refusal::InvalidFacts);
+            return Err(HistoryRefusal::InvalidFacts);
         }
         moves.push(judge_move(placement, &facts.target, discard)?);
     }
@@ -98,7 +100,7 @@ pub fn apply_reset(
         .filter(|row| row.kind != PlacementKind::Link)
         .collect();
     if actual != expected {
-        return Err(Refusal::PlacementsChanged.into());
+        return Err(HistoryRefusal::PlacementsChanged.into());
     }
     for placement in &facts.placements {
         require_observation(placement, fs)?;

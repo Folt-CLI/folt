@@ -2,7 +2,7 @@ use crate::folio::dir::path::former_home;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
 use crate::registry::Registry;
@@ -25,8 +25,8 @@ pub(super) fn former_link_home(facts: &PlacementFacts) -> Option<PathBuf> {
     former_home(&target, facts.placement.id)
 }
 
-pub fn judge_repair_link(facts: &PlacementFacts) -> Result<RepairLinkPlan, Refusal> {
-    let refuse = |reason| Refusal {
+pub fn judge_repair_link(facts: &PlacementFacts) -> Result<RepairLinkPlan, PlacementRefusal> {
+    let refuse = |reason| PlacementRefusal {
         path: facts.placement.path.to_path_buf(),
         reason,
     };

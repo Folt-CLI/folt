@@ -311,7 +311,7 @@ fn copy_commit_preserves_internal_edits_and_stale_stage() {
     let facts = history::gather_commit(&copy, &fs, &stores, &folio.registry).unwrap();
     assert!(matches!(
         history::judge_commit(&facts),
-        Err(history::Refusal::InternalEdited(_))
+        Err(history::HistoryRefusal::InternalEdited(_))
     ));
     stage::stage(
         &link,
@@ -330,7 +330,7 @@ fn copy_commit_preserves_internal_edits_and_stale_stage() {
     );
     assert!(matches!(
         history::judge_commit(&facts),
-        Err(history::Refusal::InternalEdited(_))
+        Err(history::HistoryRefusal::InternalEdited(_))
     ));
     assert_eq!(
         folio.registry.placement_at(&copy.path).unwrap().unwrap(),
@@ -350,7 +350,7 @@ fn copy_commit_preserves_internal_edits_and_stale_stage() {
     let facts = history::gather_commit(&copy, &fs, &stores, &folio.registry).unwrap();
     assert!(matches!(
         history::judge_commit(&facts),
-        Err(history::Refusal::BranchMoved { .. })
+        Err(history::HistoryRefusal::BranchMoved { .. })
     ));
     // A copy must first catch up with main, then it can commit normally.
     let checkout = CheckoutStores {
@@ -489,7 +489,7 @@ fn resumes_commit_through_link_and_rechecks_selected_link() {
     )
     .unwrap_err();
     assert!(
-        matches!(error, history::HistoryError::Refused(history::Refusal::RegistryChanged(ref path)) if *path == link.path.to_path_buf())
+        matches!(error, history::HistoryError::Refused(history::HistoryRefusal::RegistryChanged(ref path)) if *path == link.path.to_path_buf())
     );
     assert_eq!(folio.internal(), internal);
     folio

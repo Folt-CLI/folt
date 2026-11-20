@@ -17,14 +17,14 @@ pub struct HistoryStores<'a> {
 
 fn require_row(registry: &Registry, row: &Placement) -> Result<(), HistoryError> {
     if registry.placement_at(&row.path)?.as_ref() != Some(row) {
-        return Err(Refusal::RegistryChanged(row.path.to_path_buf()).into());
+        return Err(HistoryRefusal::RegistryChanged(row.path.to_path_buf()).into());
     }
     Ok(())
 }
 
 fn require_observation(facts: &PlacementFacts, fs: &impl PlacementOps) -> Result<(), HistoryError> {
     if fs.read(facts.placement.id, &facts.placement.to_placement().1)? != facts.observation {
-        return Err(Refusal::PlacementChanged(facts.placement.path.to_path_buf()).into());
+        return Err(HistoryRefusal::PlacementChanged(facts.placement.path.to_path_buf()).into());
     }
     Ok(())
 }
@@ -73,7 +73,7 @@ pub use commit::{
     resume_commit,
 };
 pub use error::HistoryError;
-pub use refusal::Refusal;
+pub use refusal::HistoryRefusal;
 pub use reset::{ResetFacts, ResetPlan, apply_reset, gather_reset, judge_reset};
 pub use tag::{create_tag, delete_tag};
 

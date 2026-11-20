@@ -1,5 +1,7 @@
-//! The operations tree orders refusal, facts, working, status, stage, history, rename, checkout, prune.
-//! Placement operations follow status and precede stage.
+//! The operations tree orders refusal, facts, working, status, step_hook, placement, stage, history, register, rename, checkout, prune.
+//! Each module imports only earlier names.
+
+mod step_hook;
 
 pub mod checkout;
 pub mod facts;
@@ -8,6 +10,7 @@ mod open;
 pub mod placement;
 pub mod prune;
 pub mod refusal;
+pub mod register;
 pub mod rename;
 pub mod rules_error;
 pub mod stage;

@@ -76,6 +76,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [signature](#signature)
 - [size](#size)
 - [stage](#stage)
+- [StepHook](#stephook)
 - [tag](#tag)
 - [TempFile](#tempfile)
 - [test_support](#test_support)
@@ -156,7 +157,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** A user directory registered as one Folio through its `__folio__.md` marker. Registration creates an empty marker when missing and then gives it a folio-name.
-- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/register.rs:91` (`InsideDirectoryFolio`)
+- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/ops/register/refusal.rs:25` (`InsideDirectoryFolio`)
 - **Related:** [Folio](#folio), [marker](#marker), [register](#register).
 - **Not:** The Folio directory in the home, or a recursive registration of every child path.
 - **Status:** decided
@@ -414,7 +415,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The `__folio__.md` file anchoring a directory Folio and carrying its Markdown content and front matter. Registration creates it when missing and can insert a missing folio-name into an existing marker.
-- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/register.rs:149` (`creates_marker`)
+- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/ops/register/plan.rs:51` (`creates_marker`)
 - **Related:** [directory Folio](#directory-folio), [front matter](#front-matter), [register](#register).
 - **Not:** A workspace `.folt/`, home format file, object codec byte, conflict marker or build-skip marker.
 - **Status:** decided
@@ -488,7 +489,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To start managing explicit paths by creating Folio identities, names, stored content and initial copy and internal rows in one registry transaction. Markdown paths receive a missing folio-name; one refused path blocks the batch, and registration creates no initial commit or ref.
-- **Code:** `crates/folt-core/src/register.rs:186` (`plan_register`); `crates/folt-core/src/register.rs:693` (`apply_register`)
+- **Code:** `crates/folt-core/src/ops/register/plan.rs:88` (`plan_register`); `crates/folt-core/src/ops/register/apply/mod.rs:15` (`apply_register`)
 - **Related:** [Folio](#folio), [folio-name](#folio-name), [placement](#placement), [marker](#marker), [plan and apply](#plan-and-apply).
 - **Not:** Recursive discovery, a Git add or an initial history commit.
 - **Status:** decided
@@ -497,7 +498,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The operation pattern in which facts are read, judged into an allowed plan or refusal, then rechecked before writes. Callers hold the home lock across gathering, judging and applying history and placement changes; registration apply takes the lock and replans.
-- **Code:** `crates/folt-core/src/ops/history/commit/gather.rs:21` (`gather_commit`); `crates/folt-core/src/ops/history/commit/judge.rs:10` (`judge_commit`); `crates/folt-core/src/ops/history/commit/apply.rs:31` (`apply_commit`); `crates/folt-core/src/register.rs:693` (`apply_register`)
+- **Code:** `crates/folt-core/src/ops/history/commit/gather.rs:21` (`gather_commit`); `crates/folt-core/src/ops/history/commit/judge.rs:10` (`judge_commit`); `crates/folt-core/src/ops/history/commit/apply.rs:31` (`apply_commit`); `crates/folt-core/src/ops/register/apply/mod.rs:15` (`apply_register`)
 - **Related:** [refusal](#refusal), [home lock](#home-lock), [register](#register), [prune](#prune).
 - **Not:** The CI plan job, a promise that every apply acquires its own lock, or an Implementation plan issue section.
 - **Status:** decided
@@ -506,7 +507,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The caller-gathered inputs to a judge function, represented by `PlacementFacts`, `CommitFacts`, `PruneFacts` or `ResetFacts`. They carry the observations, registry rows, hashes and history information required by the particular decision.
-- **Code:** `crates/folt-core/src/ops/facts.rs:13` (`PlacementFacts`); `crates/folt-core/src/ops/history/commit/gather.rs:11` (`CommitFacts`); `crates/folt-core/src/ops/prune/model.rs:14` (`PruneFacts`); `crates/folt-core/src/ops/history/reset.rs:12` (`ResetFacts`)
+- **Code:** `crates/folt-core/src/ops/facts.rs:13` (`PlacementFacts`); `crates/folt-core/src/ops/history/commit/gather.rs:11` (`CommitFacts`); `crates/folt-core/src/ops/prune/model.rs:14` (`PruneFacts`); `crates/folt-core/src/ops/history/reset.rs:14` (`ResetFacts`)
 - **Related:** [plan and apply](#plan-and-apply), [observation](#observation), [placement](#placement), [refusal](#refusal).
 - **Not:** The resulting plan or refusal, or writes performed by apply.
 - **Status:** decided
@@ -515,9 +516,9 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** A domain decision that a requested operation is not allowed under the observed [facts](#facts). Placement rules represent it as a path plus a reason; history and registration have their own refusal types.
-- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`Refusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/ops/history/refusal.rs:6` (`Refusal`); `crates/folt-core/src/register.rs:88` (`RegisterRefusalReason`)
+- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`PlacementRefusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/ops/history/refusal.rs:6` (`HistoryRefusal`); `crates/folt-core/src/ops/register/refusal.rs:18` (`RegisterRefusalReason`)
 - **Related:** [plan and apply](#plan-and-apply), [placement](#placement), [register](#register).
-- **Not:** One shared error type: qualify the module for each refusal; the rename of the two `Refusal` types is open (plan ticket G6 of [#203](https://github.com/Folt-CLI/folt/issues/203)).
+- **Not:** One shared error type: placement rules use `PlacementRefusal` and history uses `HistoryRefusal`.
 - **Status:** decided
 
 ### rename
@@ -558,6 +559,15 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 ## Code structure
 
+### StepHook
+
+- **Layer:** Code structure
+- **Definition:** The crate-private `StepHook<S, E>` trait observes an operation step through `on_step`, taking payload `S` and returning `Result<(), E>`. `NoHook` implements it for every payload and error type and always returns `Ok(())`; any `FnMut(S) -> Result<(), E>` implements it by calling the closure.
+- **Code:** `crates/folt-core/src/ops/step_hook.rs`
+- **Related:** [ops](#ops), [plan and apply](#plan-and-apply).
+- **Not:** A change to operation step order or payloads.
+- **Status:** decided
+
 ### fsx
 
 - **Layer:** Code structure
@@ -570,7 +580,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### ops
 
 - **Layer:** Code structure
-- **Definition:** The module tree of operations, with `ops::working` gathering and resolving working files, `ops::status` judging their status, and stage, history, rename, checkout and prune operations following plan and apply; register will also move into this tree.
+- **Definition:** The module tree of operations, with `ops::working` gathering and resolving working files, `ops::status` judging their status, and stage, history, register, rename, checkout and prune operations following plan and apply.
 - **Code:** `crates/folt-core/src/ops/mod.rs:1`; `crates/folt-core/src/ops/working.rs:11` (`gather`); `crates/folt-core/src/ops/status.rs:34` (`judge_working`)
 - **Related:** [facts](#facts), [stage](#stage), [unstage](#unstage), [behind](#behind), [register](#register), [rename](#rename), [checkout](#checkout), [prune](#prune), [plan and apply](#plan-and-apply).
 - **Not:** The CLI commands.
@@ -840,7 +850,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | base | Placement hash and signature; merge base; PR base branch; name prefix before a suffix | Base means placement content and signature; qualify merge base, PR base branch and name prefix. |
 | home | Folt home; OS home; former home after a move; retired workspace marker | Home means the Folt storage directory; qualify OS home and former home. Portability, restore and multi-user rules are open: [#17](https://github.com/Folt-CLI/folt/issues/17). |
 | Folio directory and directory Folio | Storage directory in the home; registered user directory | Folio directory means storage; directory Folio means the user directory anchored at a marker. |
-| placement and same-named types | Registry Placement and PlacementSpec; working-state and front-matter Edit; history Refusal and placement Refusal and RefusalReason and registration RegisterRefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; the in-memory record is `PlacementSpec`. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types and kind enums require module or domain qualification; renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
+| placement and same-named types | Registry Placement and PlacementSpec; working-state and front-matter Edit; `HistoryRefusal` and `PlacementRefusal` and RefusalReason and registration RegisterRefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; the in-memory record is `PlacementSpec`. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types use `HistoryRefusal` and `PlacementRefusal`; kind enums require module or domain qualification and their renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
 | ref, refs, reference, edge, pin | History pointers; registry reference rows; declared relationships; informal edge; retention pin; reference pin field | Reference is the declared relationship, with edge an informal synonym. Distinguish the refs table from history refs and retention pins from opaque reference pin fields; [#152](https://github.com/Folt-CLI/folt/issues/152) implements commit-hash pins. |
 | unresolved | Unknown reference target; undecodable front matter key | Use unresolved reference for the cached unknown target, and unresolved key for parser ambiguity. |
 | marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; planned conflict markers; build-skip marker | Marker means `__folio__.md`; qualify codec, conflict and build-skip markers. Workspace and home format markers are retired below. |
