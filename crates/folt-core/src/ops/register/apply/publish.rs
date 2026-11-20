@@ -10,6 +10,7 @@ use crate::fsx::FileSystem;
 use crate::home::{Home, HomeLock};
 use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
+use crate::ops::rollback::Rollback;
 use crate::ops::step_hook::StepHook;
 use crate::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use crate::placement_fs::PlacementFs;
@@ -18,7 +19,7 @@ use crate::registry::{self, NewPlacement, Registry};
 
 use super::super::error::RegisterError;
 use super::super::plan::RegisterEntry;
-use super::{ApplyState, Step};
+use super::Step;
 
 type Rows = (NewFolio, NewPlacement, NewPlacement, FolioName);
 
@@ -28,14 +29,14 @@ pub(super) fn publish_entry(
     lock: &HomeLock,
     entry: &RegisterEntry,
     content: Vec<u8>,
-    state: &mut ApplyState,
+    state: &mut Rollback<'_>,
     hook: &mut impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<Rows, RegisterError> {
     let hash = hash_blob(&content);
     let durability = Durability::DataAndDirectories;
     hook.on_step(Step::Folio(durability))?;
     let folio = create_folio_with(fs, home.path(), lock, FolioSpec { content }, durability)?;
-    state.directories.push(folio.path().to_path_buf());
+    state.record_directory(folio.path().to_path_buf());
     let mut internal = registry::internal_placement(home, folio.id())?;
     let mut copy = NewPlacement {
         path: PlacementPath::resolve(&entry.path)?,

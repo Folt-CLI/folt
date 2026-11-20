@@ -4,6 +4,7 @@ use std::io;
 use crate::config::settings::Settings;
 use crate::fsx::FileSystem;
 use crate::home::Home;
+use crate::ops::rollback::Rollback;
 use crate::ops::step_hook::StepHook;
 use crate::placement_path::RegistryError;
 
@@ -11,12 +12,12 @@ use super::super::error::RegisterError;
 use super::super::plan::{RegisterPlan, block_changed, plan_register};
 use super::super::refusal::{RegisterRefusalReason, refuse_name};
 use super::super::report::report;
-use super::{ApplyState, Step};
+use super::Step;
 
 pub(super) fn create_markers(
     fs: &dyn FileSystem,
     current: &RegisterPlan,
-    state: &mut ApplyState,
+    state: &mut Rollback<'_>,
     hook: &mut impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<(), RegisterError> {
     hook.on_step(Step::Markers)?;
@@ -29,7 +30,7 @@ pub(super) fn create_markers(
             {
                 Ok(file) => {
                     let signature = crate::fsx::signature(&file.metadata()?);
-                    state.markers.push((entry.path.clone(), signature));
+                    state.record_marker(entry.path.clone(), signature);
                     crate::fsx::sync_file(&file)?;
                     drop(file);
                     if let Some(parent) = entry.path.parent() {
