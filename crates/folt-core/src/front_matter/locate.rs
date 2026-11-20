@@ -1,8 +1,9 @@
-use crate::config::limits::{SCAN_LIMIT, SCAN_WINDOW};
+use crate::config::limits::SCAN_LIMIT;
 
 use super::error::{FrontMatterError, Result};
 use super::keys::audit;
 use super::scan::line;
+use super::scan_window;
 use super::tree::{self, Block};
 
 /// Finds a block only at the start (after an optional UTF-8 BOM). The closing
@@ -34,7 +35,7 @@ pub fn locate(bytes: &[u8]) -> Result<Option<Block>> {
     let mut pos = opening.next;
     while pos < bytes.len() && pos < SCAN_LIMIT {
         // Only inspect enough bytes past the bound to finish a delimiter.
-        let current = line(bytes, pos, bytes.len().min(SCAN_WINDOW));
+        let current = line(bytes, pos, scan_window(bytes).len());
         let content = &bytes[pos..current.end];
         if content == b"---" || content == b"..." {
             let mut block = Block {

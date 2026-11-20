@@ -142,3 +142,139 @@ fn placement_writers_report_outcomes_without_partial_prefix_moves() {
         MoveResult::Moved
     );
 }
+
+#[test]
+fn fresh_writer_creates_a_current_schema_that_both_paths_reopen() {
+    use super::schema::{SchemaState, classify_schema};
+    use crate::config::formats::APPLICATION_ID;
+    use crate::config::names::REGISTRY_FILE;
+
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    let path = home.path().join(REGISTRY_FILE);
+    let registry = Registry::open_or_create(&home, &lock).unwrap();
+    let connection = registry.connection.as_ref().unwrap();
+    let version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    let app: i64 = connection
+        .pragma_query_value(None, "application_id", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 3);
+    assert_eq!(app, i64::from(APPLICATION_ID));
+    assert!(matches!(
+        classify_schema(version, app, &path).unwrap(),
+        SchemaState::Current
+    ));
+    drop(registry);
+    assert!(Registry::open_or_create(&home, &lock).is_ok());
+    assert!(Registry::open_existing(&home).is_ok());
+}
+
+#[test]
+fn schema_version_and_application_id_preserve_both_open_paths() {
+    use crate::config::formats::APPLICATION_ID;
+    use crate::config::names::REGISTRY_FILE;
+
+    let folt = i64::from(APPLICATION_ID);
+    // Expected outcomes are writer, then read-only. A zero/zero database is
+    // prepared explicitly here; the separate fresh-file test covers creation.
+    let cases = [
+        (0, 0, "ok", "foreign"),
+        (0, 42, "foreign", "foreign"),
+        (0, folt, "foreign", "foreign"),
+        (1, 0, "foreign", "foreign"),
+        (1, 42, "foreign", "foreign"),
+        (1, folt, "outdated", "outdated"),
+        (2, 0, "foreign", "foreign"),
+        (2, 42, "foreign", "foreign"),
+        (2, folt, "ok", "foreign"),
+        (3, 0, "foreign", "foreign"),
+        (3, 42, "foreign", "foreign"),
+        (3, folt, "ok", "ok"),
+        (4, 0, "unsupported", "unsupported"),
+        (4, 42, "unsupported", "unsupported"),
+        (4, folt, "unsupported", "unsupported"),
+    ];
+    for (version, app, writer_expected, reader_expected) in cases {
+        for (writer, expected) in [(true, writer_expected), (false, reader_expected)] {
+            let directory = TempDir::new().unwrap();
+            let home = Home::open_or_create(directory.path().join("home"), &Environment::default())
+                .unwrap();
+            let lock = home.try_lock().unwrap();
+            let path = home.path().join(REGISTRY_FILE);
+            let connection = Connection::open(&path).unwrap();
+            connection
+                .pragma_update(None, "user_version", version)
+                .unwrap();
+            connection
+                .pragma_update(None, "application_id", app)
+                .unwrap();
+            drop(connection);
+            let result = if writer {
+                Registry::open_or_create(&home, &lock)
+            } else {
+                Registry::open_existing(&home)
+            };
+            let context = format!("version={version}, app={app}, writer={writer}");
+            match (expected, result) {
+                ("ok", Ok(_)) => {}
+                ("foreign", Err(error @ RegistryError::ForeignDatabase(_))) => {
+                    assert!(
+                        matches!(&error, RegistryError::ForeignDatabase(found) if found == &path),
+                        "{context}"
+                    );
+                    assert_eq!(
+                        error.to_string(),
+                        format!("not a Folt registry database: {}", path.display()),
+                        "{context}"
+                    );
+                }
+                ("outdated", Err(error @ RegistryError::OutdatedSchema { .. })) => {
+                    assert!(
+                        matches!(&error, RegistryError::OutdatedSchema { found: 1, required: 3, path: found } if found == &path),
+                        "{context}"
+                    );
+                    assert_eq!(
+                        error.to_string(),
+                        format!(
+                            "registry {} uses pre-release schema version 1; required version is 3; delete this registry before continuing",
+                            path.display()
+                        ),
+                        "{context}"
+                    );
+                }
+                ("unsupported", Err(error @ RegistryError::UnsupportedSchemaVersion { .. })) => {
+                    assert!(
+                        matches!(
+                            error,
+                            RegistryError::UnsupportedSchemaVersion {
+                                found: 4,
+                                supported: 3
+                            }
+                        ),
+                        "{context}"
+                    );
+                    assert_eq!(
+                        error.to_string(),
+                        "registry schema version 4 is newer than supported version 3",
+                        "{context}"
+                    );
+                }
+                (_, result) => panic!("{context}: expected {expected}, got {:?}", result.err()),
+            }
+        }
+    }
+}
+
+#[test]
+fn missing_read_only_registry_is_an_empty_view() {
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let registry = Registry::open_existing(&home).unwrap();
+    assert!(registry.connection.is_none());
+    assert!(!registry.path.exists());
+}

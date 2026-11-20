@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use crate::config::env::Environment;
 use crate::config::formats::OBJECT_ALGORITHM;
 use crate::config::limits::SUMMARY_LARGEST;
-use crate::config::names::{DEFAULT_BRANCH, MARKDOWN_EXTENSIONS, MARKER_FILE};
+use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE};
 use crate::config::settings::Settings;
 use crate::folio::format::FolioFormat;
 use crate::folio::row::NewFolio;
@@ -272,16 +272,6 @@ fn refuse_name(entry: &mut RegisterEntry, reason: RegisterRefusalReason) {
     entry.name_write = NameWrite::None;
 }
 
-fn markdown(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| {
-            MARKDOWN_EXTENSIONS
-                .iter()
-                .any(|extension| ext.eq_ignore_ascii_case(extension))
-        })
-}
-
 fn holder(
     registry: &Registry,
     assigned: &HashMap<FolioName, PathBuf>,
@@ -314,7 +304,7 @@ fn resolve_names(
         ) {
             continue;
         }
-        let existing = if markdown(&entry.path) {
+        let existing = if front_matter::applies_to(&entry.path) {
             let mut bytes = Vec::new();
             if !entry.creates_marker {
                 let read = File::open(&entry.path)
@@ -913,7 +903,7 @@ fn apply_locked(
                 let metadata = fs::metadata(&entry.path)?;
                 if &crate::fsx::signature(&metadata) != expected
                     || entry.prefix.as_ref().is_some_and(|prefix| {
-                        content.get(..content.len().min(SCAN_WINDOW)) != Some(prefix.as_slice())
+                        front_matter::scan_window(&content) != prefix.as_slice()
                     })
                 {
                     refuse_name(

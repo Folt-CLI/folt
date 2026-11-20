@@ -2,12 +2,11 @@ use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags};
 
-use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
 use crate::config::names::REGISTRY_FILE;
 use crate::home::{Home, HomeLock, is_regular_file};
 use crate::placement_path::RegistryError;
 
-use super::schema::check_schema;
+use super::schema::{SchemaState, classify_schema};
 use super::{Registry, schema};
 
 impl Registry {
@@ -24,30 +23,13 @@ impl Registry {
         configure(&connection, true, home.busy_timeout())?;
         let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
         let app: i64 = connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
-        if version > SCHEMA_VERSION {
-            return Err(RegistryError::UnsupportedSchemaVersion {
-                found: version,
-                supported: SCHEMA_VERSION,
-            });
-        }
-        if version != 0 && app != i64::from(APPLICATION_ID) {
-            return Err(RegistryError::ForeignDatabase(path));
-        }
-        if version == OUTDATED_SCHEMA {
-            // This refusal must be removed before the first release, when migrations are required.
-            return Err(RegistryError::OutdatedSchema {
-                found: version,
-                required: SCHEMA_VERSION,
-                path: path.clone(),
-            });
-        }
-        if version == 0 {
-            if app != 0 {
-                return Err(RegistryError::ForeignDatabase(path));
+        match classify_schema(version, app, &path)? {
+            SchemaState::Empty => {
+                let tx = connection.unchecked_transaction()?;
+                schema::create_schema(&tx)?;
+                tx.commit()?;
             }
-            let tx = connection.unchecked_transaction()?;
-            schema::create_schema(&tx)?;
-            tx.commit()?;
+            SchemaState::Current | SchemaState::Other => {}
         }
         Ok(Self {
             connection: Some(connection),
@@ -64,7 +46,16 @@ impl Registry {
                 let connection =
                     Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
                 configure(&connection, false, home.busy_timeout())?;
-                check_schema(&connection, &path)?;
+                let version: i64 =
+                    connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+                let app: i64 =
+                    connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
+                match classify_schema(version, app, &path)? {
+                    SchemaState::Current => {}
+                    SchemaState::Empty | SchemaState::Other => {
+                        return Err(RegistryError::ForeignDatabase(path));
+                    }
+                }
                 Some(connection)
             }
             Ok(false) => return Err(RegistryError::NotRegularFile(path)),
