@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use crate::folio_name::FolioName;
 use crate::front_matter::{self, Block, FrontMatterError};
 use crate::fsx::Signature;
-use crate::fsx::atomic_rewrite;
+use crate::fsx::{RealFileSystem, atomic_rewrite};
 use crate::history::{self, CommitMetadata, HistoryError, HistoryStores};
 use crate::home::HomeLock;
 use crate::id::FolioId;
@@ -303,7 +303,13 @@ pub fn apply_rename(
         return Ok(None);
     };
     if *bytes != plan.bytes {
-        atomic_rewrite(&plan.row.path.to_path_buf(), bytes, &plan.signature, |_| {})?;
+        atomic_rewrite(
+            &RealFileSystem,
+            &plan.row.path.to_path_buf(),
+            bytes,
+            &plan.signature,
+            |_| {},
+        )?;
     }
     if fs
         .hash_placement(&plan.row.to_placement().1)

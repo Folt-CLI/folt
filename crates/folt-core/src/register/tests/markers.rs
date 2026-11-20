@@ -10,7 +10,7 @@ fn case_variant_appearing_marker_replans_and_cleans_up_on_failure() {
         let lowercase = appeared.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&owned, &appeared]).unwrap();
         let mut reached_transaction = false;
-        let result = apply_with_hook(&fixture.home, &plan, false, |step| {
+        let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             match step {
                 Step::Markers => {
                     fs::write(&marker, b"---\nfolio-name: appeared\n---\neditor content").unwrap();
@@ -113,7 +113,7 @@ fn collapsed_directory_request_is_blocked_before_creating_markers() {
     symlink(&b, &current).unwrap();
 
     let mut marker_created = false;
-    let blocked = apply_with_hook(&fixture.home, &plan, false, |step| {
+    let blocked = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         if matches!(step, Step::MarkerSynced) {
             marker_created = true;
         }
@@ -155,7 +155,7 @@ fn registration_syncs_markers_and_uses_durable_folios_before_transaction() {
     let mut marker_synced = false;
     let mut durable_folios = 0;
     let mut committed = false;
-    apply_with_hook(&fixture.home, &plan, false, |step| {
+    apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         match step {
             Step::MarkerSynced => marker_synced = true,
             Step::Folio(durability) => {
@@ -190,7 +190,7 @@ fn probes_the_entire_batch_before_creating_anything() {
     let second = fixture.dir("second");
     let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
     let mut probed = Vec::new();
-    let result = apply_links_with_hook(&fixture.home, &plan, false, |step| {
+    let result = apply_links_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         if let LinkStep::Probe(path) = step {
             assert!(!first.join(MARKER_FILE).exists());
             assert!(!second.join(MARKER_FILE).exists());
