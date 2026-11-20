@@ -1,11 +1,14 @@
 use folt_core::config::env::Environment;
 use folt_core::object::hash_blob;
-use folt_core::ops::facts::{PlacementFacts, gather};
+use folt_core::ops::facts::PlacementFacts;
+#[cfg(unix)]
+use folt_core::ops::facts::gather;
 use folt_core::ops::placement::rehome::rehome;
 use folt_core::ops::placement::relocate::apply::apply_relocate;
 use folt_core::ops::placement::relocate::judge::judge_relocate;
 use folt_core::ops::placement::relocate::target::gather_relocate_target;
 use folt_core::ops::placement::remove::{apply_remove, judge_remove};
+#[cfg(unix)]
 use folt_core::ops::placement::repair::{apply_repair_link, judge_repair_link};
 use folt_core::ops::refusal::RefusalReason;
 use folt_core::ops::rules_error::RulesError;
