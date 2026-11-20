@@ -860,7 +860,7 @@ fn apply_locked(
                     Ok(file) => {
                         let signature = crate::fsx::signature(&file.metadata()?);
                         markers.push((entry.path.clone(), signature));
-                        file.sync_all()?;
+                        crate::fsx::sync_file(&file)?;
                         drop(file);
                         if let Some(parent) = entry.path.parent() {
                             RealFileSystem.sync_directory(parent)?;
@@ -1122,14 +1122,14 @@ fn apply_locked(
             }
         }
         for directory in directories {
-            if let Err(error) = fs::remove_dir_all(&directory) {
+            if let Err(error) = crate::fsx::remove_dir_all(&directory) {
                 failures.push(format!("{}: {error}", directory.display()));
             }
         }
         for (marker, signature) in markers {
             if fs::symlink_metadata(&marker)
                 .is_ok_and(|meta| meta.is_file() && crate::fsx::signature(&meta) == signature)
-                && let Err(error) = fs::remove_file(&marker)
+                && let Err(error) = crate::fsx::remove_file(&marker)
             {
                 failures.push(format!("{}: {error}", marker.display()));
             }

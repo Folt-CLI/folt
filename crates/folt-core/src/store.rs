@@ -278,7 +278,7 @@ impl ObjectStore {
             }
             let (mut out, _) = writer.finish()?;
             out.flush().map_err(ObjectError::Io)?;
-            out.sync_all().map_err(ObjectError::Io)?;
+            crate::fsx::sync_file(&out).map_err(ObjectError::Io)?;
             Ok(())
         })();
         if let Err(error) = write_result {
@@ -406,7 +406,7 @@ impl ObjectStore {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             if name.starts_with(TEMP_PREFIX_INPUT) || name.starts_with(TEMP_PREFIX_OBJECT) {
-                fs::remove_file(entry.path()).map_err(|source| StoreError::Io {
+                crate::fsx::remove_file(entry.path()).map_err(|source| StoreError::Io {
                     path: entry.path(),
                     source,
                 })?;
