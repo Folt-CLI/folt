@@ -7,7 +7,7 @@ fn published_folio_sync_failure_rolls_back_directory_markers_and_rows() {
     let plan = plan_register(&fixture.home, [&directory]).unwrap();
     let folios = fixture.home.path().join("folios");
     let result =
-        crate::fs::with_sync_failure(&folios, || apply_register(&fixture.home, &plan, false));
+        crate::fsx::with_sync_failure(&folios, || apply_register(&fixture.home, &plan, false));
     match result {
         Err(RegisterError::Folio(FolioDirError::Io { path, source })) => {
             assert_eq!(path, resolved_path(&folios));

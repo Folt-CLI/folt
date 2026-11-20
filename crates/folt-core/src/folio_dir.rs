@@ -1,10 +1,8 @@
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::fs::{self, DirBuilder, File, OpenOptions};
+use std::fs;
 use std::io::{self, Write};
-#[cfg(unix)]
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 use crate::config::names::{
@@ -13,6 +11,8 @@ use crate::config::names::{
 use crate::folio::format::{FormatError, check_format};
 use crate::folio::refs_dir::inspect_refs;
 use crate::folio::row::FolioRow;
+use crate::fsx::{FileSystem, RealFileSystem};
+use crate::fsx::{TempFile, TempMode, private_directory_builder};
 use crate::id::FolioId;
 use crate::layout::LayoutVersion;
 
@@ -88,7 +88,7 @@ pub fn create_folio(
     ensure_directory(&staging)?;
     let id = FolioId::generate();
     let temporary = staging.join(id.to_string());
-    directory_builder()
+    private_directory_builder()
         .create(&temporary)
         .map_err(|source| io_error(&temporary, source))?;
     let result = build_and_publish(home, lock, &folios, &temporary, id, spec, durability);
@@ -108,27 +108,31 @@ fn build_and_publish(
     durability: Durability,
 ) -> Result<FolioDir, FolioDirError> {
     let content_path = temporary.join(CONTENT_FILE);
-    let mut file = create_file(&content_path)?;
-    file.write_all(&spec.content)
+    let mut file = TempFile::create_at(&content_path, TempMode::Private)
+        .map_err(|source| io_error(&content_path, source))?;
+    file.file_mut()
+        .write_all(&spec.content)
         .map_err(|source| io_error(&content_path, source))?;
     if durability == Durability::DataAndDirectories {
-        file.sync_all()
+        file.sync()
             .map_err(|source| io_error(&content_path, source))?;
     }
-    // Windows cannot rename the staging directory while its content file is open.
-    drop(file);
     ensure_directory(&temporary.join(BLOBS_DIR))?;
     ensure_directory(&temporary.join(REFS_DIR))?;
     if durability == Durability::DataAndDirectories {
-        crate::fs::sync_directory(temporary).map_err(|source| io_error(temporary, source))?;
+        RealFileSystem
+            .sync_directory(temporary)
+            .map_err(|source| io_error(temporary, source))?;
     }
     let destination = folios.join(id.to_string());
     if fs::symlink_metadata(&destination).is_ok() {
         return Err(FolioDirError::AlreadyExists(destination));
     }
+    // Windows cannot rename the staging directory while its content file is open.
+    file.keep();
     fs::rename(temporary, &destination).map_err(|source| io_error(&destination, source))?;
     if durability == Durability::DataAndDirectories
-        && let Err(source) = crate::fs::sync_directory(folios)
+        && let Err(source) = RealFileSystem.sync_directory(folios)
     {
         // The rename already published this call's directory. The caller has
         // no FolioDir to roll back when creation returns an error.
@@ -300,29 +304,9 @@ fn copy_temporary_name(name: &str) -> bool {
 }
 
 fn ensure_directory(path: &Path) -> Result<(), FolioDirError> {
-    directory_builder()
+    private_directory_builder()
         .recursive(true)
         .create(path)
-        .map_err(|source| io_error(path, source))
-}
-fn directory_builder() -> DirBuilder {
-    let builder = DirBuilder::new();
-    #[cfg(unix)]
-    let builder = {
-        let mut builder = builder;
-        builder.mode(0o700);
-        builder
-    };
-    builder
-}
-fn create_file(path: &Path) -> Result<File, FolioDirError> {
-    let mut options = OpenOptions::new();
-    #[cfg(unix)]
-    options.mode(0o600);
-    options
-        .write(true)
-        .create_new(true)
-        .open(path)
         .map_err(|source| io_error(path, source))
 }
 fn io_error(path: &Path, source: io::Error) -> FolioDirError {

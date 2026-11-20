@@ -1,6 +1,6 @@
 # S ticket
 
-Use S for straightforward work with its solution already decided. The ticket asks no questions.
+Use S for straightforward work whose decision is already made. The ticket asks no questions.
 
 ## The ticket must contain
 
@@ -8,23 +8,17 @@ Use the five-section [work-item body](../issue-format.md) with Summary and Scope
 
 ## Analysis and review
 
-S needs review but no analysis. Use a read-only [review](../../delivery/review.md).
+S runs [scoping](../rules.md#analysis-depths) and needs no review. The gate and CI are its checks.
 
-## Solution
+## Outcome
 
-Write Solution at creation, short and readable for the developer, in the style of Analysis. It comes from the enabling Question, with no solution selection; the Question's answer does not replace a missing Solution or scope.
+Write the outcome in Summary and two to five numbered scenarios in Scope. Add **Agreed in #N** with the decisions the parent Question made, as constraints the work must respect, and rough file hints that do not bind. S has no Solution section and no scope attachment.
 
-Use a `> [!IMPORTANT]` decision line, **Agreed in #N** (what the parent Question decided), **You get**, **Changes**, **Not changed** and **Watch out**, then **Implementation scope** linking the complete `<N>-solution-1.md` scope attachment.
-
-Attach with gh-attach and verify at creation by downloading and comparing.
-
-S always has this scope file. Follow the [S and XS Solution layout](../issue-format.md#s-and-xs-solution-layout) and the applicable [type row](../rules.md#by-issue-type).
+When the run starts, scoping reads the ticket, the parent Question's findings and the current code, and returns the allowed files (with their test files), the scenarios and the verification commands. The implementation agent receives that result. The pull request lists the allowed files under Changes. If scoping finds the ticket does not fit the code or leaves a design question open, re-size to M; see [Re-sizing](../rules.md#analysis-triggers-and-re-sizing).
 
 ## Statuses
 
-The ticket is ready when its Solution and scope exist at creation. Do not start the implementation agent or move the ticket to S3 or S4 before these requirements are met.
-
-See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
+The ticket is ready when its outcome, scenarios and constraints exist. Scoping runs at the start of S4. See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
 
 ## Who does what
 

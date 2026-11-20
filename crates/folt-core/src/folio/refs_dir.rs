@@ -1,10 +1,11 @@
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::limits::REF_FILE_MAX_BYTES;
 use crate::config::names::{HEADS_DIR, PINS_DIR, REFS_DIR, TAGS_DIR, TEMP_PREFIX_REF};
+use crate::fsx::{FileSystem, RealFileSystem};
+use crate::fsx::{TempFile, TempMode};
 use crate::id::ObjectId;
 use crate::ref_name::{LowerRefError, RefKind, RefName};
 
@@ -71,38 +72,22 @@ fn temporary_name(name: &str) -> bool {
         && counter.bytes().all(|b| b.is_ascii_digit())
 }
 pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), LowerRefError> {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
     let parent = path
         .parent()
         .ok_or_else(|| LowerRefError::InvalidRef(path.into()))?;
     fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
-    let (temporary, mut file) = loop {
-        let temporary = parent.join(format!(
-            "{TEMP_PREFIX_REF}{}.{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
-            Ok(file) => break (temporary, file),
-            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(source) => return Err(io_error(&temporary, source)),
-        }
-    };
-    let result = (|| {
-        file.write_all(bytes)
-            .and_then(|()| file.sync_all())
-            .map_err(|source| io_error(&temporary, source))?;
-        drop(file);
-        fs::rename(&temporary, path).map_err(|source| io_error(path, source))
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result
+    let mut temporary = TempFile::create(parent, TEMP_PREFIX_REF, '.', TempMode::Default)
+        .map_err(|(path, source)| io_error(&path, source))?;
+    temporary
+        .file_mut()
+        .write_all(bytes)
+        .map_err(|source| io_error(temporary.path(), source))?;
+    temporary
+        .sync()
+        .map_err(|source| io_error(temporary.path(), source))?;
+    temporary
+        .publish(path)
+        .map_err(|source| io_error(path, source))
 }
 fn entries(path: &Path) -> Result<Vec<fs::DirEntry>, LowerRefError> {
     check_directory(path)?;
@@ -152,7 +137,9 @@ pub(crate) fn clean_directory(path: &Path, recursive: bool) -> Result<(), LowerR
     Ok(())
 }
 fn sync_directory(path: &Path) -> Result<(), LowerRefError> {
-    crate::fs::sync_directory(path).map_err(|source| io_error(path, source))
+    RealFileSystem
+        .sync_directory(path)
+        .map_err(|source| io_error(path, source))
 }
 pub(crate) fn sync_directories(path: &Path) -> Result<(), LowerRefError> {
     for entry in entries(path)? {

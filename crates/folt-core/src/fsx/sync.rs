@@ -6,7 +6,7 @@ use std::path::Path;
 /// This is a no-op on Windows: `File::open` cannot open a directory there.
 /// Directory durability is therefore not guaranteed on Windows; callers still
 /// sync regular files separately.
-pub(crate) fn sync_directory(path: &Path) -> io::Result<()> {
+pub(super) fn sync_directory(path: &Path) -> io::Result<()> {
     #[cfg(test)]
     if SYNC_FAILURE.with(|failure| {
         let mut failure = failure.borrow_mut();

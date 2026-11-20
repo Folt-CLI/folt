@@ -57,3 +57,58 @@ fn publishes_staged_folios_with_both_durability_modes() {
 
     drop(lock);
 }
+
+#[test]
+fn failure_after_content_creation_leaves_no_staging_entry() {
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    let folios = home.path().join(FOLIOS_DIR);
+    // Fail the containing-directory sync after the directory has been renamed.
+    let error = crate::fsx::with_sync_failure(&folios, || {
+        create_folio(
+            home.path(),
+            &lock,
+            FolioSpec {
+                content: b"content".to_vec(),
+            },
+            Durability::DataAndDirectories,
+        )
+    })
+    .unwrap_err();
+    assert!(matches!(error, FolioDirError::Io { path, source }
+        if path == folios && source.to_string() == "injected directory sync failure"));
+    assert_eq!(fs::read_dir(folios.join(NEW_DIR)).unwrap().count(), 0);
+    assert_eq!(fs::read_dir(folios).unwrap().count(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn published_content_keeps_private_mode() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    for durability in [Durability::None, Durability::DataAndDirectories] {
+        let folio = create_folio(
+            home.path(),
+            &lock,
+            FolioSpec {
+                content: b"content".to_vec(),
+            },
+            durability,
+        )
+        .unwrap();
+        assert_eq!(
+            fs::metadata(folio.path().join(CONTENT_FILE))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
+}

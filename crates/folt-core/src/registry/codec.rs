@@ -1,5 +1,6 @@
+use crate::fsx::Signature;
 use crate::id::ObjectId;
-use crate::placement::{PlacementBase, Signature, StagedBlob};
+use crate::placement::{PlacementBase, StagedBlob};
 use crate::placement_path::RegistryError;
 
 pub(super) struct EncodedBase {

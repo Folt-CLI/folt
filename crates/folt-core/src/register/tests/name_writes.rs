@@ -205,7 +205,7 @@ fn metadata_failure_after_name_publish_restores_or_reports_retained_name() {
     fs::write(&path, original).unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let path = &plan.entries[0].path;
-    let error = crate::placement_fs::with_rewrite_metadata_failure(path, || {
+    let error = crate::fsx::with_rewrite_metadata_failure(path, || {
         apply_register(&fixture.home, &plan, false)
     })
     .unwrap_err();
@@ -262,7 +262,7 @@ fn directory_sync_failure_after_name_publish_still_attempts_restore() {
     let path = fixture.root.join("file.md");
     fs::write(&path, b"body").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
-    let error = crate::fs::with_sync_failure(&fixture.root, || {
+    let error = crate::fsx::with_sync_failure(&fixture.root, || {
         apply_register(&fixture.home, &plan, false)
     })
     .unwrap_err();

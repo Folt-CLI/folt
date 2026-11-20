@@ -16,7 +16,7 @@ The Test issue type is for a ticket whose whole outcome is adding test cases, su
 
 ## Roles
 
-Implementation agents run headless in the ticket's worktree and implement and fix. They do not analyse code, reviews or CI. The orchestrator analyses: it runs the gate, reads CI, and hands findings and failing excerpts to the agent. The headless review agent reviews the diff, the tests in it and the CI result; it does not run anything.
+Implementation agents run headless in the ticket's worktree and implement and fix. They do not analyse code, reviews or CI. The orchestrator analyses: it runs the gate, reads CI, and hands findings and failing excerpts to the agent. With no review on XS and S, the gate and CI are the checks of those tickets. The headless review agent reviews the diff, the tests in it and the CI result; it does not run anything.
 
 ## Gate before push
 
