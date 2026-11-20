@@ -1,4 +1,17 @@
-use super::*;
+use std::fs;
+
+use crate::config::names::MARKER_FILE;
+use crate::fsx::RealFileSystem;
+use crate::ops::register::links::{LinkStep, apply_links_with_hook};
+use crate::ops::register::tests::resolved_path;
+use crate::ops::register::{
+    RegisterLinkResult, apply_register, apply_register_links, plan_register,
+};
+use crate::placement::{Observation, PlacementKind};
+use crate::placement_fs::PlacementFs;
+use crate::placement_path::PlacementPath;
+use crate::registry::Registry;
+use crate::test_support::TempHome;
 
 #[test]
 fn blocked_link_registration_does_not_probe_or_create_markers() {
