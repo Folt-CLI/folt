@@ -3,6 +3,7 @@ use super::gather::CommitFacts;
 use super::plan::{CommitPlan, resume_commit};
 use crate::config::names::DEFAULT_BRANCH;
 use crate::ops::placement::move_::{MoveTarget, judge_move};
+use crate::ops::stage::refuse::is_staged;
 use crate::ops::status::{Edit, judge_working};
 use crate::placement::{Observation, PlacementKind};
 use crate::ref_name::RefName;
@@ -36,7 +37,7 @@ pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRefusal> {
         }
         // A completed file replacement may precede the atomic registry update.
         let already_written = resume.is_some() && internal.placement_hash == Some(staged.hash);
-        if internal.placement.staged.is_some()
+        if is_staged(&internal.placement)
             || (judge_working(internal).edit != Edit::Clean && !already_written)
         {
             return Err(HistoryRefusal::InternalEdited(
