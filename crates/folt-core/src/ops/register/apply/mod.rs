@@ -1,9 +1,10 @@
-use std::path::PathBuf;
+use std::io;
 
 use crate::config::settings::Settings;
 use crate::folio_dir::Durability;
 use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::{Home, HomeLock};
+use crate::ops::rollback::Rollback;
 use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement_path::RegistryError;
 
@@ -59,7 +60,7 @@ pub(super) fn apply_locked(
     if blocked(&current, confirm_large) {
         return Ok(current);
     }
-    let mut state = ApplyState::default();
+    let mut state = Rollback::new(fs);
     let result: Result<bool, RegisterError> = (|| {
         markers::create_markers(fs, &current, &mut state, &mut hook)?;
         current = markers::refresh(home, plan, &current, &settings, &mut hook)?;
@@ -96,27 +97,27 @@ pub(super) fn apply_locked(
         // The empty file used to create an owned marker was only an
         // intermediate state, not an input snapshot for the returned plan.
         for entry in &mut current.entries {
-            if state.markers.iter().any(|(path, _)| path == &entry.path) {
+            if state.owns_marker(&entry.path) {
                 entry.signature = None;
             }
         }
+        state.commit();
     } else {
-        rollback::restore_apply(fs, state, &result)?;
+        let failures = state.fail();
+        if !failures.is_empty() {
+            let cause = match &result {
+                Err(error) => error.to_string(),
+                _ => "registration blocked".into(),
+            };
+            return Err(io::Error::other(format!("{cause}; {}", failures.join("; "))).into());
+        }
     }
     result.map(|_| current)
-}
-
-#[derive(Default)]
-struct ApplyState {
-    markers: Vec<(PathBuf, crate::fsx::Signature)>,
-    directories: Vec<PathBuf>,
-    rewritten: Vec<(PathBuf, Vec<u8>, crate::fsx::Signature)>,
 }
 
 mod capture;
 mod markers;
 mod publish;
-mod rollback;
 
 #[cfg(test)]
 mod tests;
