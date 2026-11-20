@@ -1,4 +1,4 @@
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementOps};
 use crate::placement_path::{self};
@@ -27,7 +27,7 @@ pub fn gather_relocate_target(
     let contains = |protected: &std::path::Path| {
         protected.starts_with(&from) || protected.starts_with(&destination)
     };
-    let refuse = || Refusal {
+    let refuse = || PlacementRefusal {
         path: from.clone(),
         reason: RefusalReason::Internal,
     };

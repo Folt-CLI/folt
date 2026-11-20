@@ -1,5 +1,5 @@
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::placement::{Observation, PlacementKind};
 
 use super::target::RelocateTarget;
@@ -14,7 +14,7 @@ pub struct RelocatePlan {
 pub fn judge_relocate(
     facts: &PlacementFacts,
     target: &RelocateTarget,
-) -> Result<RelocatePlan, Refusal> {
+) -> Result<RelocatePlan, PlacementRefusal> {
     match judge_relocate_checked(facts, target) {
         Err(error)
             if target.pending
@@ -36,9 +36,9 @@ pub fn judge_relocate(
 pub(super) fn judge_relocate_checked(
     facts: &PlacementFacts,
     target: &RelocateTarget,
-) -> Result<RelocatePlan, Refusal> {
+) -> Result<RelocatePlan, PlacementRefusal> {
     let path = facts.placement.path.to_path_buf();
-    let refuse = |reason| Refusal {
+    let refuse = |reason| PlacementRefusal {
         path: path.clone(),
         reason,
     };

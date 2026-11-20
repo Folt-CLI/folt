@@ -1,5 +1,5 @@
 use crate::home::HomeLock;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement::{Observation, PlacementKind, PlacementOps};
@@ -42,7 +42,7 @@ pub(super) fn apply_relocate_steps(
         rename_entry(plan, fs, registry, lock, &source)?;
         after.on_step((RelocateStep::Renamed, registry))?;
     } else if !pending {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: plan.facts.placement.path.to_path_buf(),
             reason: RefusalReason::Gone,
         }
@@ -83,7 +83,7 @@ fn recheck_rows_and_source(
     }
     for (actual, (old, _)) in originals.iter().zip(rows) {
         if actual.as_ref() != Some(old) {
-            return Err(Refusal {
+            return Err(PlacementRefusal {
                 path: old.path.to_path_buf(),
                 reason: RefusalReason::RegistryChanged,
             }
@@ -107,7 +107,7 @@ fn recheck_rows_and_source(
         }
         // Recheck the entire planned prefix before either registry transaction.
         if destination.rows != *rows {
-            return Err(Refusal {
+            return Err(PlacementRefusal {
                 path: placement.path,
                 reason: RefusalReason::RegistryChanged,
             }

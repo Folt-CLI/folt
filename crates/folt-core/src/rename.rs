@@ -171,7 +171,7 @@ pub fn plan_rename(
     }
     let row = registry
         .internal_placement(id)?
-        .ok_or(history::Refusal::MissingInternal)
+        .ok_or(history::HistoryRefusal::MissingInternal)
         .map_err(HistoryError::from)?;
     let facts = crate::ops::working::gather(&row, fs, stores.refs, registry)?;
     let Observation::File { signature } = facts.observation else {
@@ -324,7 +324,7 @@ pub fn apply_rename(
     }
     let row = registry
         .internal_placement(plan.id())?
-        .ok_or(history::Refusal::MissingInternal)
+        .ok_or(history::HistoryRefusal::MissingInternal)
         .map_err(HistoryError::from)?;
     if !row
         .staged
