@@ -112,37 +112,16 @@ impl TempFile {
     }
 
     /// Transfers the open handle while retaining responsibility for cleanup.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "adopted by the object store and placement writers in #279 and #280"
-        )
-    )]
     pub(crate) fn take_file(&mut self) -> Option<File> {
         self.file.take()
     }
 
     /// Closes the handle while retaining responsibility for cleanup.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "adopted by the object store and placement writers in #279 and #280"
-        )
-    )]
     pub(crate) fn close(&mut self) {
         drop(self.file.take());
     }
 
     /// Removes the file, returning any removal error without retrying on drop.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "adopted by the object store and placement writers in #279 and #280"
-        )
-    )]
     pub(crate) fn remove(mut self) -> io::Result<()> {
         drop(self.file.take());
         let result = fs::remove_file(&self.path);
