@@ -120,7 +120,9 @@ fn branch_sync_failure_leaves_cached_rows_untouched_and_harmless() {
             layout: FOLIO_LAYOUT_VERSION,
             algorithm: OBJECT_ALGORITHM.into(),
         };
-        let refs = RefStore::open(&folio, &format).unwrap();
+        let fs =
+            crate::fsx::fault::FaultFileSystem::new().sync_failure(&folio.path().join("refs"), 0);
+        let refs = RefStore::open_with(&folio, &format, Box::new(fs)).unwrap();
         let mut registry = Registry::open_or_create(&home, &lock).unwrap();
         let target = FolioId::generate();
         registry
@@ -148,9 +150,7 @@ fn branch_sync_failure_leaves_cached_rows_untouched_and_harmless() {
         std::fs::create_dir_all(folio.path().join("refs/heads")).unwrap();
         // Only deletion reads this ref; it needs no object lookup.
         std::fs::write(folio.path().join("refs/heads/topic"), format!("{old}\n")).unwrap();
-        let result = crate::fsx::with_sync_failure(&folio.path().join("refs"), || {
-            delete_branch(folio.id(), &topic, old, &refs, &registry, &mut lock)
-        });
+        let result = delete_branch(folio.id(), &topic, old, &refs, &registry, &mut lock);
         assert!(
             result
                 .unwrap_err()

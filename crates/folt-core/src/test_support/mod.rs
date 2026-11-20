@@ -5,6 +5,8 @@ mod facts;
 #[cfg(test)]
 mod home;
 mod paths;
+#[cfg(test)]
+pub(crate) mod registry;
 
 #[cfg(test)]
 pub(crate) use facts::{RelocateFixture, facts, target};

@@ -66,16 +66,16 @@ fn failure_after_content_creation_leaves_no_staging_entry() {
     let lock = home.try_lock().unwrap();
     let folios = home.path().join(FOLIOS_DIR);
     // Fail the containing-directory sync after the directory has been renamed.
-    let error = crate::fsx::with_sync_failure(&folios, || {
-        create_folio(
-            home.path(),
-            &lock,
-            FolioSpec {
-                content: b"content".to_vec(),
-            },
-            Durability::DataAndDirectories,
-        )
-    })
+    let fs = crate::fsx::fault::FaultFileSystem::new().sync_failure(&folios, 0);
+    let error = create_folio_with(
+        &fs,
+        home.path(),
+        &lock,
+        FolioSpec {
+            content: b"content".to_vec(),
+        },
+        Durability::DataAndDirectories,
+    )
     .unwrap_err();
     assert!(matches!(error, FolioDirError::Io { path, source }
         if path == folios && source.to_string() == "injected directory sync failure"));

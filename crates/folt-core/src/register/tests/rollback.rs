@@ -6,8 +6,8 @@ fn published_folio_sync_failure_rolls_back_directory_markers_and_rows() {
     let directory = fixture.dir("directory");
     let plan = plan_register(&fixture.home, [&directory]).unwrap();
     let folios = fixture.home.path().join("folios");
-    let result =
-        crate::fsx::with_sync_failure(&folios, || apply_register(&fixture.home, &plan, false));
+    let fs = crate::fsx::fault::FaultFileSystem::new().sync_failure(&folios, 0);
+    let result = apply_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(()));
     match result {
         Err(RegisterError::Folio(FolioDirError::Io { path, source })) => {
             assert_eq!(path, resolved_path(&folios));
@@ -38,7 +38,7 @@ fn ordinary_failures_roll_back_all_rows_and_remove_only_owned_artifacts() {
         let marker = existing.join(MARKER_FILE);
         fs::write(&marker, b"keep").unwrap();
         let plan = plan_register(&fixture.home, [&new, &existing]).unwrap();
-        let result = apply_with_hook(&fixture.home, &plan, false, |step| {
+        let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             if matches!(step, Step::Transaction) == fail_before_transaction
                 && matches!(step, Step::Transaction | Step::Commit)
             {
@@ -71,7 +71,7 @@ fn marker_that_appears_during_apply_is_used_and_preserved_on_failure() {
     let marker = dir.join(MARKER_FILE);
     let plan = plan_register(&fixture.home, [&dir]).unwrap();
     assert!(
-        apply_with_hook(&fixture.home, &plan, false, |step| {
+        apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             match step {
                 Step::Markers => {
                     fs::write(&marker, b"appeared").unwrap();
@@ -94,7 +94,7 @@ fn replaced_owned_marker_is_never_removed() {
     let marker = dir.join(MARKER_FILE);
     let plan = plan_register(&fixture.home, [&dir]).unwrap();
     assert!(
-        apply_with_hook(&fixture.home, &plan, false, |step| {
+        apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             if matches!(step, Step::Transaction) {
                 let replacement = fixture.root.join("replacement");
                 fs::write(&replacement, b"replacement").unwrap();
@@ -117,7 +117,7 @@ fn crash_before_transaction_leaves_orphan_and_retry_creates_a_new_folio() {
     fs::write(&path, b"content").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = apply_with_hook(&fixture.home, &plan, false, |step| {
+        let _ = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             if matches!(step, Step::Transaction) {
                 panic!("simulated crash");
             }
@@ -157,7 +157,7 @@ fn oversized_appearing_marker_blocks_and_cleans_only_the_new_marker() {
     let second = fixture.dir("second");
     let marker = second.join(MARKER_FILE);
     let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
-    let result = apply_with_hook(&fixture.home, &plan, false, |step| {
+    let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         if matches!(step, Step::Markers) {
             fs::write(&marker, b"large").unwrap();
         }
@@ -186,22 +186,29 @@ fn unique_name_index_failure_rolls_back_the_entire_registration() {
     let plan = plan_register(&fixture.home, &paths).unwrap();
     let lock = fixture.home.lock().unwrap();
     let holder = FolioId::generate();
-    let result = apply_locked(&fixture.home, &plan, false, &lock, |step| {
-        if matches!(step, Step::Transaction) {
-            let mut registry = Registry::open_or_create(&fixture.home, &lock)?;
-            registry.write(&lock, |tx| {
-                tx.add_folio(&NewFolio {
-                    id: holder,
-                    format: FolioFormat {
-                        layout: FOLIO_LAYOUT_VERSION,
-                        algorithm: OBJECT_ALGORITHM.into(),
-                    },
+    let result = apply_locked(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        &lock,
+        |step| {
+            if matches!(step, Step::Transaction) {
+                let mut registry = Registry::open_or_create(&fixture.home, &lock)?;
+                registry.write(&lock, |tx| {
+                    tx.add_folio(&NewFolio {
+                        id: holder,
+                        format: FolioFormat {
+                            layout: FOLIO_LAYOUT_VERSION,
+                            algorithm: OBJECT_ALGORITHM.into(),
+                        },
+                    })?;
+                    tx.set_name(holder, &FolioName::parse("second").unwrap())
                 })?;
-                tx.set_name(holder, &FolioName::parse("second").unwrap())
-            })?;
-        }
-        Ok(())
-    });
+            }
+            Ok(())
+        },
+    );
     assert!(
         matches!(result, Err(RegisterError::Registry(RegistryError::NameTaken(ref name))) if name.as_str() == "second")
     );

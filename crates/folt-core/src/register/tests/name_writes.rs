@@ -13,7 +13,7 @@ fn name_writes_restore_the_whole_batch_at_transaction_and_commit_failures() {
         let marker = directory.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&paths[0], &paths[1], &directory]).unwrap();
         let mut reached = false;
-        let error = apply_with_hook(&fixture.home, &plan, false, |step| {
+        let error = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             if matches!(step, Step::Transaction) && !fail_commit
                 || matches!(step, Step::Commit) && fail_commit
             {
@@ -58,7 +58,7 @@ fn restore_preserves_external_edits_and_reports_the_retained_name() {
     let path = fixture.root.join("file.md");
     fs::write(&path, b"body").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
-    let error = apply_with_hook(&fixture.home, &plan, false, |step| {
+    let error = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         if matches!(step, Step::Transaction) {
             assert_eq!(
                 front_matter::read_name(&fs::read(&path).unwrap())
@@ -100,7 +100,7 @@ fn changed_after_refresh_blocks_without_writing_and_restores_earlier_files() {
     fs::write(&first, b"first body").unwrap();
     fs::write(&second, b"second body").unwrap();
     let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
-    let result = apply_with_hook(&fixture.home, &plan, false, |step| {
+    let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         if matches!(step, Step::Refreshed(_)) {
             fs::write(&second, b"user edit").unwrap();
         }
@@ -128,7 +128,7 @@ fn missing_refreshed_marker_signature_blocks_and_rolls_back_earlier_files() {
     let marker = &plan.entries[1].path;
     let mut folios_started = 0;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        apply_with_hook(&fixture.home, &plan, false, |step| {
+        apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             match step {
                 Step::MarkerSynced => fs::remove_file(marker).unwrap(),
                 Step::Refreshed(refreshed) => {
@@ -205,10 +205,8 @@ fn metadata_failure_after_name_publish_restores_or_reports_retained_name() {
     fs::write(&path, original).unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let path = &plan.entries[0].path;
-    let error = crate::fsx::with_rewrite_metadata_failure(path, || {
-        apply_register(&fixture.home, &plan, false)
-    })
-    .unwrap_err();
+    let fs = crate::fsx::fault::FaultFileSystem::new().rewrite_metadata_failure(path);
+    let error = apply_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(())).unwrap_err();
     let message = error.to_string();
     assert!(message.contains("injected rewrite metadata failure"));
     if fs::read(path).unwrap() != original {
@@ -235,7 +233,7 @@ fn restore_failure_before_publication_reports_the_retained_name_with_path() {
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let path = &plan.entries[0].path;
     let edited = b"---\nfolio-name: \"file\"\n---\nbody with user edits";
-    let error = apply_with_hook(&fixture.home, &plan, false, |step| {
+    let error = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         if matches!(step, Step::Transaction) {
             fs::write(path, edited).unwrap();
             return Err(injected());
@@ -262,10 +260,8 @@ fn directory_sync_failure_after_name_publish_still_attempts_restore() {
     let path = fixture.root.join("file.md");
     fs::write(&path, b"body").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
-    let error = crate::fsx::with_sync_failure(&fixture.root, || {
-        apply_register(&fixture.home, &plan, false)
-    })
-    .unwrap_err();
+    let fs = crate::fsx::fault::FaultFileSystem::new().sync_failure(&fixture.root, 0);
+    let error = apply_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(())).unwrap_err();
     assert!(
         error
             .to_string()

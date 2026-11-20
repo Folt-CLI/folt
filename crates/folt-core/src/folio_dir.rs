@@ -82,6 +82,16 @@ pub fn create_folio(
     spec: FolioSpec,
     durability: Durability,
 ) -> Result<FolioDir, FolioDirError> {
+    create_folio_with(&RealFileSystem, home, lock, spec, durability)
+}
+
+pub(crate) fn create_folio_with(
+    fs: &dyn FileSystem,
+    home: &Path,
+    _lock: &super::home::HomeLock,
+    spec: FolioSpec,
+    durability: Durability,
+) -> Result<FolioDir, FolioDirError> {
     let folios = home.join(FOLIOS_DIR);
     ensure_directory(&folios)?;
     let staging = folios.join(NEW_DIR);
@@ -91,7 +101,7 @@ pub fn create_folio(
     private_directory_builder()
         .create(&temporary)
         .map_err(|source| io_error(&temporary, source))?;
-    let result = build_and_publish(home, lock, &folios, &temporary, id, spec, durability);
+    let result = build_and_publish(fs, &folios, &temporary, id, spec, durability);
     if result.is_err() {
         let _ = crate::fsx::remove_dir_all(&temporary);
     }
@@ -99,8 +109,7 @@ pub fn create_folio(
 }
 
 fn build_and_publish(
-    home: &Path,
-    _lock: &super::home::HomeLock,
+    fs: &dyn FileSystem,
     folios: &Path,
     temporary: &Path,
     id: FolioId,
@@ -120,8 +129,7 @@ fn build_and_publish(
     ensure_directory(&temporary.join(BLOBS_DIR))?;
     ensure_directory(&temporary.join(REFS_DIR))?;
     if durability == Durability::DataAndDirectories {
-        RealFileSystem
-            .sync_directory(temporary)
+        fs.sync_directory(temporary)
             .map_err(|source| io_error(temporary, source))?;
     }
     let destination = folios.join(id.to_string());
@@ -132,7 +140,7 @@ fn build_and_publish(
     file.keep();
     crate::fsx::rename(temporary, &destination).map_err(|source| io_error(&destination, source))?;
     if durability == Durability::DataAndDirectories
-        && let Err(source) = RealFileSystem.sync_directory(folios)
+        && let Err(source) = fs.sync_directory(folios)
     {
         // The rename already published this call's directory. The caller has
         // no FolioDir to roll back when creation returns an error.
@@ -140,7 +148,6 @@ fn build_and_publish(
             .map_err(|source| io_error(&destination, source))?;
         return Err(io_error(folios, source));
     }
-    let _ = home;
     Ok(FolioDir {
         id,
         path: destination,
