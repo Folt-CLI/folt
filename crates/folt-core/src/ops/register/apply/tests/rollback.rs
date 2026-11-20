@@ -1,4 +1,21 @@
-use super::*;
+use std::fs;
+use std::io;
+
+use crate::config::formats::OBJECT_ALGORITHM;
+use crate::config::names::MARKER_FILE;
+use crate::folio::format::FolioFormat;
+use crate::folio::row::NewFolio;
+use crate::folio_dir::FolioDirError;
+use crate::folio_name::FolioName;
+use crate::fsx::RealFileSystem;
+use crate::id::FolioId;
+use crate::layout::FOLIO_LAYOUT_VERSION;
+use crate::ops::register::apply::{Step, apply_locked, apply_with_hook};
+use crate::ops::register::tests::{injected, resolved_path};
+use crate::ops::register::{RegisterError, apply_register, plan_register};
+use crate::placement_path::{PlacementPath, RegistryError};
+use crate::registry::Registry;
+use crate::test_support::TempHome;
 
 #[test]
 fn published_folio_sync_failure_rolls_back_directory_markers_and_rows() {

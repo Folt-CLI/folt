@@ -156,7 +156,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** A user directory registered as one Folio through its `__folio__.md` marker. Registration creates an empty marker when missing and then gives it a folio-name.
-- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/register.rs:91` (`InsideDirectoryFolio`)
+- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/ops/register/refusal.rs:25` (`InsideDirectoryFolio`)
 - **Related:** [Folio](#folio), [marker](#marker), [register](#register).
 - **Not:** The Folio directory in the home, or a recursive registration of every child path.
 - **Status:** decided
@@ -414,7 +414,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The `__folio__.md` file anchoring a directory Folio and carrying its Markdown content and front matter. Registration creates it when missing and can insert a missing folio-name into an existing marker.
-- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/register.rs:149` (`creates_marker`)
+- **Code:** `crates/folt-core/src/config/names.rs:40` (`MARKER_FILE`); `crates/folt-core/src/ops/register/plan.rs:51` (`creates_marker`)
 - **Related:** [directory Folio](#directory-folio), [front matter](#front-matter), [register](#register).
 - **Not:** A workspace `.folt/`, home format file, object codec byte, conflict marker or build-skip marker.
 - **Status:** decided
@@ -488,7 +488,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To start managing explicit paths by creating Folio identities, names, stored content and initial copy and internal rows in one registry transaction. Markdown paths receive a missing folio-name; one refused path blocks the batch, and registration creates no initial commit or ref.
-- **Code:** `crates/folt-core/src/register.rs:186` (`plan_register`); `crates/folt-core/src/register.rs:681` (`apply_register`)
+- **Code:** `crates/folt-core/src/ops/register/plan.rs:88` (`plan_register`); `crates/folt-core/src/ops/register/apply/mod.rs:14` (`apply_register`)
 - **Related:** [Folio](#folio), [folio-name](#folio-name), [placement](#placement), [marker](#marker), [plan and apply](#plan-and-apply).
 - **Not:** Recursive discovery, a Git add or an initial history commit.
 - **Status:** decided
@@ -497,7 +497,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The operation pattern in which facts are read, judged into an allowed plan or refusal, then rechecked before writes. Callers hold the home lock across gathering, judging and applying history and placement changes; registration apply takes the lock and replans.
-- **Code:** `crates/folt-core/src/history.rs:40` (`gather_commit`); `crates/folt-core/src/history.rs:114` (`judge_commit`); `crates/folt-core/src/history.rs:191` (`apply_commit`); `crates/folt-core/src/register.rs:681` (`apply_register`)
+- **Code:** `crates/folt-core/src/history.rs:40` (`gather_commit`); `crates/folt-core/src/history.rs:114` (`judge_commit`); `crates/folt-core/src/history.rs:191` (`apply_commit`); `crates/folt-core/src/ops/register/apply/mod.rs:14` (`apply_register`)
 - **Related:** [refusal](#refusal), [home lock](#home-lock), [register](#register), [prune](#prune).
 - **Not:** The CI plan job, a promise that every apply acquires its own lock, or an Implementation plan issue section.
 - **Status:** decided
@@ -515,7 +515,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** A domain decision that a requested operation is not allowed under the observed [facts](#facts). Placement rules represent it as a path plus a reason; history and registration have their own refusal types.
-- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`Refusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`Refusal`); `crates/folt-core/src/register.rs:86` (`RegisterRefusalReason`)
+- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`Refusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`Refusal`); `crates/folt-core/src/ops/register/refusal.rs:18` (`RegisterRefusalReason`)
 - **Related:** [plan and apply](#plan-and-apply), [placement](#placement), [register](#register).
 - **Not:** One shared error type: qualify the module for each refusal; the rename of the two `Refusal` types is open (plan ticket G6 of [#203](https://github.com/Folt-CLI/folt/issues/203)).
 - **Status:** decided

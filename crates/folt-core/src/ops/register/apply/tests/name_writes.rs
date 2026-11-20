@@ -1,4 +1,13 @@
-use super::*;
+use std::fs;
+
+use crate::config::names::MARKER_FILE;
+use crate::front_matter::{self};
+use crate::fsx::RealFileSystem;
+use crate::ops::register::apply::{Step, apply_with_hook};
+use crate::ops::register::tests::injected;
+use crate::ops::register::{RegisterRefusalReason, RegisterStatus, apply_register, plan_register};
+use crate::registry::Registry;
+use crate::test_support::TempHome;
 
 #[test]
 fn name_writes_restore_the_whole_batch_at_transaction_and_commit_failures() {

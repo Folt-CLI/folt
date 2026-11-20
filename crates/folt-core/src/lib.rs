@@ -20,7 +20,6 @@ pub mod placement_path;
 pub mod prune;
 pub mod ref_name;
 pub mod refs;
-pub mod register;
 pub mod registry;
 pub mod rename;
 pub mod store;

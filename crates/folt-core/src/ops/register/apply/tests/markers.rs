@@ -1,4 +1,17 @@
-use super::*;
+use std::fs;
+use std::io;
+
+use crate::config::names::{CONTENT_FILE, MARKER_FILE};
+use crate::folio_dir::Durability;
+use crate::fsx::RealFileSystem;
+use crate::home::HomeError;
+use crate::ops::register::apply::{Step, apply_with_hook};
+use crate::ops::register::links::{LinkStep, apply_links_with_hook};
+use crate::ops::register::plan_register;
+use crate::ops::register::tests::{injected, resolved_path};
+use crate::placement_path::PlacementPath;
+use crate::registry::Registry;
+use crate::test_support::TempHome;
 
 #[test]
 fn case_variant_appearing_marker_replans_and_cleans_up_on_failure() {
@@ -92,6 +105,9 @@ fn case_variant_appearing_marker_replans_and_cleans_up_on_failure() {
 #[test]
 fn collapsed_directory_request_is_blocked_before_creating_markers() {
     use std::os::unix::fs::symlink;
+
+    use crate::folio_name::FolioName;
+    use crate::ops::register::{RegisterRefusalReason, RegisterRequest, RegisterStatus};
 
     let fixture = TempHome::new().unwrap();
     let a = fixture.dir("a");
