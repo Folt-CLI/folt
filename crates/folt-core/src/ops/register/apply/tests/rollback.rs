@@ -10,9 +10,10 @@ use crate::folio_name::FolioName;
 use crate::fsx::RealFileSystem;
 use crate::id::FolioId;
 use crate::layout::FOLIO_LAYOUT_VERSION;
-use crate::ops::register::apply::{Step, apply_locked, apply_with_hook};
+use crate::ops::register::apply::{Step, apply_locked, apply_steps};
 use crate::ops::register::tests::{injected, resolved_path};
 use crate::ops::register::{RegisterError, apply_register, plan_register};
+use crate::ops::step_hook::NoHook;
 use crate::placement_path::{PlacementPath, RegistryError};
 use crate::registry::Registry;
 use crate::test_support::TempHome;
@@ -24,7 +25,7 @@ fn published_folio_sync_failure_rolls_back_directory_markers_and_rows() {
     let plan = plan_register(&fixture.home, [&directory]).unwrap();
     let folios = fixture.home.path().join("folios");
     let fs = crate::fsx::fault::FaultFileSystem::new().sync_failure(&folios, 0);
-    let result = apply_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(()));
+    let result = apply_steps(&fs, &fixture.home, &plan, false, NoHook);
     match result {
         Err(RegisterError::Folio(FolioDirError::Io { path, source })) => {
             assert_eq!(path, resolved_path(&folios));
@@ -55,15 +56,21 @@ fn ordinary_failures_roll_back_all_rows_and_remove_only_owned_artifacts() {
         let marker = existing.join(MARKER_FILE);
         fs::write(&marker, b"keep").unwrap();
         let plan = plan_register(&fixture.home, [&new, &existing]).unwrap();
-        let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            if matches!(step, Step::Transaction) == fail_before_transaction
-                && matches!(step, Step::Transaction | Step::Commit)
-            {
-                Err(injected())
-            } else {
-                Ok(())
-            }
-        });
+        let result = apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                if matches!(step, Step::Transaction) == fail_before_transaction
+                    && matches!(step, Step::Transaction | Step::Commit)
+                {
+                    Err(injected())
+                } else {
+                    Ok(())
+                }
+            },
+        );
         assert!(result.is_err());
         assert!(!new.join(MARKER_FILE).exists());
         assert_eq!(fs::read(&marker).unwrap(), b"keep");
@@ -88,16 +95,22 @@ fn marker_that_appears_during_apply_is_used_and_preserved_on_failure() {
     let marker = dir.join(MARKER_FILE);
     let plan = plan_register(&fixture.home, [&dir]).unwrap();
     assert!(
-        apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            match step {
-                Step::Markers => {
-                    fs::write(&marker, b"appeared").unwrap();
-                    Ok(())
+        apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                match step {
+                    Step::Markers => {
+                        fs::write(&marker, b"appeared").unwrap();
+                        Ok(())
+                    }
+                    Step::Transaction => Err(injected()),
+                    _ => Ok(()),
                 }
-                Step::Transaction => Err(injected()),
-                _ => Ok(()),
             }
-        })
+        )
         .is_err()
     );
     assert_eq!(fs::read(marker).unwrap(), b"appeared");
@@ -111,17 +124,23 @@ fn replaced_owned_marker_is_never_removed() {
     let marker = dir.join(MARKER_FILE);
     let plan = plan_register(&fixture.home, [&dir]).unwrap();
     assert!(
-        apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            if matches!(step, Step::Transaction) {
-                let replacement = fixture.root.join("replacement");
-                fs::write(&replacement, b"replacement").unwrap();
-                fs::remove_file(&marker).unwrap();
-                fs::rename(replacement, &marker).unwrap();
-                Err(injected())
-            } else {
-                Ok(())
+        apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                if matches!(step, Step::Transaction) {
+                    let replacement = fixture.root.join("replacement");
+                    fs::write(&replacement, b"replacement").unwrap();
+                    fs::remove_file(&marker).unwrap();
+                    fs::rename(replacement, &marker).unwrap();
+                    Err(injected())
+                } else {
+                    Ok(())
+                }
             }
-        })
+        )
         .is_err()
     );
     assert_eq!(fs::read(marker).unwrap(), b"replacement");
@@ -134,12 +153,18 @@ fn crash_before_transaction_leaves_orphan_and_retry_creates_a_new_folio() {
     fs::write(&path, b"content").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            if matches!(step, Step::Transaction) {
-                panic!("simulated crash");
-            }
-            Ok(())
-        });
+        let _ = apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                if matches!(step, Step::Transaction) {
+                    panic!("simulated crash");
+                }
+                Ok(())
+            },
+        );
     }));
     assert!(result.is_err());
     assert_eq!(fixture.folio_count(), 1);
@@ -174,12 +199,18 @@ fn oversized_appearing_marker_blocks_and_cleans_only_the_new_marker() {
     let second = fixture.dir("second");
     let marker = second.join(MARKER_FILE);
     let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
-    let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        if matches!(step, Step::Markers) {
-            fs::write(&marker, b"large").unwrap();
-        }
-        Ok(())
-    })
+    let result = apply_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: Step<'_>| {
+            if matches!(step, Step::Markers) {
+                fs::write(&marker, b"large").unwrap();
+            }
+            Ok(())
+        },
+    )
     .unwrap();
     assert_eq!(result.summary.needs_confirmation, 1);
     assert!(!first.join(MARKER_FILE).exists());
@@ -209,7 +240,7 @@ fn unique_name_index_failure_rolls_back_the_entire_registration() {
         &plan,
         false,
         &lock,
-        |step| {
+        |step: Step<'_>| {
             if matches!(step, Step::Transaction) {
                 let mut registry = Registry::open_or_create(&fixture.home, &lock)?;
                 registry.write(&lock, |tx| {
