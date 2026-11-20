@@ -129,6 +129,7 @@ fn temporary_path_keeps_its_shape() {
     assert!(counter.parse::<u64>().is_ok());
 }
 
+#[cfg(unix)]
 fn entries(directory: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(directory)
         .unwrap()
