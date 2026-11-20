@@ -5,12 +5,12 @@ use crate::config::settings::Settings;
 use crate::folio_name::FolioName;
 use crate::front_matter::{self, Block};
 use crate::fsx::FileSystem;
+use crate::ops::rollback::Rollback;
 
 use super::super::error::RegisterError;
 use super::super::plan::{NameWrite, RegisterEntry, RegisterPlan, RegisterStatus, blocked};
 use super::super::refusal::{RegisterRefusalReason, io_refusal};
 use super::super::report::report;
-use super::ApplyState;
 use super::markers::block_entry;
 
 pub(super) fn capture_entry(
@@ -20,7 +20,7 @@ pub(super) fn capture_entry(
     entry: &RegisterEntry,
     settings: &Settings,
     confirm_large: bool,
-    state: &mut ApplyState,
+    state: &mut Rollback<'_>,
 ) -> Result<Option<Vec<u8>>, RegisterError> {
     let content = match fs::read(&entry.path) {
         Ok(content) => content,
@@ -72,7 +72,7 @@ fn write_name(
     current: &mut RegisterPlan,
     index: usize,
     settings: &Settings,
-    state: &mut ApplyState,
+    state: &mut Rollback<'_>,
     entry: &RegisterEntry,
     content: Vec<u8>,
 ) -> Result<Option<Vec<u8>>, RegisterError> {
@@ -114,16 +114,7 @@ fn write_name(
             ));
         };
         let write = crate::fsx::atomic_rewrite(fs, &entry.path, &updated, expected, |signature| {
-            state
-                .rewritten
-                .push((entry.path.clone(), content.clone(), signature.clone()));
-            if let Some((_, marker_signature)) = state
-                .markers
-                .iter_mut()
-                .find(|(path, _)| path == &entry.path)
-            {
-                *marker_signature = signature;
-            }
+            state.record_rewrite(entry.path.clone(), content.clone(), signature);
         });
         if let Err(error) = write {
             if error.kind() == io::ErrorKind::InvalidData {

@@ -634,8 +634,8 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### Rollback
 
 - **Layer:** Code structure
-- **Definition:** A guard that restores rewritten files when an operation fails before it completes.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Definition:** A guard that restores rewritten files and removes the markers and Folio directories this call created when an operation fails before it completes.
+- **Code:** `crates/folt-core/src/ops/rollback.rs` (`Rollback`)
 - **Related:** none.
 - **Not:** Rollback names the guard; restore names the action it performs. See the conflict row for rollback in Terms in conflict.
 - **Status:** decided
