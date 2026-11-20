@@ -11,8 +11,7 @@ use crate::ops::facts::{Behind, PlacementFacts, needs_hash};
 use crate::ops::refusal::{Refusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
-use crate::placement_fs::resolved_path;
-use crate::placement_path::{self, RegistryError};
+use crate::placement_path::{self, RegistryError, resolve_existing_ancestor};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
 use crate::registry::{self, Registry};
@@ -525,7 +524,7 @@ pub fn gather_relocate_target(
         path: from.clone(),
         reason: RefusalReason::Internal,
     };
-    if contains(&crate::placement_fs::resolved_path(registry.home_path())?) {
+    if contains(&resolve_existing_ancestor(registry.home_path())?) {
         return Err(refuse().into());
     }
     for id in registry.folios()? {
@@ -538,8 +537,9 @@ pub fn gather_relocate_target(
     let (id, mut placement) = row.to_placement();
     placement.path = destination;
     let observation = fs.read(id, &placement)?;
-    let mut originals =
-        registry.placements_under(&placement_path::PlacementPrefix::resolve(&from)?)?;
+    let mut originals = registry.placements_under(&placement_path::PlacementPrefix::from(
+        &placement_path::PlacementPath::resolve_directory(&from)?,
+    ))?;
     if registry.placement_at(&row.path)?.is_some() {
         originals = vec![row.clone()];
     } else if originals.is_empty() && fs.read(id, &row.to_placement().1)? != Observation::Directory
@@ -562,8 +562,9 @@ pub fn gather_relocate_target(
         rows.push((old, new));
     }
     // A prefix cannot absorb rows outside this move's pending set.
-    let destination_rows =
-        registry.placements_under(&placement_path::PlacementPrefix::resolve(to.to_path_buf())?)?;
+    let destination_rows = registry.placements_under(&placement_path::PlacementPrefix::from(
+        &placement_path::PlacementPath::resolve_directory(to.to_path_buf())?,
+    ))?;
     registered |= destination_rows
         .iter()
         .any(|row| !rows.iter().any(|(_, new)| new == row));
@@ -954,7 +955,7 @@ pub fn rehome(
     registry: &mut Registry,
     lock: &HomeLock,
 ) -> Result<(), RulesError> {
-    let old_home = resolved_path(old_home)?;
+    let old_home = resolve_existing_ancestor(old_home)?;
     let mut updates = Vec::new();
     let mut repairs = Vec::new();
     let mut prefix = None;
@@ -968,12 +969,13 @@ pub fn rehome(
             path: path.clone(),
             reason: RefusalReason::MixedHomes,
         })?;
-        let home = resolved_path(&home)?;
+        let home = resolve_existing_ancestor(&home)?;
         let current = fs.link_target(id);
-        let current_home = resolved_path(&former_home(&current, id).ok_or_else(|| Refusal {
-            path: current.clone(),
-            reason: RefusalReason::MixedHomes,
-        })?)?;
+        let current_home =
+            resolve_existing_ancestor(&former_home(&current, id).ok_or_else(|| Refusal {
+                path: current.clone(),
+                reason: RefusalReason::MixedHomes,
+            })?)?;
         if (home != old_home && home != current_home)
             || prefix.as_ref().is_some_and(|prefix| prefix != &home)
         {
@@ -1012,7 +1014,7 @@ pub fn rehome(
             };
             let plan = judge_repair_link(&facts)?;
             let target_home = former_link_home(&facts)
-                .map(|home| resolved_path(&home))
+                .map(|home| resolve_existing_ancestor(&home))
                 .transpose()?;
             if target_home.as_ref() != Some(&old_home) {
                 return Err(Refusal {
