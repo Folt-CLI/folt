@@ -1,5 +1,9 @@
+use std::ffi::OsStr;
+use std::fs;
+
 use super::*;
 use crate::config::env::Environment;
+use crate::config::names::{CONTENT_FILE, FOLIOS_DIR, NEW_DIR};
 use crate::home::Home;
 use crate::test_support::TempDir;
 

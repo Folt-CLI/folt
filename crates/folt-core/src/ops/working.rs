@@ -1,10 +1,10 @@
 use crate::config::names::DEFAULT_BRANCH;
+use crate::history::{RefError, RefStore};
 use crate::ops::facts::{PlacementFacts, needs_hash};
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry};
 
 /// Collects one working file, hashing when it has no base or a recorded size matches.

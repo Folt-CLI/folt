@@ -1,8 +1,8 @@
 use std::fs;
 
 use folt_core::config::limits::SCAN_LIMIT;
+use folt_core::folio::name::FolioName;
 use folt_core::folio::row::{FolioRow, NewFolio};
-use folt_core::folio_name::FolioName;
 use folt_core::front_matter::{FrontMatterError, Reference};
 use folt_core::id::FolioId;
 use folt_core::object::{ObjectKind, ObjectWriter, hash_blob};
@@ -951,9 +951,9 @@ fn registered_markdown_references_are_read_when_staging_the_internal_row() {
         .unwrap();
     let internal = registry.internal_placement(copy.id).unwrap().unwrap();
     let registered = registry.folio_row(copy.id).unwrap().unwrap();
-    let dir = folt_core::folio_dir::validate(home.path(), &registered).unwrap();
+    let dir = folt_core::folio::dir::validate(home.path(), &registered).unwrap();
     let objects = ObjectStore::open(&dir, &registered.format).unwrap();
-    let refs = folt_core::refs::RefStore::open(&dir, &registered.format).unwrap();
+    let refs = folt_core::history::RefStore::open(&dir, &registered.format).unwrap();
     assert_eq!(
         folt_core::front_matter::read_name(&fs::read(internal.path.to_path_buf()).unwrap())
             .unwrap()
@@ -1191,7 +1191,7 @@ fn recreated_branch_does_not_inherit_cached_edges() {
     )
     .unwrap_err();
     assert!(
-        matches!(error, history::HistoryError::Ref(folt_core::refs::RefError::MissingTarget(actual)) if actual == missing)
+        matches!(error, history::HistoryError::Ref(folt_core::history::RefError::MissingTarget(actual)) if actual == missing)
     );
     assert_eq!(folio.registry.references(id, "topic").unwrap().len(), 1);
     history::create_branch(
@@ -1263,11 +1263,11 @@ fn create_branch_keeps_staged_before_ref_edges_on_failure_and_success() {
         .unwrap_err();
         if commit == missing {
             assert!(
-                matches!(error, history::HistoryError::Ref(folt_core::refs::RefError::MissingTarget(id)) if id == missing)
+                matches!(error, history::HistoryError::Ref(folt_core::history::RefError::MissingTarget(id)) if id == missing)
             );
         } else {
             assert!(
-                matches!(error, history::HistoryError::Ref(folt_core::refs::RefError::WrongKind { id, actual: ObjectKind::Blob }) if id == wrong_kind)
+                matches!(error, history::HistoryError::Ref(folt_core::history::RefError::WrongKind { id, actual: ObjectKind::Blob }) if id == wrong_kind)
             );
         }
         assert_eq!(folio.registry.references(parent, "topic").unwrap(), rows);

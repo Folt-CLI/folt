@@ -1,4 +1,8 @@
+use std::fs;
+use std::io;
+
 use super::*;
+use crate::config::names::HOME_DIR_NAME;
 
 #[test]
 fn override_that_is_absolute_wins() {

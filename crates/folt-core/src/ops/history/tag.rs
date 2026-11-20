@@ -1,9 +1,9 @@
 use super::{HistoryError, HistoryRefusal, HistoryStores};
+use crate::history::{Expect, RefError, RefStore};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::{ObjectKind, Tag};
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::{Expect, RefError, RefStore};
 
 /// `None` makes a lightweight tag; an annotation must name this ref and target.
 pub fn create_tag(

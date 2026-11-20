@@ -1,5 +1,6 @@
 use super::stage_references;
 use crate::config::limits::SCAN_WINDOW;
+use crate::history::RefStore;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
@@ -7,7 +8,6 @@ use crate::ops::rules_error::RulesError;
 use crate::placement::{PlacementError, PlacementKind, StagedBlob};
 use crate::placement_path::RegistryError;
 use crate::ref_name::RefKind;
-use crate::refs::RefStore;
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 

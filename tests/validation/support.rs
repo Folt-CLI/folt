@@ -1,7 +1,8 @@
 use folt_core::config::formats::OBJECT_ALGORITHM;
+use folt_core::folio::dir::{Durability, FolioDir, FolioSpec, create_folio};
 use folt_core::folio::format::FolioFormat;
 use folt_core::folio::row::NewFolio;
-use folt_core::folio_dir::{Durability, FolioDir, FolioSpec, create_folio};
+use folt_core::history::RefStore;
 use folt_core::home::HomeLock;
 use folt_core::id::ObjectId;
 use folt_core::layout::FOLIO_LAYOUT_VERSION;
@@ -11,7 +12,6 @@ use folt_core::ops::stage;
 use folt_core::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::refs::RefStore;
 use folt_core::registry::{self, NewPlacement, Placement, Registry};
 use folt_core::store::ObjectStore;
 

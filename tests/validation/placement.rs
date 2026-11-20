@@ -98,8 +98,8 @@ mod conversion {
     use folt_core::registry::Placement;
 
     fn initial_main(folio: &mut TestFolio, lock: &mut HomeLock) -> ObjectId {
+        use folt_core::history::Expect;
         use folt_core::ref_name::RefKind;
-        use folt_core::refs::Expect;
         let commit = folio.commit_object(lock, b"initial");
         folio
             .refs

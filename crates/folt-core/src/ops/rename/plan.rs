@@ -1,5 +1,5 @@
 use super::RenameError;
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::front_matter::{self, Block, FrontMatterError};
 use crate::fsx::Signature;
 use crate::id::FolioId;

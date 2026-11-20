@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 
 /// One path and its optional explicit name.
 #[derive(Clone, Debug, Eq, PartialEq)]

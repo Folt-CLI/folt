@@ -94,7 +94,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The Folt home is the directory holding the registry, Folio directories, configuration, lock and temporary files. It defaults to `.folt` in the OS home directory; `FOLT_HOME` overrides that path.
-- **Code:** `crates/folt-core/src/home.rs:29` (`Home`); `crates/folt-core/src/home.rs:334` (`resolve_home`)
+- **Code:** `crates/folt-core/src/home/mod.rs:27` (`Home`); `crates/folt-core/src/home/locate.rs:9` (`resolve_home`)
 - **Related:** [registry](#registry), [Folio directory](#folio-directory), [home lock](#home-lock).
 - **Not:** The OS home directory or a workspace marker; portability and multi-user rules remain open in [#17](https://github.com/Folt-CLI/folt/issues/17).
 - **Status:** decided
@@ -130,7 +130,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The readable, unique Folio label: 1 to 64 ASCII letters, digits, dots, underscores or hyphens, with no leading or trailing dot or hyphen and no 64-digit hexadecimal value. The code accepts upper case, preserves case when slugging and indexes names with binary collation; Markdown content carries the `folio-name` key.
-- **Code:** `crates/folt-core/src/folio_name.rs:9` (`FolioName`); `crates/folt-core/src/folio_name.rs:46` (`parse`); `crates/folt-core/src/registry/schema.rs:36` (`folios_name`)
+- **Code:** `crates/folt-core/src/folio/name.rs:9` (`FolioName`); `crates/folt-core/src/folio/name.rs:46` (`parse`); `crates/folt-core/src/registry/schema.rs:36` (`folios_name`)
 - **Related:** [Folio id](#folio-id), [front matter](#front-matter), [rename](#rename).
 - **Not:** A file name, title, branch name or cached child label; the lowercase-only wording in [#47](https://github.com/Folt-CLI/folt/issues/47) is unconfirmed.
 - **Status:** open: #47
@@ -148,7 +148,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The directory `<home>/folios/<Folio id>/` that holds one Folio’s `folio.main`, `blobs/` and `refs/`. Its identity and layout information are read from the registry.
-- **Code:** `crates/folt-core/src/folio_dir.rs:35` (`FolioDir`)
+- **Code:** `crates/folt-core/src/folio/dir/mod.rs:32` (`FolioDir`)
 - **Related:** [home](#home), [Folio id](#folio-id), [object store](#object-store), [internal row](#internal-row).
 - **Not:** A directory Folio in the user’s files.
 - **Status:** decided
@@ -166,7 +166,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The per-Folio store of immutable objects beneath the Folio directory’s `blobs/`. Object files use an object id followed by `.blob`, regardless of object kind.
-- **Code:** `crates/folt-core/src/store.rs:24` (`ObjectStore`)
+- **Code:** `crates/folt-core/src/store/mod.rs:22` (`ObjectStore`)
 - **Related:** [Folio directory](#folio-directory), [object](#object), [blob](#blob).
 - **Not:** One global shared store or a directory containing only content blobs.
 - **Status:** decided
@@ -543,7 +543,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:105` (`copy_content`)
+- **Code:** `crates/folt-core/src/folio/dir/create.rs:47` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:105` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
@@ -552,7 +552,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The exclusive file-lock guard coordinating Folt writers in one home. It must cover each operation’s required reads, decisions and writes, with exclusive guard access for operations that require it.
-- **Code:** `crates/folt-core/src/home.rs:207` (`HomeLock`)
+- **Code:** `crates/folt-core/src/home/lock.rs:156` (`HomeLock`)
 - **Related:** [home](#home), [plan and apply](#plan-and-apply), [register](#register), [prune](#prune).
 - **Not:** A filesystem lock against external editors or permission to share one implementation worktree.
 - **Status:** decided

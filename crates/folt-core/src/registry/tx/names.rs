@@ -1,7 +1,7 @@
 use rusqlite::OptionalExtension;
 
 use crate::config::names::RENAME_PENDING_PREFIX;
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::id::FolioId;
 use crate::placement_path::RegistryError;
 

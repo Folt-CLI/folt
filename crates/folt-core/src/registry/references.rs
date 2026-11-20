@@ -1,4 +1,4 @@
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::id::FolioId;
 use crate::placement_path::RegistryError;
 

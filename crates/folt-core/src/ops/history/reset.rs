@@ -1,13 +1,13 @@
 use super::{
     HistoryError, HistoryRefusal, HistoryStores, gather_file, require_blob, require_observation,
 };
+use crate::history::Expect;
 use crate::home::HomeLock;
 use crate::id::{FolioId, ObjectId};
 use crate::ops::facts::PlacementFacts;
 use crate::ops::placement::move_::{MovePlan, MoveTarget, apply_move, judge_move};
 use crate::placement::{PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::Expect;
 use crate::registry::Registry;
 
 #[derive(Clone, Debug, Eq, PartialEq)]

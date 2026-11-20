@@ -655,7 +655,7 @@ fn rehome_after_renaming_and_reopening_the_home() {
     let lock = moved_home.try_lock().unwrap();
     let mut registry = Registry::open_or_create(&moved_home, &lock).unwrap();
     let row = registry.folio_row(copy.id).unwrap().unwrap();
-    let folio = folt_core::folio_dir::validate(moved_home.path(), &row).unwrap();
+    let folio = folt_core::folio::dir::validate(moved_home.path(), &row).unwrap();
     let objects = ObjectStore::open(&folio, &row.format).unwrap();
     let fs = PlacementFs::new(&moved_home);
     rehome(home.path(), &fs, &objects, &mut registry, &lock).unwrap();
@@ -707,7 +707,7 @@ fn rehome_repairs_relative_links_after_renaming_the_home() {
     let lock = moved_home.try_lock().unwrap();
     let mut registry = Registry::open_or_create(&moved_home, &lock).unwrap();
     let row = registry.folio_row(link.id).unwrap().unwrap();
-    let folio = folt_core::folio_dir::validate(moved_home.path(), &row).unwrap();
+    let folio = folt_core::folio::dir::validate(moved_home.path(), &row).unwrap();
     let objects = ObjectStore::open(&folio, &row.format).unwrap();
     let fs = PlacementFs::new(&moved_home);
     let facts = facts(&link, &fs);

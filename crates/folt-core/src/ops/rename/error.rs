@@ -1,4 +1,4 @@
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::front_matter::FrontMatterError;
 use crate::object::ObjectError;
 use crate::ops::history::HistoryError;

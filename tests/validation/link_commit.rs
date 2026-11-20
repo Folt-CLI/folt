@@ -1,3 +1,4 @@
+use folt_core::history::Expect;
 use folt_core::id::FolioId;
 use folt_core::id::ObjectId;
 use folt_core::object::Commit;
@@ -15,7 +16,6 @@ use folt_core::placement::{
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
 use folt_core::ref_name::{RefKind, RefName};
-use folt_core::refs::Expect;
 use folt_core::registry::NewPlacement;
 use folt_core::store::ObjectStore;
 

@@ -3,10 +3,9 @@
 
 pub mod config;
 pub mod folio;
-pub mod folio_dir;
-pub mod folio_name;
 pub mod front_matter;
 mod fsx;
+pub mod history;
 pub mod home;
 pub mod id;
 pub mod layout;
@@ -16,7 +15,6 @@ pub mod placement;
 pub mod placement_fs;
 pub mod placement_path;
 pub mod ref_name;
-pub mod refs;
 pub mod registry;
 pub mod store;
 

@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
+use crate::history::{RefError, RefStore};
 use crate::id::{FolioId, ObjectId};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Observation, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::{RefError, RefStore};
 use crate::registry;
 
 /// Read-only facts used by status and move decisions.

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::config::settings::Settings;
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::front_matter::Edit;
 use crate::home::Home;
 use crate::placement_path::{PlacementPath, absolute, path_bytes};

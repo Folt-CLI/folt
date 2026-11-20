@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 
 use crate::config::settings::Settings;
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::front_matter::{self, Block};
 use crate::fsx::FileSystem;
 use crate::ops::rollback::Rollback;

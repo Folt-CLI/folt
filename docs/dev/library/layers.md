@@ -18,13 +18,13 @@ A module may import from another module only when its table row lists that modul
 | L1 | front_matter | config, id |
 | L2 | object | config, id, ref_name |
 | L3 | home | config, layout, fsx, object |
-| L4 | folio, folio_dir, folio_name | config, layout, id, ref_name, fsx, home |
-| L5 | store | config, layout, id, object, folio, folio_dir, folio_name, fsx, home |
-| L5 | placement_path | config, id, folio_name |
-| L6 | placement, placement_fs | config, layout, id, object, folio, folio_dir, folio_name, store, fsx, home |
-| L6 | refs | config, id, ref_name, object, folio, folio_dir, folio_name, store, fsx, home |
-| L7 | registry | config, layout, id, object, folio, folio_dir, folio_name, placement, placement_fs, placement_path, front_matter, fsx, home |
-| L8 | ops | config, layout, id, fsx, ref_name, front_matter, object, home, folio, folio_dir, folio_name, store, placement_path, placement, placement_fs, refs, registry |
+| L4 | folio | config, layout, id, ref_name, fsx, home |
+| L5 | store | config, layout, id, object, folio, fsx, home |
+| L5 | placement_path | config, id, folio |
+| L6 | placement, placement_fs | config, layout, id, object, folio, store, fsx, home |
+| L6 | history | config, id, ref_name, object, folio, store, fsx, home |
+| L7 | registry | config, layout, id, object, folio, placement, placement_fs, placement_path, front_matter, fsx, home |
+| L8 | ops | config, layout, id, fsx, ref_name, front_matter, object, home, folio, store, placement_path, placement, placement_fs, history, registry |
 
 `none` means std and external crates only.
 
@@ -32,9 +32,9 @@ The target `ops` internal order is `refusal`, `facts`, `working`, `status`, `ste
 
 `test_support` and all `cfg(test)` code are outside the table.
 
-`folio_dir` and `folio_name` will move into `folio`, which already holds format, row and ref-file items. `placement_fs` will become `placement/fs`. The remaining ref-store code in `refs` belongs to the future L6 `history`; the L8 history operations now live in `ops/history`. Working-file gathering and resolution live in `ops/working`, working status in `ops/status`, and stage, rename, checkout and prune operations in their own `ops` modules. Registration operations now live in `ops/register`.
+`folio` now holds the Folio directory, folio-name, format, row and ref-file items. `placement_fs` will become `placement/fs`. The ref store now lives under `history` (`history.rs` with `ref_store`, `expect` and `error` submodules) until #291 turns `history` into a full module; the L8 history operations live in `ops/history`. Working-file gathering and resolution live in `ops/working`, working status in `ops/status`, and stage, rename, checkout and prune operations in their own `ops` modules. Registration operations now live in `ops/register`.
 
-The file-level corrections are `id` importing `config`, the existing `folio` in the L4 unit and its import permissions in dependent rows, and the existing `placement_path` at L5 with imports from `config`, `id` and L4 `folio_name`. `registry` also imports `placement_path`. The current `home -> placement_path` import is upward and remains a reported violation; listing it cannot make a higher-layer import conform to the rule.
+The file-level corrections are `id` importing `config`, the existing `folio` in the L4 unit and its import permissions in dependent rows, and the existing `placement_path` at L5 with imports from `config`, `id` and L4 `folio`. `registry` also imports `placement_path`. The current `home -> placement_path` import is upward and remains a reported violation; listing it cannot make a higher-layer import conform to the rule.
 
 ## Allowed exceptions
 

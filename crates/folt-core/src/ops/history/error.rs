@@ -1,9 +1,9 @@
 use super::HistoryRefusal;
+use crate::history::RefError;
 use crate::object::ObjectError;
 use crate::ops::{refusal as placement_refusal, rules_error::RulesError};
 use crate::placement::PlacementError;
 use crate::placement_path::RegistryError;
-use crate::refs::RefError;
 use crate::store::StoreError;
 use std::{error::Error, fmt};
 

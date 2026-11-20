@@ -1,11 +1,11 @@
 use super::{HistoryError, HistoryRefusal};
 use crate::config::names::FOLIOS_DIR;
+use crate::history::{Expect, RefError, RefStore};
 use crate::home::HomeLock;
 use crate::id::{FolioId, ObjectId};
 use crate::object::ObjectKind;
 use crate::placement_path::RegistryError;
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::{Expect, RefError, RefStore};
 use crate::registry::{Placement, Registry};
 use crate::store::{ObjectStore, StoreError};
 
@@ -18,7 +18,7 @@ pub fn create_branch(
     lock: &mut HomeLock,
 ) -> Result<(), HistoryError> {
     if let Some(actual) = refs.read(RefKind::Branch, name)? {
-        return Err(crate::refs::RefError::Stale {
+        return Err(crate::history::RefError::Stale {
             actual: Some(actual),
         }
         .into());
@@ -27,11 +27,12 @@ pub fn create_branch(
     let row = registry
         .folio_row(id)?
         .ok_or(RegistryError::FolioMissing(id))?;
-    let directory =
-        crate::folio_dir::validate(registry.home_path(), &row).map_err(|error| StoreError::Io {
+    let directory = crate::folio::dir::validate(registry.home_path(), &row).map_err(|error| {
+        StoreError::Io {
             path: registry.home_path().join(FOLIOS_DIR).join(id.to_string()),
             source: std::io::Error::other(error),
-        })?;
+        }
+    })?;
     let objects = ObjectStore::open(&directory, &row.format)?;
     let actual = objects.kind_of(commit).map_err(|error| match error {
         StoreError::Io { source, .. } if source.kind() == std::io::ErrorKind::NotFound => {

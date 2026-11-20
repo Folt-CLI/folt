@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
 
+use crate::history::{RefError, RefStore};
 use crate::id::FolioId;
 use crate::ops::facts::{self, Behind, PlacementFacts};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
-use crate::refs::{RefError, RefStore};
 use crate::registry::{self, Registry};
 
 use crate::id::ObjectId;

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::env::Environment;
 use crate::config::names::MARKER_FILE;
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::id::FolioId;
 use crate::placement::PlacementError;
 
