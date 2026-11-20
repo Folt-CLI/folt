@@ -1,3 +1,4 @@
+use super::errors::move_failure;
 use super::*;
 use crate::test_support::TempHome;
 

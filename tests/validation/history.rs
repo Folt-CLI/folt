@@ -1,7 +1,7 @@
 use folt_core::history::{self, HistoryStores};
 use folt_core::object::{Commit, Tag};
 use folt_core::placement::PlacementOps;
-use folt_core::placement_fs::PlacementFs;
+use folt_core::placement::fs::PlacementFs;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
 use folt_core::working_state;

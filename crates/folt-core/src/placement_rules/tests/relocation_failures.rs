@@ -5,7 +5,7 @@ fn rename_failure_rolls_back_new_rows_and_preserves_racing_destinations() {
     for directory in [false, true] {
         for target_directory in [false, true] {
             let (fixture, lock, mut registry) = RelocateFixture::new(directory);
-            let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+            let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             let destination = plan.target.path.to_path_buf();
             let result =
@@ -34,7 +34,7 @@ fn rename_failure_rolls_back_new_rows_and_preserves_racing_destinations() {
 #[test]
 fn rename_race_preserves_a_new_link() {
     let (fixture, lock, mut registry) = RelocateFixture::new(false);
-    let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+    let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
     let plan = fixture.plan(&registry);
     let result = apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
         assert_eq!(step, RelocateStep::Inserted);
@@ -52,7 +52,7 @@ fn rename_race_preserves_a_new_link() {
 #[test]
 fn pending_rows_are_cleaned_when_retry_destination_is_occupied() {
     let (fixture, lock, mut registry) = RelocateFixture::new(true);
-    let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+    let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
     let plan = fixture.plan(&registry);
     assert!(
         apply_relocate_steps(&plan, &fs, &mut registry, &lock, |_, _| {
@@ -71,7 +71,7 @@ fn pending_rows_are_cleaned_when_retry_destination_is_occupied() {
 fn directory_registry_transactions_are_all_or_nothing() {
     for insert in [false, true] {
         let (fixture, lock, mut registry) = RelocateFixture::new(true);
-        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         let (old, new) = &plan.target.rows[1];
         registry.fail_writes_at(if insert { &new.path } else { &old.path }, insert);
@@ -92,7 +92,7 @@ fn link_move_retries_each_crash_window_using_only_pending_rows() {
         RelocateStep::Deleted,
     ] {
         let (mut fixture, lock, mut registry) = RelocateFixture::new(false);
-        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
         let target = fs.link_target(fixture.row.id);
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
         std::fs::write(&target, b"shared content").unwrap();
@@ -142,7 +142,7 @@ fn link_move_retries_each_crash_window_using_only_pending_rows() {
 fn relative_link_normalization_preserves_registry_failure_windows() {
     for insert in [true, false] {
         let (mut fixture, lock, mut registry) = RelocateFixture::new(false);
-        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
         if let Err(error) = fs.probe_link(&fixture.row.path.to_path_buf()) {
             eprintln!("skipping relative link failure windows: {error}");
             return;

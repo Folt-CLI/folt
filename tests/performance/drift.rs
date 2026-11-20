@@ -3,10 +3,10 @@ use std::{fs, hint::black_box};
 use criterion::{BenchmarkId, Criterion};
 use folt_core::id::FolioId;
 use folt_core::object::hash_blob;
+use folt_core::placement::fs::PlacementFs;
 use folt_core::placement::{
     self, Observation, PlacementBase, PlacementKind, PlacementOps, PlacementSpec,
 };
-use folt_core::placement_fs::PlacementFs;
 
 use crate::common::TempHome;
 

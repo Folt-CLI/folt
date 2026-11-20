@@ -5,10 +5,10 @@ use folt_core::id::ObjectId;
 use folt_core::object::Commit;
 use folt_core::ops::refusal::RefusalReason;
 use folt_core::ops::rules_error::RulesError;
+use folt_core::placement::fs::PlacementFs;
 use folt_core::placement::{
     Observation, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
-use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
 use folt_core::placement_rules;
 use folt_core::ref_name::{RefKind, RefName};

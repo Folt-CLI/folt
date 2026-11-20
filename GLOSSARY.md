@@ -250,7 +250,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base and optional stage. The path is the key, and the kind is link, copy or internal.
-- **Code:** `crates/folt-core/src/registry.rs:47` (`Placement`); `crates/folt-core/src/placement.rs:9` (`PlacementKind`); `crates/folt-core/src/placement.rs:57` (`PlacementSpec`)
+- **Code:** `crates/folt-core/src/registry.rs:47` (`Placement`); `crates/folt-core/src/placement/kind.rs:3` (`PlacementKind`); `crates/folt-core/src/placement/model.rs:8` (`PlacementSpec`)
 - **Related:** [link](#link), [copy](#copy), [internal row](#internal-row), [base](#base), [stage](#stage).
 - **Not:** The file itself or `PlacementSpec`, the in-memory record the file-system layer reads, which has no Folio id or stage.
 - **Status:** decided
@@ -268,7 +268,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A placement whose path is a symbolic link to `folio.main`, always on `main` and without a base, recorded commit or stage of its own. Working operations through an intact link use the internal row.
-- **Code:** `crates/folt-core/src/placement.rs:10` (`Link`); `crates/folt-core/src/working_state.rs:259` (`resolve_working`); `crates/folt-core/src/placement_fs.rs:40` (`link_target`)
+- **Code:** `crates/folt-core/src/placement/kind.rs:4` (`Link`); `crates/folt-core/src/working_state.rs:259` (`resolve_working`); `crates/folt-core/src/placement/fs/mod.rs:52` (`link_target`)
 - **Related:** [placement](#placement), [internal row](#internal-row), [copy](#copy), [drift](#drift).
 - **Not:** A Markdown link, hard link or declared reference.
 - **Status:** decided
@@ -277,7 +277,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A placement whose path holds a regular file with its own bytes and working state. It is the default user placement kind and can follow a branch independently of other copies.
-- **Code:** `crates/folt-core/src/placement.rs:11` (`Copy`); `crates/folt-core/src/placement.rs:17` (`DEFAULT`)
+- **Code:** `crates/folt-core/src/placement/kind.rs:5` (`Copy`); `crates/folt-core/src/placement/kind.rs:11` (`DEFAULT`); `crates/folt-core/src/placement/fs/copy.rs:17` (`copy_content`)
 - **Related:** [placement](#placement), [base](#base), [stage](#stage), [behind](#behind).
 - **Not:** A definition of duplicating a Folio’s identity; that remains open in [#16](https://github.com/Folt-CLI/folt/issues/16).
 - **Status:** decided
@@ -286,7 +286,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The registry placement of kind internal for `<home>/folios/<Folio id>/folio.main`, constrained to branch `main`. It holds that file’s working state, shared by links, and is never a user-selected placement kind.
-- **Code:** `crates/folt-core/src/registry.rs:87` (`internal_placement`); `crates/folt-core/src/placement.rs:12` (`Internal`)
+- **Code:** `crates/folt-core/src/registry.rs:87` (`internal_placement`); `crates/folt-core/src/placement/kind.rs:6` (`Internal`)
 - **Related:** [placement](#placement), [link](#link), [branch](#branch), [Folio directory](#folio-directory).
 - **Not:** The file itself: call the file `folio.main` and the row the internal row on `main`.
 - **Status:** decided
@@ -295,7 +295,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The content hash and file signature captured when a copy or internal working file is created or refreshed. The signature contains size, modification time, change time and inode, with unavailable metadata represented as absent.
-- **Code:** `crates/folt-core/src/placement.rs:86` (`PlacementBase`); `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
+- **Code:** `crates/folt-core/src/placement/model.rs:35` (`PlacementBase`); `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
 - **Related:** [copy](#copy), [internal row](#internal-row), [drift](#drift), [stage](#stage).
 - **Not:** A merge base, PR base branch or name prefix before a numeric suffix; links have no base.
 - **Status:** decided
@@ -304,7 +304,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The caller-supplied description of what was found at a placement path: Missing, IntactLink, OtherLink (with its target), File (with its signature), Directory or NotAFile.
-- **Code:** `crates/folt-core/src/placement.rs:67` (`Observation`)
+- **Code:** `crates/folt-core/src/placement/model.rs:18` (`Observation`)
 - **Related:** [placement path](#placement-path), [signature](#signature), [facts](#facts), [drift](#drift).
 - **Not:** A drift decision, content hash or registry placement kind.
 - **Status:** decided
@@ -322,7 +322,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The result of comparing a copy or internal working file with its base, or observing a link. The states are InSync, PlacementEdited, Gone, Detached and Unusable.
-- **Code:** `crates/folt-core/src/placement.rs:78` (`Drift`); `crates/folt-core/src/placement.rs:114` (`classify`)
+- **Code:** `crates/folt-core/src/placement/drift.rs:6` (`Drift`); `crates/folt-core/src/placement/drift.rs:22` (`classify`)
 - **Related:** [base](#base), [link](#link), [copy](#copy), [behind](#behind).
 - **Not:** Whether a branch tip moved; the working-status edit enum means Clean or Edited, while the front matter edit type represents a byte-span replacement.
 - **Status:** decided
@@ -331,7 +331,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage; later changes to staged bytes show StagedThenModified.
-- **Code:** `crates/folt-core/src/working_state.rs:94` (`stage`); `crates/folt-core/src/placement.rs:101` (`StagedBlob`); `crates/folt-core/src/working_state.rs:21` (`Staged`)
+- **Code:** `crates/folt-core/src/working_state.rs:94` (`stage`); `crates/folt-core/src/placement/model.rs:42` (`StagedBlob`); `crates/folt-core/src/working_state.rs:21` (`Staged`)
 - **Related:** [blob](#blob), [commit](#commit), [unstage](#unstage), [refs table](#refs-table).
 - **Not:** Git staging or a development workflow stage; staging does not change the base.
 - **Status:** decided
@@ -542,7 +542,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:105` (`copy_content`)
+- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement/fs/copy.rs:17` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
