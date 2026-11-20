@@ -89,10 +89,11 @@ mod conversion {
     use folt_core::home::HomeLock;
     use folt_core::id::ObjectId;
     use folt_core::object::hash_blob;
+    use folt_core::ops::facts::gather_convert;
+    use folt_core::ops::placement::convert::{ConvertPlan, apply_convert, judge_convert};
     use folt_core::ops::refusal::RefusalReason;
     use folt_core::ops::rules_error::RulesError;
     use folt_core::placement::{PlacementError, PlacementKind, StagedBlob};
-    use folt_core::placement_rules::{self, ConvertPlan};
     use folt_core::ref_name::RefName;
     use folt_core::registry::Placement;
 
@@ -126,9 +127,8 @@ mod conversion {
         kind: PlacementKind,
     ) -> ConvertPlan {
         let fs = PlacementFs::new(&home.home);
-        let facts = placement_rules::gather_convert(row, &fs, |_| Ok(&folio.refs)).unwrap();
-        let internal =
-            placement_rules::gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs)).unwrap();
+        let facts = gather_convert(row, &fs, |_| Ok(&folio.refs)).unwrap();
+        let internal = gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs)).unwrap();
         let target = checkout::resolve(
             &folio.refs,
             &folio.objects,
@@ -136,7 +136,7 @@ mod conversion {
             16384,
         )
         .unwrap();
-        placement_rules::judge_convert(&facts, kind, Some(&target), Some(&internal)).unwrap()
+        judge_convert(&facts, kind, Some(&target), Some(&internal)).unwrap()
     }
 
     fn apply(
@@ -147,7 +147,7 @@ mod conversion {
         kind: PlacementKind,
     ) -> Placement {
         let plan = plan(home, folio, row, kind);
-        placement_rules::apply_convert(
+        apply_convert(
             &plan,
             &PlacementFs::new(&home.home),
             &folio.objects,
@@ -507,10 +507,8 @@ mod conversion {
                 .unwrap();
             let fs = PlacementFs::new(&home.home);
             // Non-main copies are refused before their branch's tip matters.
-            let facts = placement_rules::gather_convert(&row, &fs, |_| Ok(&folio.refs)).unwrap();
-            let internal =
-                placement_rules::gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs))
-                    .unwrap();
+            let facts = gather_convert(&row, &fs, |_| Ok(&folio.refs)).unwrap();
+            let internal = gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs)).unwrap();
             let target = checkout::resolve(
                 &folio.refs,
                 &folio.objects,
@@ -519,7 +517,7 @@ mod conversion {
             )
             .unwrap();
             assert_eq!(
-                placement_rules::judge_convert(&facts, kind, Some(&target), Some(&internal))
+                judge_convert(&facts, kind, Some(&target), Some(&internal))
                     .unwrap_err()
                     .reason,
                 reason,
@@ -617,7 +615,7 @@ mod conversion {
                     RefusalReason::RegistryChanged
                 }
             };
-            let result = placement_rules::apply_convert(
+            let result = apply_convert(
                 &plan,
                 &PlacementFs::new(&home.home),
                 &folio.objects,

@@ -1,4 +1,4 @@
-use crate::ops::refusal::Refusal;
+use crate::ops::refusal::PlacementRefusal;
 use crate::placement::PlacementError;
 use crate::placement_path::RegistryError;
 use crate::refs::RefError;
@@ -11,7 +11,7 @@ pub enum RulesError {
     Placement(PlacementError),
     Ref(RefError),
     Registry(RegistryError),
-    Refused(Refusal),
+    Refused(PlacementRefusal),
 }
 
 impl From<PlacementError> for RulesError {
@@ -32,8 +32,8 @@ impl From<RegistryError> for RulesError {
     }
 }
 
-impl From<Refusal> for RulesError {
-    fn from(error: Refusal) -> Self {
+impl From<PlacementRefusal> for RulesError {
+    fn from(error: PlacementRefusal) -> Self {
         Self::Refused(error)
     }
 }

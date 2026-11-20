@@ -28,12 +28,12 @@ pub enum RefusalReason {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Refusal {
+pub struct PlacementRefusal {
     pub path: PathBuf,
     pub reason: RefusalReason,
 }
 
-impl fmt::Display for Refusal {
+impl fmt::Display for PlacementRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let reason = match self.reason {
             RefusalReason::MissingInternal => "missing internal working-file row",
@@ -80,4 +80,4 @@ impl fmt::Display for Refusal {
     }
 }
 
-impl Error for Refusal {}
+impl Error for PlacementRefusal {}

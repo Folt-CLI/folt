@@ -5,17 +5,18 @@ use folt_core::id::ObjectId;
 use folt_core::object::Commit;
 use folt_core::ops::refusal::RefusalReason;
 use folt_core::ops::rules_error::RulesError;
+use folt_core::ops::status::gather_status;
+use folt_core::ops::working::{self, Edit, Staged};
 use folt_core::placement::{
     Observation, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::placement_rules;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
 use folt_core::registry::NewPlacement;
 use folt_core::store::ObjectStore;
-use folt_core::working_state::{self, Edit, Staged};
+use folt_core::working_state;
 
 use std::path::PathBuf;
 
@@ -144,7 +145,7 @@ fn links_share_internal_edit_stage_commit_and_discard() {
     };
     let internal = folio.internal();
     std::fs::write(internal.path.to_path_buf(), b"shared edit").unwrap();
-    let status = placement_rules::gather_status(
+    let status = gather_status(
         &[link.clone(), other.clone()],
         &fs,
         |_| Ok(&folio.refs),
@@ -163,7 +164,7 @@ fn links_share_internal_edit_stage_commit_and_discard() {
         &lock,
     )
     .unwrap();
-    let status = placement_rules::gather_status(
+    let status = gather_status(
         &[link.clone(), other.clone()],
         &fs,
         |_| Ok(&folio.refs),
@@ -209,7 +210,7 @@ fn links_share_internal_edit_stage_commit_and_discard() {
         folio.registry.placement_at(&link.path).unwrap().unwrap(),
         link
     );
-    let status = placement_rules::gather_status(
+    let status = gather_status(
         std::slice::from_ref(&link),
         &fs,
         |_| Ok(&folio.refs),
@@ -309,7 +310,7 @@ fn copy_commit_preserves_internal_edits_and_stale_stage() {
     let facts = history::gather_commit(&copy, &fs, &stores, &folio.registry).unwrap();
     assert!(matches!(
         history::judge_commit(&facts),
-        Err(history::Refusal::InternalEdited(_))
+        Err(history::HistoryRefusal::InternalEdited(_))
     ));
     working_state::stage(
         &link,
@@ -323,12 +324,12 @@ fn copy_commit_preserves_internal_edits_and_stale_stage() {
     std::fs::write(internal.path.to_path_buf(), b"initial").unwrap();
     let facts = history::gather_commit(&copy, &fs, &stores, &folio.registry).unwrap();
     assert_eq!(
-        working_state::judge_working(facts.internal.as_ref().unwrap()).edit,
+        working::judge::judge_working(facts.internal.as_ref().unwrap()).edit,
         Edit::Clean
     );
     assert!(matches!(
         history::judge_commit(&facts),
-        Err(history::Refusal::InternalEdited(_))
+        Err(history::HistoryRefusal::InternalEdited(_))
     ));
     assert_eq!(
         folio.registry.placement_at(&copy.path).unwrap().unwrap(),
@@ -348,7 +349,7 @@ fn copy_commit_preserves_internal_edits_and_stale_stage() {
     let facts = history::gather_commit(&copy, &fs, &stores, &folio.registry).unwrap();
     assert!(matches!(
         history::judge_commit(&facts),
-        Err(history::Refusal::BranchMoved { .. })
+        Err(history::HistoryRefusal::BranchMoved { .. })
     ));
     // A copy must first catch up with main, then it can commit normally.
     let checkout = CheckoutStores {
@@ -487,7 +488,7 @@ fn resumes_commit_through_link_and_rechecks_selected_link() {
     )
     .unwrap_err();
     assert!(
-        matches!(error, history::HistoryError::Refused(history::Refusal::RegistryChanged(ref path)) if *path == link.path.to_path_buf())
+        matches!(error, history::HistoryError::Refused(history::HistoryRefusal::RegistryChanged(ref path)) if *path == link.path.to_path_buf())
     );
     assert_eq!(folio.internal(), internal);
     folio
@@ -544,9 +545,9 @@ fn replaced_links_refuse_all_working_operations_without_changing_rows() {
         );
         assert!(error.to_string().contains("kind-change command (#33)"));
         assert!(working_state::unstage(&link, &fs, &mut folio.registry, &lock).is_err());
-        assert!(working_state::gather(&link, &fs, &folio.refs, &folio.registry).is_err());
+        assert!(working::gather(&link, &fs, &folio.refs, &folio.registry).is_err());
         assert!(
-            placement_rules::gather_status(
+            gather_status(
                 std::slice::from_ref(&link),
                 &fs,
                 |_| Ok(&folio.refs),

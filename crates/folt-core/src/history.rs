@@ -9,16 +9,20 @@ use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{Author, Commit, CommitTime, ObjectError, ObjectKind, Tag, hash_blob};
 use crate::ops::facts::PlacementFacts;
+use crate::ops::placement::move_::{
+    MovePlan, MoveTarget, apply_move, apply_move_file, judge_move, moved_row,
+};
 use crate::ops::refusal;
 use crate::ops::rules_error::RulesError;
+use crate::ops::working::judge::judge_working;
+use crate::ops::working::resolve::resolve_working;
+use crate::ops::working::{Edit, gather};
 use crate::placement::{Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_path::RegistryError;
-use crate::placement_rules::{self, MovePlan, MoveTarget};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{Expect, RefError, RefStore};
 use crate::registry::{Placement, Registry};
 use crate::store::{ObjectStore, StoreError};
-use crate::working_state::{self, Edit};
 
 /// Stores for one Folio and the caller's bound for commit object reads.
 #[derive(Clone, Copy)]
@@ -52,14 +56,14 @@ pub fn gather_commit(
         object_limit,
     } = *stores;
     let link = (row.kind == PlacementKind::Link).then(|| row.clone());
-    let working = working_state::gather(row, fs, refs, registry)?;
+    let working = gather(row, fs, refs, registry)?;
     let row = &working.placement;
     let placements = registry.placements_of_head(row.id, &row.head)?;
     let internal = if row.kind == PlacementKind::Copy && row.head == DEFAULT_BRANCH {
         let internal = placements
             .iter()
             .find(|row| row.kind == PlacementKind::Internal)
-            .ok_or(Refusal::MissingInternal)?;
+            .ok_or(HistoryRefusal::MissingInternal)?;
         Some(gather_file(internal, fs, refs)?)
     } else {
         None
@@ -114,47 +118,50 @@ fn matches_requested_commit(actual: &Commit, requested: &Commit) -> bool {
         && actual.parents == requested.parents
 }
 
-pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, Refusal> {
+pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRefusal> {
     let row = &facts.working.placement;
     if row.kind == PlacementKind::Link {
-        return Err(Refusal::Link(row.path.to_path_buf()));
+        return Err(HistoryRefusal::Link(row.path.to_path_buf()));
     }
-    let staged = row.staged.ok_or(Refusal::NothingStaged)?;
+    let staged = row.staged.ok_or(HistoryRefusal::NothingStaged)?;
     if !matches!(facts.working.observation, Observation::File { .. }) {
-        return Err(Refusal::Unusable(row.path.to_path_buf()));
+        return Err(HistoryRefusal::Unusable(row.path.to_path_buf()));
     }
     if row.kind == PlacementKind::Internal && row.head != DEFAULT_BRANCH {
-        return Err(Refusal::InvalidFacts);
+        return Err(HistoryRefusal::InvalidFacts);
     }
     let resume = resume_commit(facts);
     if facts.working.tip != row.commit_id && resume.is_none() {
         return Err(branch_moved(facts));
     }
     if row.kind == PlacementKind::Copy && row.head == DEFAULT_BRANCH {
-        let internal = facts.internal.as_ref().ok_or(Refusal::MissingInternal)?;
+        let internal = facts
+            .internal
+            .as_ref()
+            .ok_or(HistoryRefusal::MissingInternal)?;
         if internal.placement.id != row.id
             || internal.placement.kind != PlacementKind::Internal
             || internal.placement.head != DEFAULT_BRANCH
         {
-            return Err(Refusal::InvalidFacts);
+            return Err(HistoryRefusal::InvalidFacts);
         }
         // A completed file replacement may precede the atomic registry update.
         let already_written = resume.is_some() && internal.placement_hash == Some(staged.hash);
         if internal.placement.staged.is_some()
-            || (working_state::judge_working(internal).edit != Edit::Clean && !already_written)
+            || (judge_working(internal).edit != Edit::Clean && !already_written)
         {
-            return Err(Refusal::InternalEdited(
+            return Err(HistoryRefusal::InternalEdited(
                 internal.placement.path.to_path_buf(),
             ));
         }
         // Only the branch and content affect move permission; apply supplies
         // the new commit id once its caller-provided metadata has been encoded.
         let target = MoveTarget {
-            branch: RefName::parse(DEFAULT_BRANCH).map_err(|_| Refusal::InvalidFacts)?,
+            branch: RefName::parse(DEFAULT_BRANCH).map_err(|_| HistoryRefusal::InvalidFacts)?,
             commit: resume.or(row.commit_id).unwrap_or(staged.hash),
             content: staged.hash,
         };
-        placement_rules::judge_move(internal, &target, false)?;
+        judge_move(internal, &target, false)?;
     }
     Ok(CommitPlan {
         facts: facts.clone(),
@@ -162,8 +169,8 @@ pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, Refusal> {
     })
 }
 
-fn branch_moved(facts: &CommitFacts) -> Refusal {
-    Refusal::BranchMoved {
+fn branch_moved(facts: &CommitFacts) -> HistoryRefusal {
+    HistoryRefusal::BranchMoved {
         tip: facts.working.tip,
         ahead: facts
             .placements
@@ -208,8 +215,8 @@ pub fn apply_commit(
     require_row(registry, row)?;
     if let Some(link) = &plan.facts.link {
         require_row(registry, link)?;
-        if working_state::resolve_working(link, registry, fs)? != *row {
-            return Err(Refusal::RegistryChanged(link.path.to_path_buf()).into());
+        if resolve_working(link, registry, fs)? != *row {
+            return Err(HistoryRefusal::RegistryChanged(link.path.to_path_buf()).into());
         }
     }
     require_observation(&plan.facts.working, fs)?;
@@ -221,7 +228,7 @@ pub fn apply_commit(
             require_observation(internal, fs)?;
         }
     }
-    let staged = row.staged.ok_or(Refusal::InvalidFacts)?;
+    let staged = row.staged.ok_or(HistoryRefusal::InvalidFacts)?;
     let commit = Commit {
         content: staged.hash,
         parents: row.commit_id.into_iter().collect(),
@@ -243,7 +250,7 @@ pub fn apply_commit(
     }
     if staged.hash == hash_blob(b"") {
         if staged.size != 0 {
-            return Err(Refusal::InvalidFacts.into());
+            return Err(HistoryRefusal::InvalidFacts.into());
         }
         objects.put(lock, ObjectKind::Blob, b"")?;
     } else {
@@ -284,12 +291,9 @@ pub fn apply_commit(
             commit: id,
             content: staged.hash,
         };
-        let move_plan = placement_rules::judge_move(internal, &target, false)?;
-        let base = placement_rules::apply_move_file(&move_plan, fs, objects, registry, lock)?;
-        Some((
-            internal.placement.clone(),
-            placement_rules::moved_row(&move_plan, base),
-        ))
+        let move_plan = judge_move(internal, &target, false)?;
+        let base = apply_move_file(&move_plan, fs, objects, registry, lock)?;
+        Some((internal.placement.clone(), moved_row(&move_plan, base)))
     } else {
         None
     };
@@ -297,7 +301,7 @@ pub fn apply_commit(
     updated.commit_id = Some(id);
     updated.staged = None;
     let Observation::File { signature } = &facts.working.observation else {
-        return Err(Refusal::InvalidFacts.into());
+        return Err(HistoryRefusal::InvalidFacts.into());
     };
     updated.base = Some(PlacementBase {
         hash: staged.hash,
@@ -330,14 +334,14 @@ pub fn apply_commit(
 
 fn require_row(registry: &Registry, row: &Placement) -> Result<(), HistoryError> {
     if registry.placement_at(&row.path)?.as_ref() != Some(row) {
-        return Err(Refusal::RegistryChanged(row.path.to_path_buf()).into());
+        return Err(HistoryRefusal::RegistryChanged(row.path.to_path_buf()).into());
     }
     Ok(())
 }
 
 fn require_observation(facts: &PlacementFacts, fs: &impl PlacementOps) -> Result<(), HistoryError> {
     if fs.read(facts.placement.id, &facts.placement.to_placement().1)? != facts.observation {
-        return Err(Refusal::PlacementChanged(facts.placement.path.to_path_buf()).into());
+        return Err(HistoryRefusal::PlacementChanged(facts.placement.path.to_path_buf()).into());
     }
     Ok(())
 }
@@ -408,7 +412,7 @@ pub fn gather_reset(
     } = *stores;
     let old = refs
         .read(RefKind::Branch, branch)?
-        .ok_or(Refusal::MissingBranch)?;
+        .ok_or(HistoryRefusal::MissingBranch)?;
     let target = objects.get_commit(commit, object_limit)?;
     require_blob(objects, target.content)?;
     let rows = registry.placements_of_head(id, branch.as_str())?;
@@ -438,20 +442,16 @@ pub struct ResetPlan {
     moves: Vec<MovePlan>,
 }
 
-pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, Refusal> {
+pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, HistoryRefusal> {
     let mut moves = Vec::new();
     for placement in &facts.placements {
         if placement.placement.id != facts.id
             || placement.placement.head != facts.target.branch.as_str()
             || placement.tip != Some(facts.old)
         {
-            return Err(Refusal::InvalidFacts);
+            return Err(HistoryRefusal::InvalidFacts);
         }
-        moves.push(placement_rules::judge_move(
-            placement,
-            &facts.target,
-            discard,
-        )?);
+        moves.push(judge_move(placement, &facts.target, discard)?);
     }
     Ok(ResetPlan {
         facts: facts.clone(),
@@ -479,7 +479,7 @@ pub fn apply_reset(
         .filter(|row| row.kind != PlacementKind::Link)
         .collect();
     if actual != expected {
-        return Err(Refusal::PlacementsChanged.into());
+        return Err(HistoryRefusal::PlacementsChanged.into());
     }
     for placement in &facts.placements {
         require_observation(placement, fs)?;
@@ -495,17 +495,17 @@ pub fn apply_reset(
     )?;
     refs.sync_refs()?;
     for movement in &plan.moves {
-        placement_rules::apply_move(movement, fs, objects, registry, lock)?;
+        apply_move(movement, fs, objects, registry, lock)?;
     }
     Ok(())
 }
 
 /// Pass `placements_of_head`, including the internal row, to this pure judge.
-pub fn judge_delete_branch(placements: &[Placement]) -> Result<(), Refusal> {
+pub fn judge_delete_branch(placements: &[Placement]) -> Result<(), HistoryRefusal> {
     if placements.is_empty() {
         Ok(())
     } else {
-        Err(Refusal::BranchInUse(
+        Err(HistoryRefusal::BranchInUse(
             placements
                 .iter()
                 .map(|row| row.path.to_path_buf())
@@ -539,12 +539,12 @@ pub fn create_tag(
     let HistoryStores { objects, refs, .. } = *stores;
     if let Some(tag) = annotation {
         if tag.name != name.as_str() || tag.target != commit {
-            return Err(Refusal::TagMismatch.into());
+            return Err(HistoryRefusal::TagMismatch.into());
         }
         tag.encode_body()?;
     }
     if refs.read(RefKind::Tag, name)?.is_some() {
-        return Err(Refusal::TagExists.into());
+        return Err(HistoryRefusal::TagExists.into());
     }
     let actual = objects.kind_of(commit)?;
     if actual != ObjectKind::Commit {
@@ -603,7 +603,7 @@ fn require_blob(objects: &ObjectStore, id: ObjectId) -> Result<(), HistoryError>
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Refusal {
+pub enum HistoryRefusal {
     NothingStaged,
     BranchMoved {
         tip: Option<ObjectId>,
@@ -621,16 +621,16 @@ pub enum Refusal {
     InvalidFacts,
     TagMismatch,
     TagExists,
-    Move(refusal::Refusal),
+    Move(refusal::PlacementRefusal),
 }
 
-impl From<refusal::Refusal> for Refusal {
-    fn from(error: refusal::Refusal) -> Self {
+impl From<refusal::PlacementRefusal> for HistoryRefusal {
+    fn from(error: refusal::PlacementRefusal) -> Self {
         Self::Move(error)
     }
 }
 
-impl fmt::Display for Refusal {
+impl fmt::Display for HistoryRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NothingStaged => write!(f, "nothing staged"),
@@ -663,11 +663,11 @@ impl fmt::Display for Refusal {
         }
     }
 }
-impl Error for Refusal {}
+impl Error for HistoryRefusal {}
 
 #[derive(Debug)]
 pub enum HistoryError {
-    Refused(Refusal),
+    Refused(HistoryRefusal),
     Object(ObjectError),
     Store(StoreError),
     Ref(RefError),
@@ -676,8 +676,8 @@ pub enum HistoryError {
     Rules(RulesError),
 }
 
-impl From<Refusal> for HistoryError {
-    fn from(error: Refusal) -> Self {
+impl From<HistoryRefusal> for HistoryError {
+    fn from(error: HistoryRefusal) -> Self {
         Self::Refused(error)
     }
 }
@@ -711,8 +711,8 @@ impl From<RulesError> for HistoryError {
         Self::Rules(error)
     }
 }
-impl From<refusal::Refusal> for HistoryError {
-    fn from(error: refusal::Refusal) -> Self {
+impl From<refusal::PlacementRefusal> for HistoryError {
+    fn from(error: refusal::PlacementRefusal) -> Self {
         Self::Refused(error.into())
     }
 }

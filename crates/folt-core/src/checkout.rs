@@ -2,9 +2,11 @@ use std::error::Error;
 use std::fmt;
 
 use crate::home::HomeLock;
+use crate::ops::facts::gather_move;
+use crate::ops::placement::move_::{MoveTarget, apply_move, judge_move};
 use crate::ops::rules_error::RulesError;
+use crate::ops::working::resolve::resolve_working;
 use crate::placement::PlacementOps;
-use crate::placement_rules::{self, MoveTarget};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry};
@@ -48,11 +50,11 @@ pub fn checkout_placement(
     registry: &mut Registry,
     lock: &HomeLock,
 ) -> Result<(), CheckoutError> {
-    let row = &crate::working_state::resolve_working(row, registry, fs)?;
+    let row = &resolve_working(row, registry, fs)?;
     let target = resolve(stores.refs, stores.objects, branch, stores.object_limit)?;
-    let facts = placement_rules::gather_move(row, fs, |_| Ok(stores.refs))?;
-    let plan = placement_rules::judge_move(&facts, &target, discard).map_err(RulesError::from)?;
-    placement_rules::apply_move(&plan, fs, stores.objects, registry, lock)?;
+    let facts = gather_move(row, fs, |_| Ok(stores.refs))?;
+    let plan = judge_move(&facts, &target, discard).map_err(RulesError::from)?;
+    apply_move(&plan, fs, stores.objects, registry, lock)?;
     Ok(())
 }
 
