@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::config::limits::REF_FILE_MAX_BYTES;
 use crate::config::names::{HEADS_DIR, PINS_DIR, REFS_DIR, TAGS_DIR, TEMP_PREFIX_REF};
-use crate::fsx::{FileSystem, RealFileSystem};
+use crate::fsx::FileSystem;
 use crate::fsx::{TempFile, TempMode};
 use crate::id::ObjectId;
 use crate::ref_name::{LowerRefError, RefKind, RefName};
@@ -75,7 +75,7 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), LowerRefErro
     let parent = path
         .parent()
         .ok_or_else(|| LowerRefError::InvalidRef(path.into()))?;
-    fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
+    crate::fsx::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
     let mut temporary = TempFile::create(parent, TEMP_PREFIX_REF, '.', TempMode::Default)
         .map_err(|(path, source)| io_error(&path, source))?;
     temporary
@@ -127,7 +127,7 @@ pub(crate) fn clean_directory(path: &Path, recursive: bool) -> Result<(), LowerR
             .file_type()
             .map_err(|source| io_error(&child, source))?;
         if ty.is_file() && entry.file_name().to_str().is_some_and(temporary_name) {
-            fs::remove_file(&child).map_err(|source| io_error(&child, source))?;
+            crate::fsx::remove_file(&child).map_err(|source| io_error(&child, source))?;
         } else if recursive && ty.is_dir() {
             clean_directory(&child, true)?;
         } else if recursive && !ty.is_file() {
@@ -136,12 +136,11 @@ pub(crate) fn clean_directory(path: &Path, recursive: bool) -> Result<(), LowerR
     }
     Ok(())
 }
-fn sync_directory(path: &Path) -> Result<(), LowerRefError> {
-    RealFileSystem
-        .sync_directory(path)
+fn sync_directory(fs: &dyn FileSystem, path: &Path) -> Result<(), LowerRefError> {
+    fs.sync_directory(path)
         .map_err(|source| io_error(path, source))
 }
-pub(crate) fn sync_directories(path: &Path) -> Result<(), LowerRefError> {
+pub(crate) fn sync_directories(fs: &dyn FileSystem, path: &Path) -> Result<(), LowerRefError> {
     for entry in entries(path)? {
         let child = entry.path();
         if entry
@@ -149,11 +148,11 @@ pub(crate) fn sync_directories(path: &Path) -> Result<(), LowerRefError> {
             .map_err(|source| io_error(&child, source))?
             .is_dir()
         {
-            sync_directories(&child)?;
+            sync_directories(fs, &child)?;
         }
     }
     if metadata(path)?.is_some() {
-        sync_directory(path)?;
+        sync_directory(fs, path)?;
     }
     Ok(())
 }

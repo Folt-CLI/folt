@@ -21,18 +21,28 @@ impl<T: Read + Seek> ReadSeek for T {}
 
 /// Immutable objects stored beneath one Folio's `blobs` directory.
 pub struct ObjectStore {
+    fs: Box<dyn FileSystem>,
     root: PathBuf,
     format: FolioFormat,
 }
 
 impl ObjectStore {
     pub fn open(folio: &FolioDir, format: &FolioFormat) -> Result<Self, StoreError> {
+        Self::open_with(folio, format, Box::new(RealFileSystem))
+    }
+
+    pub(crate) fn open_with(
+        folio: &FolioDir,
+        format: &FolioFormat,
+        fs: Box<dyn FileSystem>,
+    ) -> Result<Self, StoreError> {
         check_format(format).map_err(|error| match error {
             FormatError::Newer { found, supported } => StoreError::NewerFormat { found, supported },
             FormatError::Older { found, supported } => StoreError::OlderFormat { found, supported },
             FormatError::UnsupportedAlgorithm(value) => StoreError::UnsupportedAlgorithm(value),
         })?;
         Ok(Self {
+            fs,
             root: folio.path().join(BLOBS_DIR),
             format: format.clone(),
         })
@@ -278,7 +288,7 @@ impl ObjectStore {
             }
             let (mut out, _) = writer.finish()?;
             out.flush().map_err(ObjectError::Io)?;
-            out.sync_all().map_err(ObjectError::Io)?;
+            crate::fsx::sync_file(&out).map_err(ObjectError::Io)?;
             Ok(())
         })();
         if let Err(error) = write_result {
@@ -384,7 +394,7 @@ impl ObjectStore {
         Ok(out)
     }
     pub fn sync_blobs(&self) -> Result<(), StoreError> {
-        RealFileSystem
+        self.fs
             .sync_directory(&self.root)
             .map_err(|source| StoreError::Io {
                 path: self.root.clone(),
@@ -406,7 +416,7 @@ impl ObjectStore {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             if name.starts_with(TEMP_PREFIX_INPUT) || name.starts_with(TEMP_PREFIX_OBJECT) {
-                fs::remove_file(entry.path()).map_err(|source| StoreError::Io {
+                crate::fsx::remove_file(entry.path()).map_err(|source| StoreError::Io {
                     path: entry.path(),
                     source,
                 })?;

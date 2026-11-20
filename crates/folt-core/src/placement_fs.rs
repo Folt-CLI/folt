@@ -21,11 +21,16 @@ use crate::store::ObjectStore;
 /// Filesystem implementation of link and copy placement operations.
 pub struct PlacementFs<'a> {
     home: &'a Home,
+    fs: &'a dyn FileSystem,
 }
 
 impl<'a> PlacementFs<'a> {
     pub fn new(home: &'a Home) -> Self {
-        Self { home }
+        Self::with_fs(home, &RealFileSystem)
+    }
+
+    pub(crate) fn with_fs(home: &'a Home, fs: &'a dyn FileSystem) -> Self {
+        Self { home, fs }
     }
 
     /// Checks whether the path's filesystem permits creating a symbolic link.
@@ -35,7 +40,7 @@ impl<'a> PlacementFs<'a> {
         let probe_path = temporary_path(parent, TEMP_TAG_LINK_PROBE);
         let probe =
             TempFile::sibling_at(&probe_path).map_err(|source| symlink_failure(path, source))?;
-        RealFileSystem
+        self.fs
             .create_symlink(&self.home.path().join(FOLIOS_DIR), probe.path())
             .map_err(|source| symlink_failure(path, source))?;
         probe
@@ -77,7 +82,7 @@ impl<'a> PlacementFs<'a> {
             "folt-link",
         );
         let temporary = TempFile::sibling_at(&link_path).map_err(|e| failure(&link_path, e))?;
-        RealFileSystem
+        self.fs
             .create_symlink(&target, temporary.path())
             .map_err(|e| failure(&link_path, e))?;
         if let Some(expected) = expected
@@ -125,7 +130,7 @@ impl<'a> PlacementFs<'a> {
         let prepare = if replace {
             match fs::symlink_metadata(&placement.path) {
                 Ok(existing) if existing.is_file() => {
-                    fs::set_permissions(temporary.path(), existing.permissions())
+                    crate::fsx::set_permissions(temporary.path(), existing.permissions())
                         .map_err(|error| failure(temporary.path(), error))
                 }
                 Ok(_) => Err(failure(
@@ -164,7 +169,7 @@ impl<'a> PlacementFs<'a> {
             prepare?;
             temporary.publish(&placement.path)
         } else {
-            let linked = match fs::hard_link(temporary.path(), &placement.path) {
+            let linked = match crate::fsx::hard_link(temporary.path(), &placement.path) {
                 Ok(()) => Ok(()),
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
                 Err(error) if hard_links_unsupported(&error) => {
@@ -206,7 +211,7 @@ impl PlacementOps for PlacementFs<'_> {
         match placement.kind {
             PlacementKind::Link => {
                 fs::metadata(&target).map_err(|e| failure(&target, e))?;
-                RealFileSystem
+                self.fs
                     .create_symlink(&target, &placement.path)
                     .map_err(|e| failure(&placement.path, e))?;
                 Ok(Written { base: None })
@@ -291,7 +296,7 @@ impl PlacementOps for PlacementFs<'_> {
 
     fn sync_parent(&self, placement: &PlacementSpec) -> Result<(), PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
-        RealFileSystem
+        self.fs
             .sync_directory(parent)
             .map_err(|error| failure(parent, error))
     }
@@ -318,24 +323,25 @@ impl PlacementOps for PlacementFs<'_> {
                         .map_err(|error| failure(temporary.path(), error))?;
                     let metadata = fs::metadata(&placement.path)
                         .map_err(|error| failure(&placement.path, error))?;
-                    output
-                        .set_permissions(metadata.permissions())
+                    crate::fsx::set_file_permissions(&output, metadata.permissions())
                         .map_err(|error| failure(temporary.path(), error))?;
-                    output
-                        .sync_all()
+                    crate::fsx::sync_file(&output)
                         .map_err(|error| failure(temporary.path(), error))?;
                     temporary
                 }
                 (PlacementKind::Copy, PlacementKind::Link, Observation::File { .. }) => {
-                    require_single_link(&placement.path)?;
+                    self.fs
+                        .link_count(&placement.path)
+                        .and_then(crate::fsx::ensure_single)
+                        .map_err(|error| failure(&placement.path, error))?;
                     let target = self.link_target(id);
                     fs::metadata(&target).map_err(|error| failure(&target, error))?;
                     let temporary = TempFile::sibling_at(&temporary_path)
                         .map_err(|error| symlink_failure(&placement.path, error))?;
-                    RealFileSystem
+                    self.fs
                         .create_symlink(&target, temporary.path())
                         .map_err(|error| symlink_failure(&placement.path, error))?;
-                    RealFileSystem
+                    self.fs
                         .sync_directory(parent)
                         .map_err(|error| failure(parent, error))?;
                     temporary
@@ -351,7 +357,10 @@ impl PlacementOps for PlacementFs<'_> {
                 return Err(PlacementError::PlacementChanged);
             }
             if to_kind == PlacementKind::Link {
-                require_single_link(&placement.path)?;
+                self.fs
+                    .link_count(&placement.path)
+                    .and_then(crate::fsx::ensure_single)
+                    .map_err(|error| failure(&placement.path, error))?;
             }
             // Rename replaces the entry atomically (MoveFileExW with
             // MOVEFILE_REPLACE_EXISTING on Windows). Never unlink first: a
@@ -359,7 +368,7 @@ impl PlacementOps for PlacementFs<'_> {
             temporary
                 .publish(&placement.path)
                 .map_err(|error| failure(&placement.path, error))?;
-            RealFileSystem
+            self.fs
                 .sync_directory(parent)
                 .map_err(|error| failure(parent, error))?;
             let base = if to_kind == PlacementKind::Copy {
@@ -384,7 +393,7 @@ impl PlacementOps for PlacementFs<'_> {
         expected: &Observation,
     ) -> Result<Written, PlacementError> {
         self.relocate_with_rename(id, placement, to, expected, |from, to| {
-            RealFileSystem.rename_no_replace(from, to)
+            self.fs.rename_no_replace(from, to)
         })
     }
 
@@ -399,7 +408,8 @@ impl PlacementOps for PlacementFs<'_> {
         }
         match expected {
             Observation::IntactLink | Observation::OtherLink { .. } | Observation::File { .. } => {
-                fs::remove_file(&placement.path).map_err(|error| failure(&placement.path, error))
+                crate::fsx::remove_file(&placement.path)
+                    .map_err(|error| failure(&placement.path, error))
             }
             _ => Err(PlacementError::PlacementChanged),
         }
@@ -476,7 +486,7 @@ fn write_copy(
         .get_to(content, ObjectKind::Blob, &mut *output)
         .map_err(PlacementError::Store)?;
     output.flush().map_err(|error| failure(&path, error))?;
-    output.sync_all().map_err(|error| failure(&path, error))?;
+    crate::fsx::sync_file(output).map_err(|error| failure(&path, error))?;
     temporary.close();
     Ok(())
 }
