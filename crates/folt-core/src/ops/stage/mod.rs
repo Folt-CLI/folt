@@ -70,6 +70,7 @@ pub fn unstage(
 }
 
 mod references;
+pub(crate) mod refuse;
 mod write;
 
 pub(crate) use references::stage_references;

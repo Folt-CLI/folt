@@ -1,4 +1,4 @@
-//! The operations tree orders refusal, facts, working, status, step_hook, placement, stage, history, register, rename, checkout, prune.
+//! The operations tree orders refusal, facts, working, status, step_hook, stage, placement, history, register, rename, checkout, prune.
 //! Each module imports only earlier names or rollback, which imports only fsx.
 
 mod step_hook;

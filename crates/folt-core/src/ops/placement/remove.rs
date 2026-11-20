@@ -2,6 +2,7 @@ use crate::home::HomeLock;
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
+use crate::ops::stage::refuse::is_staged;
 use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
 use crate::registry::Registry;
 
@@ -31,7 +32,7 @@ pub fn judge_remove(
             (PlacementKind::Link, Observation::IntactLink) => {}
             (PlacementKind::Copy, Observation::File { .. }) => {
                 if !discard {
-                    if facts.placement.staged.is_some() {
+                    if is_staged(&facts.placement) {
                         return Err(refuse(RefusalReason::Staged));
                     }
                     match placement::classify(&placement, &facts.observation, facts.placement_hash)

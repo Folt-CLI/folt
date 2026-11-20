@@ -4,6 +4,7 @@ use crate::id::ObjectId;
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
+use crate::ops::stage::refuse::is_staged;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::registry::{self, Registry};
 use crate::store::ObjectStore;
@@ -57,7 +58,7 @@ pub fn judge_convert(
     {
         return Err(refuse(RefusalReason::CopyBranch));
     }
-    if facts.placement.staged.is_some() {
+    if is_staged(&facts.placement) {
         return Err(refuse(RefusalReason::Staged));
     }
     if to_kind == PlacementKind::Copy && target.is_none() {
@@ -93,7 +94,7 @@ pub fn judge_convert(
         if working.kind != PlacementKind::Internal
             || internal.placement.id != facts.placement.id
             || working.head != DEFAULT_BRANCH
-            || internal.placement.staged.is_some()
+            || is_staged(&internal.placement)
             || internal.placement_hash != target.map(|target| target.content)
             || placement::classify(&working, &internal.observation, internal.placement_hash)
                 != Drift::InSync

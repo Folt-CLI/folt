@@ -6,6 +6,7 @@ use crate::id::FolioId;
 use crate::object::{ObjectKind, hash_blob};
 use crate::ops::history::{self, HistoryError, HistoryStores};
 use crate::ops::stage;
+use crate::ops::stage::refuse::is_staged;
 use crate::placement::Observation;
 use crate::placement_fs::PlacementFs;
 use crate::placement_path::RegistryError;
@@ -203,7 +204,7 @@ fn check_internal(
         && row.staged.is_some_and(|stage| {
             stage.hash == hash_blob(bytes) && stage.size == bytes.len() as u64
         });
-    if (!clean && !own_edit) || (row.staged.is_some() && !own_stage) {
+    if (!clean && !own_edit) || (is_staged(row) && !own_stage) {
         return Err(RenameError::InternalChanged(row.path.to_path_buf()));
     }
     // Ref advancement is owned by history. Only a pending rename stage can
