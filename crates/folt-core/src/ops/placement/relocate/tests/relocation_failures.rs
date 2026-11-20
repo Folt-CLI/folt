@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(unix)]
+use std::path::PathBuf;
 
 #[test]
 fn rename_failure_rolls_back_new_rows_and_preserves_racing_destinations() {

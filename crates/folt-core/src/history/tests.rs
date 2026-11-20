@@ -66,7 +66,7 @@ fn main_copy_refuses_clean_internal_with_stage() {
     facts.working.placement.head = "main".into();
     let mut internal = facts.working.clone();
     internal.placement.kind = PlacementKind::Internal;
-    assert_eq!(working_state::judge_working(&internal).edit, Edit::Clean);
+    assert_eq!(judge_working(&internal).edit, Edit::Clean);
     facts.internal = Some(internal);
     let refusal = judge_commit(&facts).unwrap_err();
     assert!(matches!(refusal, Refusal::InternalEdited(_)));

@@ -4,9 +4,9 @@ use crate::fsx::Signature;
 use crate::id::FolioId;
 use crate::object::hash_blob;
 use crate::ops::facts::PlacementFacts;
+use crate::ops::placement::move_::MoveTarget;
 use crate::placement::{Observation, PlacementBase, PlacementKind};
 use crate::placement_path::PlacementPath;
-use crate::placement_rules::MoveTarget;
 use crate::ref_name::RefName;
 use crate::registry;
 
@@ -52,8 +52,9 @@ pub(crate) use relocation::RelocateFixture;
 mod relocation {
     use super::*;
     use crate::home::HomeLock;
+    use crate::ops::placement::relocate::judge::{RelocatePlan, judge_relocate};
+    use crate::ops::placement::relocate::target::gather_relocate_target;
     use crate::placement::{self, PlacementOps};
-    use crate::placement_rules::{RelocatePlan, gather_relocate_target, judge_relocate};
     use crate::registry::Registry;
     use crate::test_support::TempHome;
 

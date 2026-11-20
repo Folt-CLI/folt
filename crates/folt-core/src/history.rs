@@ -9,16 +9,20 @@ use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{Author, Commit, CommitTime, ObjectError, ObjectKind, Tag, hash_blob};
 use crate::ops::facts::PlacementFacts;
+use crate::ops::placement::move_::{
+    MovePlan, MoveTarget, apply_move, apply_move_file, judge_move, moved_row,
+};
 use crate::ops::refusal;
 use crate::ops::rules_error::RulesError;
+use crate::ops::working::judge::judge_working;
+use crate::ops::working::resolve::resolve_working;
+use crate::ops::working::{Edit, gather};
 use crate::placement::{Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps};
 use crate::placement_path::RegistryError;
-use crate::placement_rules::{self, MovePlan, MoveTarget};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{Expect, RefError, RefStore};
 use crate::registry::{Placement, Registry};
 use crate::store::{ObjectStore, StoreError};
-use crate::working_state::{self, Edit};
 
 /// Stores for one Folio and the caller's bound for commit object reads.
 #[derive(Clone, Copy)]
@@ -52,7 +56,7 @@ pub fn gather_commit(
         object_limit,
     } = *stores;
     let link = (row.kind == PlacementKind::Link).then(|| row.clone());
-    let working = working_state::gather(row, fs, refs, registry)?;
+    let working = gather(row, fs, refs, registry)?;
     let row = &working.placement;
     let placements = registry.placements_of_head(row.id, &row.head)?;
     let internal = if row.kind == PlacementKind::Copy && row.head == DEFAULT_BRANCH {
@@ -141,7 +145,7 @@ pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, Refusal> {
         // A completed file replacement may precede the atomic registry update.
         let already_written = resume.is_some() && internal.placement_hash == Some(staged.hash);
         if internal.placement.staged.is_some()
-            || (working_state::judge_working(internal).edit != Edit::Clean && !already_written)
+            || (judge_working(internal).edit != Edit::Clean && !already_written)
         {
             return Err(Refusal::InternalEdited(
                 internal.placement.path.to_path_buf(),
@@ -154,7 +158,7 @@ pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, Refusal> {
             commit: resume.or(row.commit_id).unwrap_or(staged.hash),
             content: staged.hash,
         };
-        placement_rules::judge_move(internal, &target, false)?;
+        judge_move(internal, &target, false)?;
     }
     Ok(CommitPlan {
         facts: facts.clone(),
@@ -208,7 +212,7 @@ pub fn apply_commit(
     require_row(registry, row)?;
     if let Some(link) = &plan.facts.link {
         require_row(registry, link)?;
-        if working_state::resolve_working(link, registry, fs)? != *row {
+        if resolve_working(link, registry, fs)? != *row {
             return Err(Refusal::RegistryChanged(link.path.to_path_buf()).into());
         }
     }
@@ -284,12 +288,9 @@ pub fn apply_commit(
             commit: id,
             content: staged.hash,
         };
-        let move_plan = placement_rules::judge_move(internal, &target, false)?;
-        let base = placement_rules::apply_move_file(&move_plan, fs, objects, registry, lock)?;
-        Some((
-            internal.placement.clone(),
-            placement_rules::moved_row(&move_plan, base),
-        ))
+        let move_plan = judge_move(internal, &target, false)?;
+        let base = apply_move_file(&move_plan, fs, objects, registry, lock)?;
+        Some((internal.placement.clone(), moved_row(&move_plan, base)))
     } else {
         None
     };
@@ -447,11 +448,7 @@ pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, Refus
         {
             return Err(Refusal::InvalidFacts);
         }
-        moves.push(placement_rules::judge_move(
-            placement,
-            &facts.target,
-            discard,
-        )?);
+        moves.push(judge_move(placement, &facts.target, discard)?);
     }
     Ok(ResetPlan {
         facts: facts.clone(),
@@ -495,7 +492,7 @@ pub fn apply_reset(
     )?;
     refs.sync_refs()?;
     for movement in &plan.moves {
-        placement_rules::apply_move(movement, fs, objects, registry, lock)?;
+        apply_move(movement, fs, objects, registry, lock)?;
     }
     Ok(())
 }
