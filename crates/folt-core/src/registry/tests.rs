@@ -1,6 +1,12 @@
-use super::*;
+use std::path::Path;
+
+use rusqlite::Connection;
+
+use super::{MoveResult, Registry, RegistryTransaction, RemoveResult};
 use crate::config::env::Environment;
-use crate::placement_path::path_bytes;
+use crate::home::Home;
+use crate::id::FolioId;
+use crate::placement_path::{PlacementPath, PlacementPrefix, RegistryError, path_bytes};
 use crate::test_support::TempDir;
 
 #[test]
