@@ -6,6 +6,7 @@ use super::gather::CommitFacts;
 use super::judge::branch_moved;
 use super::plan::{CommitPlan, matches_requested_commit};
 use crate::fsx::Signature;
+use crate::history::{Expect, RefError};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::{Author, Commit, CommitTime, ObjectKind, hash_blob};
@@ -14,7 +15,6 @@ use crate::ops::working::resolve_working;
 use crate::placement::{Observation, PlacementBase, PlacementOps};
 use crate::placement_path::RegistryError;
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::{Expect, RefError};
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 

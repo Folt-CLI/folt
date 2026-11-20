@@ -123,9 +123,9 @@ fn register_link(
     let folio = registry
         .folio_row(row.id)?
         .ok_or_else(|| io::Error::other("Folio is missing"))?;
-    let directory = crate::folio_dir::validate(home.path(), &folio)?;
+    let directory = crate::folio::dir::validate(home.path(), &folio)?;
     let objects = crate::store::ObjectStore::open(&directory, &folio.format)?;
-    let refs = crate::refs::RefStore::open(&directory, &folio.format)?;
+    let refs = crate::history::RefStore::open(&directory, &folio.format)?;
     let placement_fs = PlacementFs::with_fs(home, fs);
     let facts = gather_convert(&row, &placement_fs, |_| Ok(&refs))?;
     if row.kind == PlacementKind::Link && facts.observation == Observation::IntactLink {

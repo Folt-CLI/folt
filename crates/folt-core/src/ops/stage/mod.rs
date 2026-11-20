@@ -1,10 +1,10 @@
+use crate::history::RefStore;
 use crate::home::HomeLock;
 use crate::object::ObjectKind;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::ops::working::{read_working, resolve_working};
 use crate::placement::{Observation, PlacementError, PlacementOps, StagedBlob};
-use crate::refs::RefStore;
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 use write::write_stage;

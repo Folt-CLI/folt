@@ -1,4 +1,7 @@
+use std::fs;
+
 use super::*;
+use crate::ref_name::LowerRefError;
 
 #[test]
 fn lower_ref_error_converts_variant_for_variant() {

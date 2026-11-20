@@ -1,8 +1,9 @@
 use std::fs;
 
+use folt_core::folio::name::FolioName;
 use folt_core::folio::row::NewFolio;
-use folt_core::folio_name::FolioName;
 use folt_core::front_matter;
+use folt_core::history::Expect;
 use folt_core::home::HomeLock;
 use folt_core::id::FolioId;
 use folt_core::id::ObjectId;
@@ -14,7 +15,6 @@ use folt_core::placement::{PlacementKind, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::{PlacementPath, RegistryError};
 use folt_core::ref_name::{RefKind, RefName};
-use folt_core::refs::Expect;
 use folt_core::registry::{NewPlacement, Placement};
 
 use crate::common::TempHome;

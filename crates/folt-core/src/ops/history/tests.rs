@@ -118,9 +118,9 @@ fn reset_requires_discard_for_edits() {
 #[test]
 fn branch_sync_failure_leaves_cached_rows_untouched_and_harmless() {
     use crate::config::formats::OBJECT_ALGORITHM;
+    use crate::folio::dir::{Durability, FolioSpec, create_folio};
     use crate::folio::format::FolioFormat;
     use crate::folio::row::NewFolio;
-    use crate::folio_dir::{Durability, FolioSpec, create_folio};
     use crate::home::Home;
     use crate::layout::FOLIO_LAYOUT_VERSION;
 

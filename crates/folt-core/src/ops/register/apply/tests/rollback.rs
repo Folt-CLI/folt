@@ -3,10 +3,10 @@ use std::io;
 
 use crate::config::formats::OBJECT_ALGORITHM;
 use crate::config::names::MARKER_FILE;
+use crate::folio::dir::FolioDirError;
 use crate::folio::format::FolioFormat;
+use crate::folio::name::FolioName;
 use crate::folio::row::NewFolio;
-use crate::folio_dir::FolioDirError;
-use crate::folio_name::FolioName;
 use crate::fsx::RealFileSystem;
 use crate::id::FolioId;
 use crate::layout::FOLIO_LAYOUT_VERSION;

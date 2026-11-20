@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-use crate::folio_dir::FolioDirError;
+use crate::folio::dir::FolioDirError;
 use crate::home::HomeError;
 use crate::home::config_file::ConfigError;
 use crate::placement_path::RegistryError;

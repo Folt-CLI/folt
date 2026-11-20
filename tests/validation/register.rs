@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use folt_core::config::limits::DEFAULT_LARGE_FILE_BYTES;
 use folt_core::config::names::CONTENT_FILE;
 use folt_core::config::settings::Settings;
+use folt_core::history::RefStore;
 use folt_core::object::hash_blob;
 use folt_core::ops::facts::{Behind, gather};
 use folt_core::ops::register::{
@@ -14,7 +15,6 @@ use folt_core::ops::status::judge_status;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::refs::RefStore;
 use folt_core::registry::Registry;
 
 use crate::common::TempHome;
@@ -60,7 +60,7 @@ fn files_are_captured_without_history_and_repeated_registration_is_a_noop() {
         assert_eq!(internal.base.as_ref().unwrap().hash, hash_blob(content));
         assert_eq!(fs::read(internal.path.to_path_buf()).unwrap(), content);
         let format = registry.folio_row(row.id).unwrap().unwrap().format;
-        let dir = folt_core::folio_dir::validate(
+        let dir = folt_core::folio::dir::validate(
             home.path(),
             &registry.folio_row(row.id).unwrap().unwrap(),
         )
@@ -457,7 +457,7 @@ fn repointed_parent_blocks_file_registration() {
 
 #[cfg(unix)]
 fn assert_repointed_parent_cannot_collapse_requests(links: bool) {
-    use folt_core::folio_name::FolioName;
+    use folt_core::folio::name::FolioName;
     use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
@@ -513,7 +513,7 @@ fn assert_repointed_parent_cannot_collapse_requests(links: bool) {
 
 #[cfg(unix)]
 fn assert_repointed_parent_cannot_collapse_marker_requests(links: bool, directory: bool) {
-    use folt_core::folio_name::FolioName;
+    use folt_core::folio::name::FolioName;
     use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
@@ -603,7 +603,7 @@ fn repointed_parent_cannot_collapse_existing_marker_directory_requests() {
 #[cfg(unix)]
 #[test]
 fn unchanged_parent_registers_named_marker_request() {
-    use folt_core::folio_name::FolioName;
+    use folt_core::folio::name::FolioName;
     use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
@@ -653,7 +653,7 @@ fn unchanged_parent_registers_named_marker_request() {
 #[cfg(unix)]
 #[test]
 fn repointed_parent_cannot_collapse_directory_requests() {
-    use folt_core::folio_name::FolioName;
+    use folt_core::folio::name::FolioName;
     use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
@@ -740,7 +740,7 @@ fn two_path_spellings_register_one_file() {
 #[cfg(unix)]
 #[test]
 fn unchanged_parent_registers_named_file() {
-    use folt_core::folio_name::FolioName;
+    use folt_core::folio::name::FolioName;
     use folt_core::ops::register::RegisterRequest;
     use std::os::unix::fs::symlink;
 
@@ -950,7 +950,7 @@ fn assert_unix_name_registered(name: &std::ffi::OsStr) {
         &home.home,
         [register::RegisterRequest::new(
             &path,
-            folt_core::folio_name::FolioName::parse("explicit").unwrap(),
+            folt_core::folio::name::FolioName::parse("explicit").unwrap(),
         )],
     )
     .unwrap();
@@ -1153,8 +1153,8 @@ fn assert_hard_linked_source_remains_a_registered_copy() {
     assert_eq!(registry.folios().unwrap().len(), 2);
 }
 
-fn name(value: &str) -> folt_core::folio_name::FolioName {
-    folt_core::folio_name::FolioName::parse(value).unwrap()
+fn name(value: &str) -> folt_core::folio::name::FolioName {
+    folt_core::folio::name::FolioName::parse(value).unwrap()
 }
 
 fn named(path: impl AsRef<Path>, value: &str) -> register::RegisterRequest {

@@ -1,9 +1,9 @@
+use crate::history::{RefError, RefStore};
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
 use crate::ops::facts::PlacementFacts;
 use crate::placement::{Observation, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
-use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 

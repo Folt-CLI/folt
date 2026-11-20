@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use crate::config::limits::SCAN_WINDOW;
-use crate::folio_name::FolioName;
+use crate::folio::name::FolioName;
 use crate::front_matter::{self, Block};
 use crate::registry::Registry;
 

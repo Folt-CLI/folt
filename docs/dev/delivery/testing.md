@@ -108,7 +108,7 @@ To add a regression test, declare a module in `regression/main.rs`, record the b
 
 Tests must not change process environment, working directory or umask. Start CLI commands as child processes; set any command-specific environment on the child. Do not use sleeps, clocks or metadata timing to detect edits. Keep property tests bounded and reproducible. Platform-specific tests carry `#[cfg(unix)]` or `#[cfg(windows)]`.
 
-Portability limit found while adding this suite: existing history operations sync directories through `File::open(...).sync_all()` in `store.rs` and `refs.rs`. Opening directories this way fails on Windows, so the history validation tests expose an existing Windows blocker. Fixing directory durability needs a separate implementation decision; these tests do not skip the failure. The suite was run on Linux with Rust 1.98.1; Windows, macOS and Rust 1.89 have not been verified.
+Portability limit found while adding this suite: existing history operations sync directories through `File::open(...).sync_all()` in `store/` and `history/ref_store.rs`. Opening directories this way fails on Windows, so the history validation tests expose an existing Windows blocker. Fixing directory durability needs a separate implementation decision; these tests do not skip the failure. The suite was run on Linux with Rust 1.98.1; Windows, macOS and Rust 1.89 have not been verified.
 
 ## Performance
 

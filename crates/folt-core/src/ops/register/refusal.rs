@@ -2,7 +2,7 @@ use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
-use crate::folio_name::{FolioName, FolioNameError, StemError};
+use crate::folio::name::{FolioName, FolioNameError, StemError};
 use crate::front_matter::FrontMatterError;
 use crate::id::FolioId;
 

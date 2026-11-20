@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 
 use crate::config::names::{CONTENT_FILE, MARKER_FILE};
-use crate::folio_dir::Durability;
+use crate::folio::dir::Durability;
 use crate::fsx::RealFileSystem;
 use crate::home::HomeError;
 use crate::ops::register::apply::{Step, apply_steps};
@@ -113,7 +113,7 @@ fn case_variant_appearing_marker_replans_and_cleans_up_on_failure() {
 fn collapsed_directory_request_is_blocked_before_creating_markers() {
     use std::os::unix::fs::symlink;
 
-    use crate::folio_name::FolioName;
+    use crate::folio::name::FolioName;
     use crate::ops::register::{RegisterRefusalReason, RegisterRequest, RegisterStatus};
 
     let fixture = TempHome::new().unwrap();

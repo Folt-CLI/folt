@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::config::settings::Settings;
-use crate::folio_dir::Durability;
+use crate::folio::dir::Durability;
 use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::{Home, HomeLock};
 use crate::ops::rollback::Rollback;

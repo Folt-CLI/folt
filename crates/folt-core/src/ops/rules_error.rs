@@ -1,7 +1,7 @@
+use crate::history::RefError;
 use crate::ops::refusal::PlacementRefusal;
 use crate::placement::PlacementError;
 use crate::placement_path::RegistryError;
-use crate::refs::RefError;
 use std::error::Error;
 use std::fmt;
 

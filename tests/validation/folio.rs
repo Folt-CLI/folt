@@ -1,4 +1,4 @@
-use folt_core::folio_dir::{self, Inspection};
+use folt_core::folio::dir::{self, Inspection};
 use folt_core::object::{ObjectError, ObjectKind, hash_blob};
 use folt_core::store::StoreError;
 use proptest::prelude::*;
@@ -14,7 +14,7 @@ fn created_folio_inspects_and_validates() {
     let row = folio.registry.folio_row(folio.folio.id()).unwrap().unwrap();
     assert_eq!(row.format, folio.format);
     assert!(matches!(
-        folio_dir::inspect(
+        dir::inspect(
             home.path(),
             folio.folio.path().file_name().unwrap(),
             Some(&row)
@@ -22,7 +22,7 @@ fn created_folio_inspects_and_validates() {
         Inspection::Valid(_)
     ));
     assert_eq!(
-        folio_dir::validate(home.path(), &row).unwrap().id(),
+        dir::validate(home.path(), &row).unwrap().id(),
         folio.folio.id()
     );
 }

@@ -106,8 +106,8 @@ fn moving_prefix_preserves_row_data() {
 
 #[test]
 fn names_are_unique_case_sensitive_and_released_by_removal() {
+    use folt_core::folio::name::FolioName;
     use folt_core::folio::row::NewFolio;
-    use folt_core::folio_name::FolioName;
     use folt_core::id::FolioId;
     use folt_core::registry::Registry;
 
@@ -167,8 +167,8 @@ fn names_are_unique_case_sensitive_and_released_by_removal() {
 
 #[test]
 fn replace_all_preserves_only_surviving_names() {
+    use folt_core::folio::name::FolioName;
     use folt_core::folio::row::{FolioRow, NewFolio};
-    use folt_core::folio_name::FolioName;
     use folt_core::id::FolioId;
 
     let home = TempHome::new();
