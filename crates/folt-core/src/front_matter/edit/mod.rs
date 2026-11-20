@@ -4,10 +4,9 @@ use crate::config::limits::SCAN_WINDOW;
 use crate::config::names::OWNED;
 
 use super::error::{FrontMatterError, Result};
-use super::keys::{node, unresolved_key_checks};
+use super::keys::{edit_key_checks, node};
 use super::locate::locate;
-use super::scalar::{supported, text};
-use super::scan::explicit_key;
+use super::scalar::supported;
 use super::tree::Block;
 
 mod block;
@@ -35,18 +34,7 @@ pub fn apply_edit(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>> {
 }
 
 fn edit_checks(bytes: &[u8], block: &Block) -> Result<()> {
-    unresolved_key_checks(bytes, block)?;
-    for n in &block.nodes {
-        let spelling = text(&bytes[n.key_range.clone()])?;
-        if explicit_key(spelling).is_some() {
-            continue;
-        }
-        let spelling = spelling.trim();
-        // Keep escaped quoted spellings opaque when editing foreign nodes.
-        if spelling.starts_with(['\'', '"']) && spelling.contains('\\') {
-            return Err(FrontMatterError::Ambiguous);
-        }
-    }
+    edit_key_checks(bytes, block)?;
     for key in OWNED {
         if let Some(n) = node(block, key)? {
             supported(bytes, n)?;

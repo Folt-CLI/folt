@@ -5,6 +5,7 @@
 //! plan it again after applying another edit. Names are written as double-quoted
 //! strings; ids remain unquoted.
 
+mod applies;
 mod edit;
 mod entries;
 mod error;
@@ -15,13 +16,16 @@ mod reference;
 mod scalar;
 mod scan;
 mod tree;
+mod window;
 
+pub use applies::applies_to;
 pub use edit::{Edit, apply_edit};
 pub use error::FrontMatterError;
 pub use locate::locate;
 pub use read::{read_id, read_name};
 pub use reference::{Reference, read_references};
 pub use tree::{Block, Node};
+pub(crate) use window::scan_window;
 
 #[cfg(test)]
 mod tests;

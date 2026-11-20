@@ -377,7 +377,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### scan
 
 - **Layer:** Front matter and references
-- **Definition:** The private `front_matter::scan` module containing line, whitespace, punctuation, explicit-key and flow-boundary helpers used to inspect front matter bytes without building nodes.
+- **Definition:** The private `front_matter::scan` module containing line, whitespace, punctuation and flow-boundary helpers used to inspect front matter bytes without building nodes.
 - **Code:** `crates/folt-core/src/front_matter/scan.rs:2` (`Line`)
 - **Related:** [front matter](#front-matter), [scan limit](#scan-limit), [tree](#tree), [explicit key](#explicit-key).
 - **Not:** The scan limit or a general YAML parser.
@@ -432,7 +432,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A YAML key introduced by the `? key` syntax, with `?` followed by a space, a tab or the end of the line. The front matter parser recognizes this syntax separately from an ordinary key.
-- **Code:** `crates/folt-core/src/front_matter/scan.rs:91` (`explicit_key`)
+- **Code:** `crates/folt-core/src/front_matter/keys.rs:10` (`explicit_key`)
 - **Related:** [front matter](#front-matter), [owned key](#owned-key).
 - **Not:** A user-given name (explicit name) or registration confirmation (explicit confirmation).
 - **Status:** decided

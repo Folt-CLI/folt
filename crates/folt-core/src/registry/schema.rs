@@ -1,34 +1,47 @@
 use std::path::Path;
 
-use rusqlite::{Connection, Transaction};
+use rusqlite::Transaction;
 
 use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
 use crate::layout::HOME_FORMAT_VERSION;
 use crate::placement_path::RegistryError;
 
-pub(super) fn check_schema(connection: &Connection, path: &Path) -> Result<(), RegistryError> {
-    let version: i64 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
-    let app: i64 = connection.pragma_query_value(None, "application_id", |r| r.get(0))?;
+pub(super) enum SchemaState {
+    Empty,
+    Current,
+    Other,
+}
+
+pub(super) fn classify_schema(
+    version: i64,
+    app: i64,
+    path: &Path,
+) -> Result<SchemaState, RegistryError> {
     if version > SCHEMA_VERSION {
         return Err(RegistryError::UnsupportedSchemaVersion {
             found: version,
             supported: SCHEMA_VERSION,
         });
     }
-    if app != i64::from(APPLICATION_ID) {
+    if version == 0 && app == 0 {
+        return Ok(SchemaState::Empty);
+    }
+    if app != i64::from(APPLICATION_ID) || version == 0 {
         return Err(RegistryError::ForeignDatabase(path.to_path_buf()));
     }
     if version == OUTDATED_SCHEMA {
+        // This refusal must be removed before the first release, when migrations are required.
         return Err(RegistryError::OutdatedSchema {
             found: version,
             required: SCHEMA_VERSION,
             path: path.to_path_buf(),
         });
     }
-    if version != SCHEMA_VERSION {
-        return Err(RegistryError::ForeignDatabase(path.to_path_buf()));
-    }
-    Ok(())
+    Ok(if version == SCHEMA_VERSION {
+        SchemaState::Current
+    } else {
+        SchemaState::Other
+    })
 }
 
 pub(super) fn create_schema(tx: &Transaction<'_>) -> Result<(), RegistryError> {
