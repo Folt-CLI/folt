@@ -1,6 +1,6 @@
 use crate::home::HomeLock;
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
 use crate::registry::Registry;
@@ -17,9 +17,9 @@ pub fn judge_remove(
     facts: &PlacementFacts,
     delete_file: bool,
     discard: bool,
-) -> Result<RemovePlan, Refusal> {
+) -> Result<RemovePlan, PlacementRefusal> {
     let (_, placement) = facts.placement.to_placement();
-    let refuse = |reason| Refusal {
+    let refuse = |reason| PlacementRefusal {
         path: placement.path.clone(),
         reason,
     };

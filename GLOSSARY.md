@@ -515,9 +515,9 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** A domain decision that a requested operation is not allowed under the observed [facts](#facts). Placement rules represent it as a path plus a reason; history and registration have their own refusal types.
-- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`Refusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`Refusal`); `crates/folt-core/src/ops/register/refusal.rs:18` (`RegisterRefusalReason`)
+- **Code:** `crates/folt-core/src/ops/refusal.rs:31` (`PlacementRefusal`); `crates/folt-core/src/ops/refusal.rs:6` (`RefusalReason`); `crates/folt-core/src/history.rs:603` (`HistoryRefusal`); `crates/folt-core/src/ops/register/refusal.rs:18` (`RegisterRefusalReason`)
 - **Related:** [plan and apply](#plan-and-apply), [placement](#placement), [register](#register).
-- **Not:** One shared error type: qualify the module for each refusal; the rename of the two `Refusal` types is open (plan ticket G6 of [#203](https://github.com/Folt-CLI/folt/issues/203)).
+- **Not:** One shared error type: placement rules use `PlacementRefusal` and history uses `HistoryRefusal`.
 - **Status:** decided
 
 ### rename
@@ -840,7 +840,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | base | Placement hash and signature; merge base; PR base branch; name prefix before a suffix | Base means placement content and signature; qualify merge base, PR base branch and name prefix. |
 | home | Folt home; OS home; former home after a move; retired workspace marker | Home means the Folt storage directory; qualify OS home and former home. Portability, restore and multi-user rules are open: [#17](https://github.com/Folt-CLI/folt/issues/17). |
 | Folio directory and directory Folio | Storage directory in the home; registered user directory | Folio directory means storage; directory Folio means the user directory anchored at a marker. |
-| placement and same-named types | Registry Placement and PlacementSpec; working-state and front-matter Edit; history Refusal and placement Refusal and RefusalReason and registration RegisterRefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; the in-memory record is `PlacementSpec`. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types and kind enums require module or domain qualification; renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
+| placement and same-named types | Registry Placement and PlacementSpec; working-state and front-matter Edit; `HistoryRefusal` and `PlacementRefusal` and RefusalReason and registration RegisterRefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; the in-memory record is `PlacementSpec`. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types use `HistoryRefusal` and `PlacementRefusal`; kind enums require module or domain qualification and their renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
 | ref, refs, reference, edge, pin | History pointers; registry reference rows; declared relationships; informal edge; retention pin; reference pin field | Reference is the declared relationship, with edge an informal synonym. Distinguish the refs table from history refs and retention pins from opaque reference pin fields; [#152](https://github.com/Folt-CLI/folt/issues/152) implements commit-hash pins. |
 | unresolved | Unknown reference target; undecodable front matter key | Use unresolved reference for the cached unknown target, and unresolved key for parser ambiguity. |
 | marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; planned conflict markers; build-skip marker | Marker means `__folio__.md`; qualify codec, conflict and build-skip markers. Workspace and home format markers are retired below. |

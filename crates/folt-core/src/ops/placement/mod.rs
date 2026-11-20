@@ -1,12 +1,12 @@
 use crate::ops::facts::PlacementFacts;
-use crate::ops::refusal::{Refusal, RefusalReason};
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementOps};
 use crate::registry::{self, Registry};
 
 pub(super) fn check_row(row: &registry::Placement, registry: &Registry) -> Result<(), RulesError> {
     if registry.placement_at(&row.path)?.as_ref() != Some(row) {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: row.path.to_path_buf(),
             reason: RefusalReason::RegistryChanged,
         }
@@ -22,7 +22,7 @@ pub(super) fn check_file(facts: &PlacementFacts, fs: &impl PlacementOps) -> Resu
             && matches!(facts.observation, Observation::File { .. })
             && Some(fs.hash_placement(&placement)?) != facts.placement_hash)
     {
-        return Err(Refusal {
+        return Err(PlacementRefusal {
             path: placement.path,
             reason: RefusalReason::PlacementChanged,
         }
