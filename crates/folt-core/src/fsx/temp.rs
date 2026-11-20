@@ -58,6 +58,50 @@ impl TempFile {
         })
     }
 
+    /// Chooses an absent sibling path without creating a filesystem entry.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "adopted by the object store and placement writers in #279 and #280"
+        )
+    )]
+    pub(crate) fn sibling(
+        directory: &Path,
+        prefix: &str,
+        separator: char,
+    ) -> Result<Self, (PathBuf, io::Error)> {
+        loop {
+            let path = directory.join(temp_name(prefix, separator));
+            match Self::sibling_at(&path) {
+                Ok(file) => return Ok(file),
+                Err(source) if source.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(source) => return Err((path, source)),
+            }
+        }
+    }
+
+    /// Guards an absent path without creating it or following a symbolic link there.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "adopted by the object store and placement writers in #279 and #280"
+        )
+    )]
+    pub(crate) fn sibling_at(path: &Path) -> io::Result<Self> {
+        match fs::symlink_metadata(path) {
+            Ok(_) => return Err(io::ErrorKind::AlreadyExists.into()),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+            Err(source) => return Err(source),
+        }
+        Ok(Self {
+            path: path.to_path_buf(),
+            file: None,
+            armed: true,
+        })
+    }
+
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
@@ -65,6 +109,45 @@ impl TempFile {
     #[expect(clippy::expect_used, reason = "only consuming methods close the file")]
     pub(crate) fn file_mut(&mut self) -> &mut File {
         self.file.as_mut().expect("temporary file is open")
+    }
+
+    /// Transfers the open handle while retaining responsibility for cleanup.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "adopted by the object store and placement writers in #279 and #280"
+        )
+    )]
+    pub(crate) fn take_file(&mut self) -> Option<File> {
+        self.file.take()
+    }
+
+    /// Closes the handle while retaining responsibility for cleanup.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "adopted by the object store and placement writers in #279 and #280"
+        )
+    )]
+    pub(crate) fn close(&mut self) {
+        drop(self.file.take());
+    }
+
+    /// Removes the file, returning any removal error without retrying on drop.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "adopted by the object store and placement writers in #279 and #280"
+        )
+    )]
+    pub(crate) fn remove(mut self) -> io::Result<()> {
+        drop(self.file.take());
+        let result = fs::remove_file(&self.path);
+        self.armed = false;
+        result
     }
 
     pub(crate) fn sync(&mut self) -> io::Result<()> {
