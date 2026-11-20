@@ -278,3 +278,46 @@ fn missing_read_only_registry_is_an_empty_view() {
     assert!(registry.connection.is_none());
     assert!(!registry.path.exists());
 }
+
+fn open_registry(directory: &TempDir) -> (Home, crate::home::HomeLock) {
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    (home, lock)
+}
+
+#[test]
+fn backup_writes_a_snapshot_and_leaves_no_temporary_file() {
+    let directory = TempDir::new().unwrap();
+    let (home, lock) = open_registry(&directory);
+    let registry = Registry::open_or_create(&home, &lock).unwrap();
+    let backups = directory.path().join("backups");
+    std::fs::create_dir(&backups).unwrap();
+    registry
+        .backup_to(&lock, backups.join("registry.db"))
+        .unwrap();
+    let names: Vec<_> = std::fs::read_dir(&backups)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("registry.db")]);
+}
+
+#[test]
+fn failed_backup_publication_leaves_no_temporary_file() {
+    let directory = TempDir::new().unwrap();
+    let (home, lock) = open_registry(&directory);
+    let registry = Registry::open_or_create(&home, &lock).unwrap();
+    let backups = directory.path().join("backups");
+    std::fs::create_dir(&backups).unwrap();
+    // A directory at the destination makes the final rename fail after the snapshot is written.
+    let destination = backups.join("registry.db");
+    std::fs::create_dir(&destination).unwrap();
+    std::fs::write(destination.join("keep"), b"x").unwrap();
+    assert!(registry.backup_to(&lock, &destination).is_err());
+    let names: Vec<_> = std::fs::read_dir(&backups)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("registry.db")]);
+}

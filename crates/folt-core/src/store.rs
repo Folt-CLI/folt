@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
@@ -10,8 +10,7 @@ use crate::config::limits::{
 use crate::config::names::{BLOB_EXTENSION, BLOBS_DIR, TEMP_PREFIX_INPUT, TEMP_PREFIX_OBJECT};
 use crate::folio::format::{FolioFormat, FormatError, check_format};
 use crate::folio_dir::FolioDir;
-use crate::fsx::temp_name;
-use crate::fsx::{FileSystem, RealFileSystem};
+use crate::fsx::{FileSystem, RealFileSystem, TempFile, TempMode};
 use crate::home::{HomeLock, is_regular_file};
 use crate::id::ObjectId;
 use crate::layout::LayoutVersion;
@@ -149,59 +148,51 @@ impl ObjectStore {
         length: u64,
         mut reader: R,
     ) -> Result<ObjectId, StoreError> {
-        let spool = self.root.join(temp_name(TEMP_PREFIX_INPUT, '.'));
-        let result = (|| {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&spool)
-                .map_err(|source| StoreError::Io {
-                    path: spool.clone(),
-                    source,
-                })?;
-            let mut count = 0u64;
-            let mut buffer = vec![0; STREAM_BUFFER_SIZE];
-            loop {
-                let n = reader.read(&mut buffer).map_err(|source| StoreError::Io {
-                    path: spool.clone(),
-                    source,
-                })?;
-                if n == 0 {
-                    break;
-                }
-                count = count
-                    .checked_add(n as u64)
-                    .ok_or(StoreError::SourceChanged)?;
-                if count > length {
-                    return Err(StoreError::SourceChanged);
-                }
-                file.write_all(&buffer[..n])
-                    .map_err(|source| StoreError::Io {
-                        path: spool.clone(),
-                        source,
-                    })?;
+        let mut spool = TempFile::create(&self.root, TEMP_PREFIX_INPUT, '.', TempMode::Default)
+            .map_err(|(path, source)| StoreError::Io { path, source })?;
+        let spool_path = spool.path().to_path_buf();
+        let mut count = 0u64;
+        let mut buffer = vec![0; STREAM_BUFFER_SIZE];
+        loop {
+            let n = reader.read(&mut buffer).map_err(|source| StoreError::Io {
+                path: spool_path.clone(),
+                source,
+            })?;
+            if n == 0 {
+                break;
             }
-            if count != length {
+            count = count
+                .checked_add(n as u64)
+                .ok_or(StoreError::SourceChanged)?;
+            if count > length {
                 return Err(StoreError::SourceChanged);
             }
-            drop(file);
-            self.put_source(
-                _lock,
-                kind,
-                length,
-                || {
-                    File::open(&spool)
-                        .map(|f| Box::new(f) as Box<dyn ReadSeek>)
-                        .map_err(|source| StoreError::Io {
-                            path: spool.clone(),
-                            source,
-                        })
-                },
-                &spool,
-            )
-        })();
-        let _ = fs::remove_file(&spool);
-        result
+            spool
+                .file_mut()
+                .write_all(&buffer[..n])
+                .map_err(|source| StoreError::Io {
+                    path: spool_path.clone(),
+                    source,
+                })?;
+        }
+        if count != length {
+            return Err(StoreError::SourceChanged);
+        }
+        spool.close();
+        self.put_source(
+            _lock,
+            kind,
+            length,
+            || {
+                File::open(&spool_path)
+                    .map(|f| Box::new(f) as Box<dyn ReadSeek>)
+                    .map_err(|source| StoreError::Io {
+                        path: spool_path.clone(),
+                        source,
+                    })
+            },
+            &spool_path,
+        )
     }
 
     // split in the folt-core refactor (#203)
@@ -262,15 +253,13 @@ impl ObjectStore {
                 path: source_path.into(),
                 source,
             })?;
-        let temp = self.root.join(temp_name(TEMP_PREFIX_OBJECT, '.'));
-        let out = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp)
-            .map_err(|source| StoreError::Io {
-                path: temp.clone(),
-                source,
-            })?;
+        let mut temp = TempFile::create(&self.root, TEMP_PREFIX_OBJECT, '.', TempMode::Default)
+            .map_err(|(path, source)| StoreError::Io { path, source })?;
+        let temp_path = temp.path().to_path_buf();
+        let out = temp.take_file().ok_or_else(|| StoreError::Io {
+            path: temp_path.clone(),
+            source: io::Error::other("temporary object file handle is missing"),
+        })?;
         let write_result = (|| {
             let mut writer = ObjectWriter::new(out, kind, length, compressed)?;
             let mut verify = ObjectHasher::new(kind, length);
@@ -293,30 +282,23 @@ impl ObjectStore {
             Ok(())
         })();
         if let Err(error) = write_result {
-            let _ = fs::remove_file(&temp);
             return Err(StoreError::Object(error));
         }
         match is_regular_file(&dest) {
             Ok(true) => {
-                fs::remove_file(&temp).map_err(|source| StoreError::Io { path: temp, source })?;
-            }
-            Ok(false) => {
-                let _ = fs::remove_file(&temp);
-                return Err(StoreError::NotRegularFile(dest));
-            }
-            Err(source) if source.kind() == io::ErrorKind::NotFound => {
-                fs::rename(&temp, &dest).map_err(|source| {
-                    let _ = fs::remove_file(&temp);
-                    StoreError::Io {
-                        path: dest.clone(),
-                        source,
-                    }
+                temp.remove().map_err(|source| StoreError::Io {
+                    path: temp_path,
+                    source,
                 })?;
             }
-            Err(source) => {
-                let _ = fs::remove_file(&temp);
-                return Err(StoreError::Io { path: dest, source });
+            Ok(false) => return Err(StoreError::NotRegularFile(dest)),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {
+                temp.publish(&dest).map_err(|source| StoreError::Io {
+                    path: dest.clone(),
+                    source,
+                })?;
             }
+            Err(source) => return Err(StoreError::Io { path: dest, source }),
         }
         Ok(id)
     }

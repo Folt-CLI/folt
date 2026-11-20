@@ -6,7 +6,8 @@ use crate::config::limits::STREAM_BUFFER_SIZE;
 use crate::config::names::{FOLIOS_DIR, TEMP_TAG_CONVERT, TEMP_TAG_COPY, TEMP_TAG_LINK_PROBE};
 use crate::folio::dir::path::content_path;
 use crate::fsx::{
-    FileSystem, RealFileSystem, copy_new, hard_links_unsupported, signature, temp_name,
+    FileSystem, RealFileSystem, TempFile, TempMode, copy_new, hard_links_unsupported, signature,
+    temp_name,
 };
 use crate::home::Home;
 use crate::id::FolioId;
@@ -31,11 +32,15 @@ impl<'a> PlacementFs<'a> {
     /// Runs only when a link is explicitly requested; a copy never calls it.
     pub fn probe_link(&self, path: &Path) -> Result<(), PlacementError> {
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let probe = temporary_path(parent, TEMP_TAG_LINK_PROBE);
+        let probe_path = temporary_path(parent, TEMP_TAG_LINK_PROBE);
+        let probe =
+            TempFile::sibling_at(&probe_path).map_err(|source| symlink_failure(path, source))?;
         RealFileSystem
-            .create_symlink(&self.home.path().join(FOLIOS_DIR), &probe)
+            .create_symlink(&self.home.path().join(FOLIOS_DIR), probe.path())
             .map_err(|source| symlink_failure(path, source))?;
-        fs::remove_file(&probe).map_err(|source| failure(&probe, source))
+        probe
+            .remove()
+            .map_err(|source| failure(&probe_path, source))
     }
 
     fn refresh_link(
@@ -67,20 +72,22 @@ impl<'a> PlacementFs<'a> {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(failure(&placement.path, error)),
         }
-        let temporary = temporary_path(
+        let link_path = temporary_path(
             placement.path.parent().unwrap_or_else(|| Path::new(".")),
             "folt-link",
         );
+        let temporary = TempFile::sibling_at(&link_path).map_err(|e| failure(&link_path, e))?;
         RealFileSystem
-            .create_symlink(&target, &temporary)
-            .map_err(|e| failure(&temporary, e))?;
+            .create_symlink(&target, temporary.path())
+            .map_err(|e| failure(&link_path, e))?;
         if let Some(expected) = expected
             && self.read(id, placement)? != *expected
         {
-            let _ = fs::remove_file(&temporary);
             return Err(PlacementError::PlacementChanged);
         }
-        fs::rename(&temporary, &placement.path).map_err(|e| failure(&placement.path, e))?;
+        temporary
+            .publish(&placement.path)
+            .map_err(|e| failure(&placement.path, e))?;
         Ok(Written { base: None })
     }
 
@@ -112,14 +119,14 @@ impl<'a> PlacementFs<'a> {
         expected: Option<&Observation>,
     ) -> Result<Written, PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
-        let temporary = temporary_path(parent, TEMP_TAG_COPY);
-        write_copy(&temporary, objects, content)?;
+        let mut temporary = create_temporary_file(parent, TEMP_TAG_COPY)?;
+        write_copy(&mut temporary, objects, content)?;
         // Defer destination errors so a changed observation is reported as such.
         let prepare = if replace {
             match fs::symlink_metadata(&placement.path) {
                 Ok(existing) if existing.is_file() => {
-                    fs::set_permissions(&temporary, existing.permissions())
-                        .map_err(|error| failure(&temporary, error))
+                    fs::set_permissions(temporary.path(), existing.permissions())
+                        .map_err(|error| failure(temporary.path(), error))
                 }
                 Ok(_) => Err(failure(
                     &placement.path,
@@ -134,11 +141,9 @@ impl<'a> PlacementFs<'a> {
         if !replace {
             if let Err(error) = fs::symlink_metadata(&placement.path) {
                 if error.kind() != io::ErrorKind::NotFound {
-                    let _ = fs::remove_file(&temporary);
                     return Err(failure(&placement.path, error));
                 }
             } else {
-                let _ = fs::remove_file(&temporary);
                 return Err(failure(
                     &placement.path,
                     io::Error::new(
@@ -152,36 +157,28 @@ impl<'a> PlacementFs<'a> {
             if let Some(expected) = expected {
                 match self.read(id, placement) {
                     Ok(observation) if &observation == expected => {}
-                    Ok(_) => {
-                        let _ = fs::remove_file(&temporary);
-                        return Err(PlacementError::PlacementChanged);
-                    }
-                    Err(error) => {
-                        let _ = fs::remove_file(&temporary);
-                        return Err(error);
-                    }
+                    Ok(_) => return Err(PlacementError::PlacementChanged),
+                    Err(error) => return Err(error),
                 }
             }
-            if let Err(error) = prepare {
-                let _ = fs::remove_file(&temporary);
-                return Err(error);
-            }
-            fs::rename(&temporary, &placement.path)
+            prepare?;
+            temporary.publish(&placement.path)
         } else {
-            match fs::hard_link(&temporary, &placement.path) {
+            let linked = match fs::hard_link(temporary.path(), &placement.path) {
                 Ok(()) => Ok(()),
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
                 Err(error) if hard_links_unsupported(&error) => {
-                    copy_new(&temporary, &placement.path)
+                    copy_new(temporary.path(), &placement.path)
                 }
                 Err(error) => Err(error),
-            }
+            };
+            // The temporary name is gone before the placement is read, so its link count is one.
+            drop(temporary);
+            linked
         };
         if let Err(error) = publish {
-            let _ = fs::remove_file(&temporary);
             return Err(failure(&placement.path, error));
         }
-        let _ = fs::remove_file(&temporary);
         let metadata = fs::symlink_metadata(&placement.path)
             .map_err(|error| failure(&placement.path, error))?;
         Ok(Written {
@@ -309,37 +306,39 @@ impl PlacementOps for PlacementFs<'_> {
         expected: &Observation,
     ) -> Result<Written, PlacementError> {
         let parent = placement.path.parent().unwrap_or_else(|| Path::new("."));
-        let temporary = temporary_path(parent, TEMP_TAG_CONVERT);
-        let mut prepared = false;
-        let result = (|| {
-            match (placement.kind, to_kind, expected) {
+        let temporary_path = temporary_path(parent, TEMP_TAG_CONVERT);
+        (|| {
+            let temporary = match (placement.kind, to_kind, expected) {
                 (PlacementKind::Link, PlacementKind::Copy, Observation::IntactLink) => {
-                    write_copy(&temporary, objects, content)?;
-                    prepared = true;
+                    let mut temporary = create_temporary_file(parent, TEMP_TAG_CONVERT)?;
+                    write_copy(&mut temporary, objects, content)?;
                     let output = OpenOptions::new()
                         .write(true)
-                        .open(&temporary)
-                        .map_err(|error| failure(&temporary, error))?;
+                        .open(temporary.path())
+                        .map_err(|error| failure(temporary.path(), error))?;
                     let metadata = fs::metadata(&placement.path)
                         .map_err(|error| failure(&placement.path, error))?;
                     output
                         .set_permissions(metadata.permissions())
-                        .map_err(|error| failure(&temporary, error))?;
+                        .map_err(|error| failure(temporary.path(), error))?;
                     output
                         .sync_all()
-                        .map_err(|error| failure(&temporary, error))?;
+                        .map_err(|error| failure(temporary.path(), error))?;
+                    temporary
                 }
                 (PlacementKind::Copy, PlacementKind::Link, Observation::File { .. }) => {
                     require_single_link(&placement.path)?;
                     let target = self.link_target(id);
                     fs::metadata(&target).map_err(|error| failure(&target, error))?;
-                    RealFileSystem
-                        .create_symlink(&target, &temporary)
+                    let temporary = TempFile::sibling_at(&temporary_path)
                         .map_err(|error| symlink_failure(&placement.path, error))?;
-                    prepared = true;
+                    RealFileSystem
+                        .create_symlink(&target, temporary.path())
+                        .map_err(|error| symlink_failure(&placement.path, error))?;
                     RealFileSystem
                         .sync_directory(parent)
                         .map_err(|error| failure(parent, error))?;
+                    temporary
                 }
                 _ => {
                     return Err(failure(
@@ -347,7 +346,7 @@ impl PlacementOps for PlacementFs<'_> {
                         io::Error::other("invalid conversion"),
                     ));
                 }
-            }
+            };
             if self.read(id, placement)? != *expected {
                 return Err(PlacementError::PlacementChanged);
             }
@@ -357,7 +356,8 @@ impl PlacementOps for PlacementFs<'_> {
             // Rename replaces the entry atomically (MoveFileExW with
             // MOVEFILE_REPLACE_EXISTING on Windows). Never unlink first: a
             // failed replacement must leave the original entry available for retry.
-            fs::rename(&temporary, &placement.path)
+            temporary
+                .publish(&placement.path)
                 .map_err(|error| failure(&placement.path, error))?;
             RealFileSystem
                 .sync_directory(parent)
@@ -373,11 +373,7 @@ impl PlacementOps for PlacementFs<'_> {
                 None
             };
             Ok(Written { base })
-        })();
-        if prepared {
-            let _ = fs::remove_file(&temporary);
-        }
-        result
+        })()
     }
 
     fn relocate(
@@ -463,24 +459,26 @@ fn require_absent(path: &Path) -> Result<(), PlacementError> {
     }
 }
 
-fn write_copy(path: &Path, objects: &ObjectStore, content: ObjectId) -> Result<(), PlacementError> {
-    let mut output = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-        .map_err(|error| failure(path, error))?;
-    let result = (|| {
-        objects
-            .get_to(content, ObjectKind::Blob, &mut output)
-            .map_err(PlacementError::Store)?;
-        output.flush().map_err(|error| failure(path, error))?;
-        output.sync_all().map_err(|error| failure(path, error))
-    })();
-    drop(output);
-    if result.is_err() {
-        let _ = fs::remove_file(path);
-    }
-    result
+fn create_temporary_file(parent: &Path, tag: &str) -> Result<TempFile, PlacementError> {
+    let path = temporary_path(parent, tag);
+    TempFile::create_at(&path, TempMode::Default).map_err(|error| failure(&path, error))
+}
+
+/// Writes the object into the temporary file and closes it; the guard removes it on failure.
+fn write_copy(
+    temporary: &mut TempFile,
+    objects: &ObjectStore,
+    content: ObjectId,
+) -> Result<(), PlacementError> {
+    let path = temporary.path().to_path_buf();
+    let output = temporary.file_mut();
+    objects
+        .get_to(content, ObjectKind::Blob, &mut *output)
+        .map_err(PlacementError::Store)?;
+    output.flush().map_err(|error| failure(&path, error))?;
+    output.sync_all().map_err(|error| failure(&path, error))?;
+    temporary.close();
+    Ok(())
 }
 
 fn hash_file(path: &Path) -> Result<ObjectId, PlacementError> {
