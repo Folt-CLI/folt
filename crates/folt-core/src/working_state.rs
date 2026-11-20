@@ -1,6 +1,5 @@
 use crate::config::limits::SCAN_WINDOW;
 use crate::config::names::DEFAULT_BRANCH;
-use crate::config::names::MARKDOWN_EXTENSIONS;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
@@ -160,17 +159,8 @@ pub(crate) fn stage_references<'a>(
     selected: &Placement,
     prefix: &'a [u8],
 ) -> Result<Vec<crate::front_matter::Reference<'a>>, crate::front_matter::FrontMatterError> {
-    let prefix = &prefix[..prefix.len().min(SCAN_WINDOW)];
-    let markdown = selected
-        .path
-        .to_path_buf()
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| {
-            MARKDOWN_EXTENSIONS
-                .iter()
-                .any(|extension| ext.eq_ignore_ascii_case(extension))
-        });
+    let prefix = crate::front_matter::scan_window(prefix);
+    let markdown = crate::front_matter::applies_to(&selected.path.to_path_buf());
     // Internal working files have no Markdown extension. Only their own named
     // front matter enables detection; copies and links use the selected path.
     let markdown = if !markdown && selected.kind == PlacementKind::Internal {
@@ -200,16 +190,7 @@ fn write_stage(
     registry: &mut Registry,
     lock: &HomeLock,
 ) -> Result<(), RulesError> {
-    let markdown = selected
-        .path
-        .to_path_buf()
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| {
-            MARKDOWN_EXTENSIONS
-                .iter()
-                .any(|extension| ext.eq_ignore_ascii_case(extension))
-        });
+    let markdown = crate::front_matter::applies_to(&selected.path.to_path_buf());
     let prefix = blob
         .filter(|_| markdown || selected.kind == PlacementKind::Internal)
         .map(|(objects, hash, _)| objects.get_prefix(hash, ObjectKind::Blob, SCAN_WINDOW))
