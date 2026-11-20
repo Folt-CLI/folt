@@ -1,6 +1,10 @@
+use super::gather::in_scope;
+use super::report::report;
 use super::*;
 use crate::object::hash_blob;
 use crate::placement::StagedBlob;
+use crate::placement::{Observation, PlacementKind};
+use crate::placement_path::PlacementPath;
 use crate::test_support::facts;
 
 fn missing() -> PruneFacts {

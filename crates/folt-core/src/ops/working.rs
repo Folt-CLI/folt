@@ -1,8 +1,37 @@
 use crate::config::names::DEFAULT_BRANCH;
+use crate::ops::facts::{PlacementFacts, needs_hash};
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
+use crate::ref_name::{RefKind, RefName};
+use crate::refs::{RefError, RefStore};
 use crate::registry::{Placement, Registry};
+
+/// Collects one working file, hashing when it has no base or a recorded size matches.
+pub fn gather(
+    row: &Placement,
+    fs: &impl PlacementOps,
+    refs: &RefStore,
+    registry: &Registry,
+) -> Result<PlacementFacts, RulesError> {
+    let row = &resolve_working(row, registry, fs)?;
+    let observation = read_working(row, fs)?;
+    let placement_hash = if needs_hash(row, &observation) {
+        Some(fs.hash_placement(&row.to_placement().1)?)
+    } else {
+        None
+    };
+    let tip = refs.read(
+        RefKind::Branch,
+        &RefName::parse(&row.head).map_err(RefError::from)?,
+    )?;
+    Ok(PlacementFacts {
+        placement: row.clone(),
+        observation,
+        placement_hash,
+        tip,
+    })
+}
 
 /// Links share the internal working row, provided their entry still points to it.
 pub fn resolve_working(
@@ -18,7 +47,7 @@ pub fn resolve_working(
     resolve_observed(row, &observation, internal)
 }
 
-pub(super) fn resolve_observed(
+fn resolve_observed(
     row: &Placement,
     observation: &Observation,
     internal: Option<Placement>,
@@ -64,7 +93,7 @@ fn require_working(row: &Placement) -> Result<(), RulesError> {
     Ok(())
 }
 
-pub(crate) fn read_working(
+pub(super) fn read_working(
     row: &Placement,
     fs: &impl PlacementOps,
 ) -> Result<Observation, RulesError> {
@@ -82,3 +111,6 @@ pub(crate) fn read_working(
     }
     .into())
 }
+
+#[cfg(test)]
+mod tests;

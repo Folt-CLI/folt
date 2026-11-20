@@ -1,11 +1,11 @@
 use folt_core::home::HomeLock;
 use folt_core::object::hash_blob;
+use folt_core::ops::prune::{self, PruneError, PruneOptions};
 #[cfg(unix)]
 use folt_core::placement::PlacementKind;
 use folt_core::placement::StagedBlob;
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::prune::{self, PruneError, PruneOptions};
 use folt_core::registry::{NewPlacement, Placement};
 
 use crate::common::TempHome;

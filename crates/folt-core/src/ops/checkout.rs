@@ -5,7 +5,7 @@ use crate::home::HomeLock;
 use crate::ops::facts::gather_move;
 use crate::ops::placement::move_::{MoveTarget, apply_move, judge_move};
 use crate::ops::rules_error::RulesError;
-use crate::ops::working::resolve::resolve_working;
+use crate::ops::working::resolve_working;
 use crate::placement::PlacementOps;
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};

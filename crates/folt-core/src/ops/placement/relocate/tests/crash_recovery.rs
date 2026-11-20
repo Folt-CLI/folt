@@ -22,12 +22,12 @@ fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
             )
             .is_err()
         );
-        let result = crate::prune::prune_placements(
+        let result = crate::ops::prune::prune_placements(
             &mut registry,
             &fs,
             &lock,
             &[],
-            crate::prune::PruneOptions {
+            crate::ops::prune::PruneOptions {
                 apply: true,
                 confirm_mass_deletion: false,
             },
@@ -56,12 +56,12 @@ fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
     }
     crate::test_support::registry::fail_writes_at(&registry, &rows[1].path, false);
     assert!(
-        crate::prune::prune_placements(
+        crate::ops::prune::prune_placements(
             &mut registry,
             &fs,
             &lock,
             &[],
-            crate::prune::PruneOptions {
+            crate::ops::prune::PruneOptions {
                 apply: true,
                 confirm_mass_deletion: true
             },
@@ -94,12 +94,12 @@ fn prune_preserves_missing_parents_after_directory_move_interruptions() {
             .is_err()
         );
         let before = registry.all_placements().unwrap();
-        let report = crate::prune::prune_placements(
+        let report = crate::ops::prune::prune_placements(
             &mut registry,
             &fs,
             &lock,
             &[],
-            crate::prune::PruneOptions {
+            crate::ops::prune::PruneOptions {
                 apply: true,
                 confirm_mass_deletion: false,
             },

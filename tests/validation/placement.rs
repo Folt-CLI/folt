@@ -85,10 +85,10 @@ fn link_points_to_internal_working_file() {
 
 mod conversion {
     use super::*;
-    use folt_core::checkout::{self, CheckoutStores};
     use folt_core::home::HomeLock;
     use folt_core::id::ObjectId;
     use folt_core::object::hash_blob;
+    use folt_core::ops::checkout::{self, CheckoutStores};
     use folt_core::ops::facts::gather_convert;
     use folt_core::ops::placement::convert::{ConvertPlan, apply_convert, judge_convert};
     use folt_core::ops::refusal::RefusalReason;
