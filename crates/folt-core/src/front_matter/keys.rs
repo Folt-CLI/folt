@@ -4,8 +4,27 @@ use crate::config::names::OWNED;
 
 use super::error::{FrontMatterError, Result};
 use super::scalar::{meaningful, scalar, text};
-use super::scan::{colon, explicit_key, line, punctuation};
+use super::scan::{colon, line, punctuation};
 use super::tree::{Block, Node};
+
+pub(super) fn explicit_key(s: &str) -> Option<&str> {
+    s.strip_prefix('?')
+        .filter(|tail| tail.is_empty() || tail.starts_with([' ', '\t']))
+}
+
+pub(super) fn top_level(raw: &str) -> bool {
+    !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ")
+}
+
+pub(super) fn decoded_key(spelling: &str) -> String {
+    scalar(spelling)
+        .map(Cow::into_owned)
+        .unwrap_or_else(|_| spelling.into())
+}
+
+pub(super) fn quoted_spelling(spelling: &str) -> bool {
+    spelling.starts_with(['\'', '"'])
+}
 
 fn owned_spelling(spelling: &str) -> Option<usize> {
     OWNED.iter().position(|key| spelling.trim() == *key)
@@ -77,7 +96,7 @@ pub(super) fn resolved_explicit_key(bytes: &[u8], n: &Node, block: &Block) -> Re
     for part in &parts {
         // A closing quote must end the scalar. The general scalar decoder is
         // deliberately permissive about interior quotes in opaque values.
-        if let Some(quote) = part.chars().next().filter(|c| matches!(c, '\'' | '"')) {
+        if let Some(quote) = part.chars().next().filter(|_| quoted_spelling(part)) {
             let mut chars = part.char_indices().skip(1).peekable();
             let mut closed = false;
             while let Some((i, c)) = chars.next() {
@@ -122,7 +141,23 @@ pub(super) fn unresolved_key_checks(bytes: &[u8], block: &Block) -> Result<()> {
             return Err(FrontMatterError::Ambiguous);
         }
         // An undecodable quoted key could hide an owned key.
-        if spelling.starts_with(['\'', '"']) && scalar(spelling).is_err() {
+        if quoted_spelling(spelling) && scalar(spelling).is_err() {
+            return Err(FrontMatterError::Ambiguous);
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn edit_key_checks(bytes: &[u8], block: &Block) -> Result<()> {
+    unresolved_key_checks(bytes, block)?;
+    for n in &block.nodes {
+        let spelling = text(&bytes[n.key_range.clone()])?;
+        if explicit_key(spelling).is_some() {
+            continue;
+        }
+        let spelling = spelling.trim();
+        // Keep escaped quoted spellings opaque when editing foreign nodes.
+        if quoted_spelling(spelling) && spelling.contains('\\') {
             return Err(FrontMatterError::Ambiguous);
         }
     }

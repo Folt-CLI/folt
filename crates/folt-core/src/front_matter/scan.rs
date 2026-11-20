@@ -88,17 +88,9 @@ pub(super) fn colon(s: &str) -> Option<usize> {
             .is_none_or(|b| b.is_ascii_whitespace() || *b == b'{' || *b == b'[')
     })
 }
-pub(super) fn explicit_key(s: &str) -> Option<&str> {
-    s.strip_prefix('?')
-        .filter(|tail| tail.is_empty() || tail.starts_with([' ', '\t']))
-}
 pub(super) fn flow_end(s: &str) -> Option<usize> {
     let closing = if s.starts_with('{') { '}' } else { ']' };
     punctuation(&s[1..], closing).first().map(|n| n + 2)
-}
-
-pub(super) fn top_level(raw: &str) -> bool {
-    !raw.is_empty() && !raw.starts_with([' ', '\t', '#']) && !raw.starts_with("- ")
 }
 
 /// Locates a borrowed token within its original input without copying it.

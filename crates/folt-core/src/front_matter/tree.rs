@@ -1,10 +1,9 @@
-use std::borrow::Cow;
 use std::ops::Range;
 
 use super::error::{FrontMatterError, Result};
-use super::keys::resolved_explicit_key;
-use super::scalar::{scalar, text};
-use super::scan::{colon, explicit_key, flow_end, line, punctuation, top_level, trim_end};
+use super::keys::{decoded_key, explicit_key, quoted_spelling, resolved_explicit_key, top_level};
+use super::scalar::text;
+use super::scan::{colon, flow_end, line, punctuation, trim_end};
 
 /// A top-level node. Spans include original spelling and whitespace; `value`
 /// excludes spacing after the colon and a trailing comment on its final line.
@@ -69,13 +68,9 @@ pub(super) fn build(bytes: &[u8], block: &mut Block) -> Result<()> {
                     .unwrap_or_else(|| punctuation(raw, '#').first().copied().unwrap_or(raw.len()));
                 let spelling = raw[..end].trim_end();
                 let key = if let Some(key) = explicit_key(spelling) {
-                    scalar(key.trim())
-                        .map(Cow::into_owned)
-                        .unwrap_or_else(|_| key.trim().into())
+                    decoded_key(key.trim())
                 } else {
-                    scalar(spelling)
-                        .map(Cow::into_owned)
-                        .unwrap_or_else(|_| spelling.into())
+                    decoded_key(spelling)
                 };
                 let mut value_start = pos + key_end.map_or(raw.len(), |n| n + 1);
                 while value_start < current.end && matches!(bytes[value_start], b' ' | b'\t') {
@@ -91,7 +86,7 @@ pub(super) fn build(bytes: &[u8], block: &mut Block) -> Result<()> {
                     value: value_start..value_end,
                     comment: comment..current.end,
                     continuation: current.next..block.body.end,
-                    ambiguous: complex.is_some() || spelling.starts_with(['\'', '"']),
+                    ambiguous: complex.is_some() || quoted_spelling(spelling),
                     key_ranges: key_end.map(|end| pos..pos + end).into_iter().collect(),
                 });
                 // A flow value may wrap over several lines. Its final closing
