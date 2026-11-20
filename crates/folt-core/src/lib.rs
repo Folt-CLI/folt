@@ -17,7 +17,6 @@ pub mod ops;
 pub mod placement;
 pub mod placement_fs;
 pub mod placement_path;
-pub mod placement_rules;
 pub mod prune;
 pub mod ref_name;
 pub mod refs;

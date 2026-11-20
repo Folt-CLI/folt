@@ -185,7 +185,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** An object whose body is the exact captured content bytes. Staging stores working content as a blob for a later commit.
-- **Code:** `crates/folt-core/src/object/kind.rs:6` (`Blob`); `crates/folt-core/src/working_state.rs:94` (`stage`)
+- **Code:** `crates/folt-core/src/object/kind.rs:6` (`Blob`); `crates/folt-core/src/working_state.rs:17` (`stage`)
 - **Related:** [object](#object), [stage](#stage), [commit](#commit).
 - **Not:** Every file ending in `.blob`: commit and tag objects use that extension too.
 - **Status:** decided
@@ -239,7 +239,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** History
 - **Definition:** The commit id currently held by a branch ref. A placement records its own starting commit separately, so it can differ from the tip.
-- **Code:** `crates/folt-core/src/working_state.rs:35` (`gather`); `crates/folt-core/src/ops/facts.rs:22` (`Behind`)
+- **Code:** `crates/folt-core/src/ops/working/mod.rs:29` (`gather`); `crates/folt-core/src/ops/facts.rs:28` (`Behind`)
 - **Related:** [branch](#branch), [commit](#commit), [behind](#behind).
 - **Not:** The branch name stored in `head`, a content blob id or an ancestry comparison.
 - **Status:** decided
@@ -268,7 +268,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A placement whose path is a symbolic link to `folio.main`, always on `main` and without a base, recorded commit or stage of its own. Working operations through an intact link use the internal row.
-- **Code:** `crates/folt-core/src/placement.rs:10` (`Link`); `crates/folt-core/src/working_state.rs:259` (`resolve_working`); `crates/folt-core/src/placement_fs.rs:40` (`link_target`)
+- **Code:** `crates/folt-core/src/placement.rs:10` (`Link`); `crates/folt-core/src/ops/working/resolve.rs:8` (`resolve_working`); `crates/folt-core/src/placement_fs.rs:40` (`link_target`)
 - **Related:** [placement](#placement), [internal row](#internal-row), [copy](#copy), [drift](#drift).
 - **Not:** A Markdown link, hard link or declared reference.
 - **Status:** decided
@@ -331,7 +331,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage; later changes to staged bytes show StagedThenModified.
-- **Code:** `crates/folt-core/src/working_state.rs:94` (`stage`); `crates/folt-core/src/placement.rs:101` (`StagedBlob`); `crates/folt-core/src/working_state.rs:21` (`Staged`)
+- **Code:** `crates/folt-core/src/working_state.rs:17` (`stage`); `crates/folt-core/src/placement.rs:101` (`StagedBlob`); `crates/folt-core/src/ops/working/mod.rs:15` (`Staged`)
 - **Related:** [blob](#blob), [commit](#commit), [unstage](#unstage), [refs table](#refs-table).
 - **Not:** Git staging or a development workflow stage; staging does not change the base.
 - **Status:** decided
@@ -340,7 +340,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** To clear a placement’s recorded stage without reading or changing the working file. This operation does not rebuild the cached references.
-- **Code:** `crates/folt-core/src/working_state.rs:142` (`unstage`)
+- **Code:** `crates/folt-core/src/working_state.rs:65` (`unstage`)
 - **Related:** [stage](#stage), [placement](#placement), [refs table](#refs-table).
 - **Not:** Discarding file edits, deleting a blob or resetting the branch.
 - **Status:** decided
@@ -349,7 +349,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A comparison between a placement’s recorded commit and its branch tip. Behind means both exist and differ; the other results are UpToDate, NoHistory, Unrecorded and MissingTip.
-- **Code:** `crates/folt-core/src/ops/facts.rs:22` (`Behind`); `crates/folt-core/src/working_state.rs:58` (`judge_working`)
+- **Code:** `crates/folt-core/src/ops/facts.rs:28` (`Behind`); `crates/folt-core/src/ops/working/judge.rs:8` (`judge_working`)
 - **Related:** [tip](#tip), [branch](#branch), [drift](#drift), [checkout](#checkout).
 - **Not:** Proof that one commit is an ancestor of another; the current comparison does not walk history.
 - **Status:** decided
@@ -358,7 +358,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** To move a copy or internal row to a branch tip through the placement move rules, resolving an intact link to its internal row first. Internal rows can only check out `main`; an edited working file requires explicit discard permission only when its content differs from the target commit’s content, and can be checked out without discard when it already matches.
-- **Code:** `crates/folt-core/src/checkout.rs:40` (`checkout_placement`); `crates/folt-core/src/checkout.rs:20` (`resolve`); `crates/folt-core/src/placement_rules.rs:217` (`judge_move`)
+- **Code:** `crates/folt-core/src/checkout.rs:40` (`checkout_placement`); `crates/folt-core/src/checkout.rs:20` (`resolve`); `crates/folt-core/src/ops/placement/move_.rs:38` (`judge_move`)
 - **Related:** [branch](#branch), [tip](#tip), [copy](#copy), [internal row](#internal-row).
 - **Not:** Checking out a tag or detached commit id, or moving the branch ref itself.
 - **Status:** decided
@@ -506,7 +506,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** The caller-gathered inputs to a judge function, represented by `PlacementFacts`, `CommitFacts`, `PruneFacts` or `ResetFacts`. They carry the observations, registry rows, hashes and history information required by the particular decision.
-- **Code:** `crates/folt-core/src/ops/facts.rs:7` (`PlacementFacts`); `crates/folt-core/src/history.rs:30` (`CommitFacts`); `crates/folt-core/src/prune.rs:22` (`PruneFacts`); `crates/folt-core/src/history.rs:386` (`ResetFacts`)
+- **Code:** `crates/folt-core/src/ops/facts.rs:13` (`PlacementFacts`); `crates/folt-core/src/history.rs:30` (`CommitFacts`); `crates/folt-core/src/prune.rs:22` (`PruneFacts`); `crates/folt-core/src/history.rs:386` (`ResetFacts`)
 - **Related:** [plan and apply](#plan-and-apply), [observation](#observation), [placement](#placement), [refusal](#refusal).
 - **Not:** The resulting plan or refusal, or writes performed by apply.
 - **Status:** decided

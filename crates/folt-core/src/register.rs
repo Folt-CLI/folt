@@ -791,7 +791,8 @@ fn register_link(
     path: &Path,
     lock: &HomeLock,
 ) -> Result<(), Box<dyn Error>> {
-    use crate::placement_rules::{apply_convert, gather_convert, judge_convert};
+    use crate::ops::facts::gather_convert;
+    use crate::ops::placement::convert::{apply_convert, judge_convert};
     let mut registry = Registry::open_or_create(home, lock)?;
     let row = registry
         .placement_at(&PlacementPath::resolve(path)?)?

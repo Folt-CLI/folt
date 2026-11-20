@@ -1,4 +1,8 @@
 use super::*;
+use crate::id::FolioId;
+use crate::object::hash_blob;
+use crate::ref_name::RefName;
+use crate::test_support::{facts, target};
 
 #[test]
 // split in the folt-core refactor (#203)

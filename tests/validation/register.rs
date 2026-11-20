@@ -6,11 +6,11 @@ use folt_core::config::limits::DEFAULT_LARGE_FILE_BYTES;
 use folt_core::config::names::CONTENT_FILE;
 use folt_core::config::settings::Settings;
 use folt_core::object::hash_blob;
-use folt_core::ops::facts::Behind;
+use folt_core::ops::facts::{Behind, gather};
+use folt_core::ops::status::judge_status;
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::placement_rules;
 use folt_core::refs::RefStore;
 use folt_core::register::{
     self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
@@ -66,12 +66,11 @@ fn files_are_captured_without_history_and_repeated_registration_is_a_noop() {
         )
         .unwrap();
         let refs = RefStore::open(&dir, &format).unwrap();
-        let facts =
-            placement_rules::gather(&[row, internal], &PlacementFs::new(&home.home), |_| {
-                Ok(&refs)
-            })
-            .unwrap();
-        for status in placement_rules::judge_status(&facts) {
+        let facts = gather(&[row, internal], &PlacementFs::new(&home.home), |_| {
+            Ok(&refs)
+        })
+        .unwrap();
+        for status in judge_status(&facts) {
             assert_eq!(status.drift, Drift::InSync);
             assert_eq!(status.behind, Some(Behind::NoHistory));
         }

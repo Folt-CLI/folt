@@ -1,11 +1,14 @@
-use super::*;
-use crate::object::hash_blob;
-use crate::test_support::{RelocateFixture, facts, target};
+use super::apply::{RelocateStep, apply_relocate, apply_relocate_steps};
+use super::judge::{RelocatePlan, judge_relocate};
+use super::target::{RelocateTarget, gather_relocate_target};
+use crate::ops::refusal::RefusalReason;
+use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps};
+use crate::registry::Registry;
+use crate::test_support::{RelocateFixture, facts};
 
-mod convert;
 mod crash_recovery;
 mod directory_plans;
-mod judging;
+mod refusals;
 mod relocation_failures;
 
 fn assert_move_rows(plan: &RelocatePlan, registry: &Registry, old: bool, new: bool) {

@@ -1,98 +1,16 @@
 use crate::config::limits::SCAN_WINDOW;
-use crate::config::names::DEFAULT_BRANCH;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
-use crate::ops::facts::{Behind, PlacementFacts, needs_hash};
 use crate::ops::refusal::{Refusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
+use crate::ops::working::resolve::{read_working, resolve_working};
 use crate::placement::{Observation, PlacementError, PlacementKind, PlacementOps, StagedBlob};
 use crate::placement_path::RegistryError;
-use crate::ref_name::{RefKind, RefName};
-use crate::refs::{RefError, RefStore};
+use crate::ref_name::RefKind;
+use crate::refs::RefStore;
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Edit {
-    Clean,
-    Edited,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Staged {
-    None,
-    Staged,
-    StagedThenModified,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct WorkingStatus {
-    pub edit: Edit,
-    pub staged: Staged,
-    pub behind: Behind,
-}
-
-/// Collects one working file, hashing when it has no base or a recorded size matches.
-pub fn gather(
-    row: &Placement,
-    fs: &impl PlacementOps,
-    refs: &RefStore,
-    registry: &Registry,
-) -> Result<PlacementFacts, RulesError> {
-    let row = &resolve_working(row, registry, fs)?;
-    let observation = read_working(row, fs)?;
-    let placement_hash = if needs_hash(row, &observation) {
-        Some(fs.hash_placement(&row.to_placement().1)?)
-    } else {
-        None
-    };
-    let tip = refs.read(
-        RefKind::Branch,
-        &RefName::parse(&row.head).map_err(RefError::from)?,
-    )?;
-    Ok(PlacementFacts {
-        placement: row.clone(),
-        observation,
-        placement_hash,
-        tip,
-    })
-}
-
-/// Compares only the supplied observations; no commits or files are read.
-pub fn judge_working(facts: &PlacementFacts) -> WorkingStatus {
-    let row = &facts.placement;
-    let matches = |hash: ObjectId, size: u64| {
-        matches!(&facts.observation, Observation::File { signature } if signature.size == size)
-            && facts.placement_hash == Some(hash)
-    };
-    let edit = if row
-        .base
-        .as_ref()
-        .is_some_and(|base| matches(base.hash, base.signature.size))
-    {
-        Edit::Clean
-    } else {
-        Edit::Edited
-    };
-    let staged = match row.staged {
-        None => Staged::None,
-        Some(staged) if matches(staged.hash, staged.size) => Staged::Staged,
-        Some(_) => Staged::StagedThenModified,
-    };
-    let behind = match (row.commit_id, facts.tip) {
-        (None, None) => Behind::NoHistory,
-        (None, Some(_)) => Behind::Unrecorded,
-        (Some(_), None) => Behind::MissingTip,
-        (Some(commit), Some(tip)) if commit == tip => Behind::UpToDate,
-        (Some(_), Some(tip)) => Behind::Behind { tip },
-    };
-    WorkingStatus {
-        edit,
-        staged,
-        behind,
-    }
-}
 
 /// Captures a blob, then records its stage without changing the working base.
 /// The home lock must cover selecting the row and staging it.
@@ -241,82 +159,3 @@ fn write_stage(
     })?;
     Ok(())
 }
-
-/// Links share the internal working row, provided their entry still points to it.
-pub fn resolve_working(
-    row: &Placement,
-    registry: &Registry,
-    fs: &impl PlacementOps,
-) -> Result<Placement, RulesError> {
-    if row.kind != PlacementKind::Link {
-        return Ok(row.clone());
-    }
-    let observation = fs.read(row.id, &row.to_placement().1)?;
-    let internal = registry.internal_placement(row.id)?;
-    resolve_observed(row, &observation, internal)
-}
-
-fn resolve_observed(
-    row: &Placement,
-    observation: &Observation,
-    internal: Option<Placement>,
-) -> Result<Placement, RulesError> {
-    if row.kind != PlacementKind::Link {
-        return Ok(row.clone());
-    }
-    let reason = match observation {
-        Observation::IntactLink => {
-            return internal
-                .filter(|internal| {
-                    internal.id == row.id
-                        && internal.kind == PlacementKind::Internal
-                        && internal.head == DEFAULT_BRANCH
-                })
-                .ok_or_else(|| {
-                    Refusal {
-                        path: row.path.to_path_buf(),
-                        reason: RefusalReason::MissingInternal,
-                    }
-                    .into()
-                });
-        }
-        Observation::Missing => RefusalReason::Gone,
-        Observation::Directory | Observation::NotAFile => RefusalReason::NotAFile,
-        Observation::File { .. } | Observation::OtherLink { .. } => RefusalReason::LinkReplaced,
-    };
-    Err(Refusal {
-        path: row.path.to_path_buf(),
-        reason,
-    }
-    .into())
-}
-
-fn require_working(row: &Placement) -> Result<(), RulesError> {
-    if row.kind == PlacementKind::Link {
-        return Err(Refusal {
-            path: row.path.to_path_buf(),
-            reason: RefusalReason::Link,
-        }
-        .into());
-    }
-    Ok(())
-}
-
-fn read_working(row: &Placement, fs: &impl PlacementOps) -> Result<Observation, RulesError> {
-    require_working(row)?;
-    let observation = fs.read(row.id, &row.to_placement().1)?;
-    let reason = match observation {
-        Observation::File { .. } => return Ok(observation),
-        Observation::Missing => RefusalReason::Gone,
-        Observation::Directory | Observation::NotAFile => RefusalReason::NotAFile,
-        Observation::IntactLink | Observation::OtherLink { .. } => RefusalReason::Unusable,
-    };
-    Err(Refusal {
-        path: row.path.to_path_buf(),
-        reason,
-    }
-    .into())
-}
-
-#[cfg(test)]
-mod tests;

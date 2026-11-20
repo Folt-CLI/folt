@@ -1,5 +1,9 @@
+use super::judge::judge_working;
+use super::resolve::resolve_observed;
 use super::*;
 use crate::object::hash_blob;
+use crate::ops::refusal::RefusalReason;
+use crate::placement::{Observation, PlacementKind, StagedBlob};
 use crate::test_support::facts;
 
 #[test]
