@@ -4,6 +4,7 @@ use std::io;
 use crate::config::settings::Settings;
 use crate::fsx::FileSystem;
 use crate::home::Home;
+use crate::ops::step_hook::StepHook;
 use crate::placement_path::RegistryError;
 
 use super::super::error::RegisterError;
@@ -16,9 +17,9 @@ pub(super) fn create_markers(
     fs: &dyn FileSystem,
     current: &RegisterPlan,
     state: &mut ApplyState,
-    hook: &mut impl FnMut(Step<'_>) -> Result<(), RegistryError>,
+    hook: &mut impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<(), RegisterError> {
-    hook(Step::Markers)?;
+    hook.on_step(Step::Markers)?;
     for entry in &current.entries {
         if entry.creates_marker {
             match OpenOptions::new()
@@ -34,7 +35,7 @@ pub(super) fn create_markers(
                     if let Some(parent) = entry.path.parent() {
                         fs.sync_directory(parent)?;
                     }
-                    hook(Step::MarkerSynced)?;
+                    hook.on_step(Step::MarkerSynced)?;
                 }
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
                 Err(error) => return Err(error.into()),
@@ -49,11 +50,11 @@ pub(super) fn refresh(
     plan: &RegisterPlan,
     current: &RegisterPlan,
     settings: &Settings,
-    hook: &mut impl FnMut(Step<'_>) -> Result<(), RegistryError>,
+    hook: &mut impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<RegisterPlan, RegisterError> {
     // An appearing marker must be checked for type, readability and size.
     let mut refreshed = plan_register(home, plan.requests.clone())?;
-    hook(Step::Refreshed(&mut refreshed))?;
+    hook.on_step(Step::Refreshed(&mut refreshed))?;
     Ok(block_changed(
         current,
         refreshed,

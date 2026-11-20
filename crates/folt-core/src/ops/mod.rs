@@ -1,4 +1,6 @@
-//! The operations tree orders refusal, facts, working, status, placement, then register; each module imports only earlier names.
+//! The operations tree orders refusal, facts, working, status, step_hook, placement, then register; each module imports only earlier names.
+
+mod step_hook;
 
 pub mod facts;
 mod open;

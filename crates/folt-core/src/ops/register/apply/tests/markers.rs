@@ -5,8 +5,8 @@ use crate::config::names::{CONTENT_FILE, MARKER_FILE};
 use crate::folio_dir::Durability;
 use crate::fsx::RealFileSystem;
 use crate::home::HomeError;
-use crate::ops::register::apply::{Step, apply_with_hook};
-use crate::ops::register::links::{LinkStep, apply_links_with_hook};
+use crate::ops::register::apply::{Step, apply_steps};
+use crate::ops::register::links::{LinkStep, apply_links_steps};
 use crate::ops::register::plan_register;
 use crate::ops::register::tests::{injected, resolved_path};
 use crate::placement_path::PlacementPath;
@@ -23,35 +23,42 @@ fn case_variant_appearing_marker_replans_and_cleans_up_on_failure() {
         let lowercase = appeared.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&owned, &appeared]).unwrap();
         let mut reached_transaction = false;
-        let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            match step {
-                Step::Markers => {
-                    fs::write(&marker, b"---\nfolio-name: appeared\n---\neditor content").unwrap();
-                    // A hard link supplies the case-insensitive alias on filesystems
-                    // where the two spellings name distinct paths. create_new must
-                    // see an existing file and must not claim ownership of it.
-                    if !lowercase.exists() {
-                        fs::hard_link(&marker, &lowercase).unwrap();
+        let result = apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                match step {
+                    Step::Markers => {
+                        fs::write(&marker, b"---\nfolio-name: appeared\n---\neditor content")
+                            .unwrap();
+                        // A hard link supplies the case-insensitive alias on filesystems
+                        // where the two spellings name distinct paths. create_new must
+                        // see an existing file and must not claim ownership of it.
+                        if !lowercase.exists() {
+                            fs::hard_link(&marker, &lowercase).unwrap();
+                        }
                     }
-                }
-                Step::Refreshed(refreshed) => {
-                    let index = refreshed
-                        .requests
-                        .iter()
-                        .position(|p| p.path == appeared)
-                        .unwrap();
-                    refreshed.entries[index].path = marker.clone();
-                }
-                Step::Transaction => {
-                    reached_transaction = true;
-                    if fail_transaction {
-                        return Err(injected());
+                    Step::Refreshed(refreshed) => {
+                        let index = refreshed
+                            .requests
+                            .iter()
+                            .position(|p| p.path == appeared)
+                            .unwrap();
+                        refreshed.entries[index].path = marker.clone();
                     }
+                    Step::Transaction => {
+                        reached_transaction = true;
+                        if fail_transaction {
+                            return Err(injected());
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-            Ok(())
-        });
+                Ok(())
+            },
+        );
         assert!(reached_transaction);
         assert_eq!(
             fs::read(&marker).unwrap(),
@@ -129,12 +136,18 @@ fn collapsed_directory_request_is_blocked_before_creating_markers() {
     symlink(&b, &current).unwrap();
 
     let mut marker_created = false;
-    let blocked = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        if matches!(step, Step::MarkerSynced) {
-            marker_created = true;
-        }
-        Ok(())
-    })
+    let blocked = apply_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: Step<'_>| {
+            if matches!(step, Step::MarkerSynced) {
+                marker_created = true;
+            }
+            Ok(())
+        },
+    )
     .unwrap();
     assert!(
         !marker_created,
@@ -171,30 +184,36 @@ fn registration_syncs_markers_and_uses_durable_folios_before_transaction() {
     let mut marker_synced = false;
     let mut durable_folios = 0;
     let mut committed = false;
-    apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        match step {
-            Step::MarkerSynced => marker_synced = true,
-            Step::Folio(durability) => {
-                assert!(marker_synced);
-                assert_eq!(durability, Durability::DataAndDirectories);
-                durable_folios += 1;
+    apply_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: Step<'_>| {
+            match step {
+                Step::MarkerSynced => marker_synced = true,
+                Step::Folio(durability) => {
+                    assert!(marker_synced);
+                    assert_eq!(durability, Durability::DataAndDirectories);
+                    durable_folios += 1;
+                }
+                Step::Transaction => {
+                    assert!(marker_synced);
+                    assert_eq!(durable_folios, 2);
+                    assert!(
+                        Registry::open_existing(&fixture.home)
+                            .unwrap()
+                            .folios()
+                            .unwrap()
+                            .is_empty()
+                    );
+                }
+                Step::Commit => committed = true,
+                _ => {}
             }
-            Step::Transaction => {
-                assert!(marker_synced);
-                assert_eq!(durable_folios, 2);
-                assert!(
-                    Registry::open_existing(&fixture.home)
-                        .unwrap()
-                        .folios()
-                        .unwrap()
-                        .is_empty()
-                );
-            }
-            Step::Commit => committed = true,
-            _ => {}
-        }
-        Ok(())
-    })
+            Ok(())
+        },
+    )
     .unwrap();
     assert!(committed);
 }
@@ -206,25 +225,31 @@ fn probes_the_entire_batch_before_creating_anything() {
     let second = fixture.dir("second");
     let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
     let mut probed = Vec::new();
-    let result = apply_links_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        if let LinkStep::Probe(path) = step {
-            assert!(!first.join(MARKER_FILE).exists());
-            assert!(!second.join(MARKER_FILE).exists());
-            assert!(!fixture.home.path().join("folios").exists());
-            assert!(!fixture.home.path().join("registry.db").exists());
-            assert!(matches!(
-                fixture.home.try_lock(),
-                Err(HomeError::Locked { .. })
-            ));
-            probed.push(path.to_path_buf());
-            if probed.len() == 2 {
-                return Err(io::Error::other("probe unavailable").into());
+    let result = apply_links_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: LinkStep<'_>| {
+            if let LinkStep::Probe(path) = step {
+                assert!(!first.join(MARKER_FILE).exists());
+                assert!(!second.join(MARKER_FILE).exists());
+                assert!(!fixture.home.path().join("folios").exists());
+                assert!(!fixture.home.path().join("registry.db").exists());
+                assert!(matches!(
+                    fixture.home.try_lock(),
+                    Err(HomeError::Locked { .. })
+                ));
+                probed.push(path.to_path_buf());
+                if probed.len() == 2 {
+                    return Err(io::Error::other("probe unavailable").into());
+                }
+            } else {
+                panic!("registration must not start after a failed probe");
             }
-        } else {
-            panic!("registration must not start after a failed probe");
-        }
-        Ok(())
-    });
+            Ok(())
+        },
+    );
     assert!(
         result
             .unwrap_err()

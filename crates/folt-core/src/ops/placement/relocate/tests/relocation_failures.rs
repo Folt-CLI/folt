@@ -10,8 +10,12 @@ fn rename_failure_rolls_back_new_rows_and_preserves_racing_destinations() {
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             let destination = plan.target.path.to_path_buf();
-            let result =
-                apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, registry| {
+            let result = apply_relocate_steps(
+                &plan,
+                &fs,
+                &mut registry,
+                &lock,
+                |(step, registry): (RelocateStep, &Registry)| {
                     assert_eq!(step, RelocateStep::Inserted);
                     assert_move_rows(&plan, registry, true, true);
                     if target_directory {
@@ -20,7 +24,8 @@ fn rename_failure_rolls_back_new_rows_and_preserves_racing_destinations() {
                         std::fs::write(&destination, b"other process").unwrap();
                     }
                     Ok(())
-                });
+                },
+            );
             assert!(result.is_err());
             assert_move_rows(&plan, &registry, true, false);
             assert!(fixture.row.path.to_path_buf().exists());
@@ -38,11 +43,17 @@ fn rename_race_preserves_a_new_link() {
     let (fixture, lock, mut registry) = RelocateFixture::new(false);
     let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
     let plan = fixture.plan(&registry);
-    let result = apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
-        assert_eq!(step, RelocateStep::Inserted);
-        std::os::unix::fs::symlink("foreign target", plan.target.path.to_path_buf()).unwrap();
-        Ok(())
-    });
+    let result = apply_relocate_steps(
+        &plan,
+        &fs,
+        &mut registry,
+        &lock,
+        |(step, _): (RelocateStep, &Registry)| {
+            assert_eq!(step, RelocateStep::Inserted);
+            std::os::unix::fs::symlink("foreign target", plan.target.path.to_path_buf()).unwrap();
+            Ok(())
+        },
+    );
     assert!(result.is_err());
     assert_move_rows(&plan, &registry, true, false);
     assert_eq!(
@@ -57,9 +68,13 @@ fn pending_rows_are_cleaned_when_retry_destination_is_occupied() {
     let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
     let plan = fixture.plan(&registry);
     assert!(
-        apply_relocate_steps(&plan, &fs, &mut registry, &lock, |_, _| {
-            Err(PlacementError::PlacementChanged.into())
-        })
+        apply_relocate_steps(
+            &plan,
+            &fs,
+            &mut registry,
+            &lock,
+            |(_, _): (RelocateStep, &Registry)| { Err(PlacementError::PlacementChanged.into()) }
+        )
         .is_err()
     );
     std::fs::create_dir(plan.target.path.to_path_buf()).unwrap();
@@ -114,13 +129,19 @@ fn link_move_retries_each_crash_window_using_only_pending_rows() {
             .unwrap();
         let plan = fixture.plan(&registry);
         assert!(
-            apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
-                if step == crash {
-                    Err(PlacementError::PlacementChanged.into())
-                } else {
-                    Ok(())
+            apply_relocate_steps(
+                &plan,
+                &fs,
+                &mut registry,
+                &lock,
+                |(step, _): (RelocateStep, &Registry)| {
+                    if step == crash {
+                        Err(PlacementError::PlacementChanged.into())
+                    } else {
+                        Ok(())
+                    }
                 }
-            })
+            )
             .is_err()
         );
         drop(registry);

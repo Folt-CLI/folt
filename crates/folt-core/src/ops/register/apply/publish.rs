@@ -10,6 +10,7 @@ use crate::fsx::FileSystem;
 use crate::home::{Home, HomeLock};
 use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
+use crate::ops::step_hook::StepHook;
 use crate::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use crate::placement_fs::PlacementFs;
 use crate::placement_path::{PlacementPath, RegistryError};
@@ -28,11 +29,11 @@ pub(super) fn publish_entry(
     entry: &RegisterEntry,
     content: Vec<u8>,
     state: &mut ApplyState,
-    hook: &mut impl FnMut(Step<'_>) -> Result<(), RegistryError>,
+    hook: &mut impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<Rows, RegisterError> {
     let hash = hash_blob(&content);
     let durability = Durability::DataAndDirectories;
-    hook(Step::Folio(durability))?;
+    hook.on_step(Step::Folio(durability))?;
     let folio = create_folio_with(fs, home.path(), lock, FolioSpec { content }, durability)?;
     state.directories.push(folio.path().to_path_buf());
     let mut internal = registry::internal_placement(home, folio.id())?;
@@ -82,14 +83,14 @@ pub(super) fn publish_rows(
     home: &Home,
     lock: &HomeLock,
     rows: &[Rows],
-    hook: &mut impl FnMut(Step<'_>) -> Result<(), RegistryError>,
+    hook: &mut impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<(), RegisterError> {
     if rows.is_empty() {
         return Ok(());
     }
     // Persist the home entry too when create_folio first created folios/.
     fs.sync_directory(home.path())?;
-    hook(Step::Transaction)?;
+    hook.on_step(Step::Transaction)?;
     let mut registry = Registry::open_or_create(home, lock)?;
     registry.write(lock, |tx| {
         for (folio, internal, copy, name) in rows {
@@ -98,7 +99,7 @@ pub(super) fn publish_rows(
             tx.add_placement(internal)?;
             tx.add_placement(copy)?;
         }
-        hook(Step::Commit)
+        hook.on_step(Step::Commit)
     })?;
     Ok(())
 }
