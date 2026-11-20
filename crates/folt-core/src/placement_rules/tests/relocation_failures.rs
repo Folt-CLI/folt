@@ -74,7 +74,11 @@ fn directory_registry_transactions_are_all_or_nothing() {
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         let (old, new) = &plan.target.rows[1];
-        registry.fail_writes_at(if insert { &new.path } else { &old.path }, insert);
+        crate::test_support::registry::fail_writes_at(
+            &registry,
+            if insert { &new.path } else { &old.path },
+            insert,
+        );
         let result = apply_relocate(&plan, &fs, &mut registry, &lock);
         assert!(result.is_err());
         assert_move_rows(&plan, &registry, true, !insert);
@@ -168,7 +172,11 @@ fn relative_link_normalization_preserves_registry_failure_windows() {
             .unwrap();
         let plan = fixture.plan(&registry);
         let (old, new) = &plan.target.rows[0];
-        registry.fail_writes_at(if insert { &new.path } else { &old.path }, insert);
+        crate::test_support::registry::fail_writes_at(
+            &registry,
+            if insert { &new.path } else { &old.path },
+            insert,
+        );
         assert!(apply_relocate(&plan, &fs, &mut registry, &lock).is_err());
         assert_move_rows(&plan, &registry, true, !insert);
         let mut present = if insert { old.clone() } else { new.clone() };
@@ -187,7 +195,7 @@ fn relative_link_normalization_preserves_registry_failure_windows() {
         );
         assert_eq!(old.path.to_path_buf().exists(), insert);
         assert_eq!(new.path.to_path_buf().exists(), !insert);
-        registry.clear_write_failure();
+        crate::test_support::registry::clear_write_failure(&registry);
         drop(registry);
         let mut registry = Registry::open_or_create(&fixture.home, &lock).unwrap();
         let retry = fixture.plan(&registry);

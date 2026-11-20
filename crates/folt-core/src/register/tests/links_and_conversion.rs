@@ -6,7 +6,7 @@ fn blocked_link_registration_does_not_probe_or_create_markers() {
     let directory = fixture.dir("directory");
     let missing = fixture.root.join("missing");
     let plan = plan_register(&fixture.home, [&directory, &missing]).unwrap();
-    let result = apply_links_with_hook(&fixture.home, &plan, false, |_| {
+    let result = apply_links_with_hook(&RealFileSystem, &fixture.home, &plan, false, |_| {
         panic!("blocked apply must not probe")
     })
     .unwrap();
@@ -22,9 +22,8 @@ fn link_registration_failure_rolls_back_before_commit() {
     let directory = fixture.dir("directory");
     let plan = plan_register(&fixture.home, [&directory]).unwrap();
     let folios = fixture.home.path().join("folios");
-    let result = crate::fsx::with_sync_failure(&folios, || {
-        apply_links_with_hook(&fixture.home, &plan, false, |_| Ok(()))
-    });
+    let fs = crate::fsx::fault::FaultFileSystem::new().sync_failure(&folios, 0);
+    let result = apply_links_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(()));
     assert!(result.is_err());
     assert!(!directory.join(MARKER_FILE).exists());
     assert_eq!(fixture.folio_count(), 0);
@@ -45,7 +44,7 @@ fn crash_after_registration_keeps_copies_and_retry_converts_without_new_folios()
     fs::write(&path, b"content").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let crash = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = apply_links_with_hook(&fixture.home, &plan, false, |step| {
+        let _ = apply_links_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
             if matches!(step, LinkStep::Registered) {
                 panic!("simulated crash");
             }
@@ -72,7 +71,7 @@ fn edited_path_is_reported_and_other_conversions_continue() {
     }
     let edited = resolved_path(&paths[1]);
     let plan = plan_register(&fixture.home, &paths).unwrap();
-    let result = apply_links_with_hook(&fixture.home, &plan, false, |step| {
+    let result = apply_links_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
         match step {
             LinkStep::Probe(path) => PlacementFs::new(&fixture.home).probe_link(path)?,
             LinkStep::Convert(path) if resolved_path(path) == edited => fs::write(path, b"edit")?,
@@ -110,12 +109,19 @@ fn conversion_syncs_link_creation_and_rename_and_retry_finishes_copy_row() {
         fs::write(&path, b"content").unwrap();
         let plan = plan_register(&fixture.home, [&path]).unwrap();
         apply_register(&fixture.home, &plan, false).unwrap();
-        let (result, retry) =
-            crate::fsx::with_sync_failure_after(&directory, successful_syncs, || {
-                let result = apply_register_links(&fixture.home, &plan, false).unwrap();
-                let retry = apply_register_links(&fixture.home, &plan, false).unwrap();
-                (result, retry)
-            });
+        let fs =
+            crate::fsx::fault::FaultFileSystem::new().sync_failure(&directory, successful_syncs);
+        let apply = || {
+            apply_links_with_hook(&fs, &fixture.home, &plan, false, |step| {
+                if let LinkStep::Probe(path) = step {
+                    PlacementFs::with_fs(&fixture.home, &fs).probe_link(path)?;
+                }
+                Ok(())
+            })
+            .unwrap()
+        };
+        let result = apply();
+        let retry = apply();
         assert!(
             matches!(&result.paths[0].1, RegisterLinkResult::LeftAsCopy { reason }
             if reason.contains("injected directory sync failure"))

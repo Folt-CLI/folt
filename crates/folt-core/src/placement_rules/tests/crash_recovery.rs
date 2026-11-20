@@ -48,7 +48,7 @@ fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
     for row in &rows {
         std::fs::remove_file(row.path.to_path_buf()).unwrap();
     }
-    registry.fail_writes_at(&rows[1].path, false);
+    crate::test_support::registry::fail_writes_at(&registry, &rows[1].path, false);
     assert!(
         crate::prune::prune_placements(
             &mut registry,

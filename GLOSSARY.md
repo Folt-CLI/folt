@@ -562,7 +562,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Code structure
 - **Definition:** The single module that owns file-system writes (temporary files, atomic rename, directory sync and mode setting) and the `FileSystem` trait with a real and a fault-injecting implementation.
-- **Code:** `crates/folt-core/src/fsx/mod.rs:22` (`FileSystem`)
+- **Code:** `crates/folt-core/src/fsx/mod.rs:22` (`FileSystem`); `crates/folt-core/src/fsx/fault.rs` (`FaultFileSystem`)
 - **Related:** [publish](#publish).
 - **Not:** Raw `std::fs` mutations elsewhere.
 - **Status:** decided
