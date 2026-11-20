@@ -7,13 +7,19 @@ fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         assert!(
-            apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
-                if step == crash {
-                    Err(PlacementError::PlacementChanged.into())
-                } else {
-                    Ok(())
+            apply_relocate_steps(
+                &plan,
+                &fs,
+                &mut registry,
+                &lock,
+                |(step, _): (RelocateStep, &Registry)| {
+                    if step == crash {
+                        Err(PlacementError::PlacementChanged.into())
+                    } else {
+                        Ok(())
+                    }
                 }
-            })
+            )
             .is_err()
         );
         let result = crate::prune::prune_placements(
@@ -72,13 +78,19 @@ fn prune_preserves_missing_parents_after_directory_move_interruptions() {
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         assert!(
-            apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
-                if step == crash {
-                    Err(PlacementError::PlacementChanged.into())
-                } else {
-                    Ok(())
+            apply_relocate_steps(
+                &plan,
+                &fs,
+                &mut registry,
+                &lock,
+                |(step, _): (RelocateStep, &Registry)| {
+                    if step == crash {
+                        Err(PlacementError::PlacementChanged.into())
+                    } else {
+                        Ok(())
+                    }
                 }
-            })
+            )
             .is_err()
         );
         let before = registry.all_placements().unwrap();
@@ -118,15 +130,20 @@ fn move_crash_windows_reopen_and_reuse_pending_rows() {
             let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             assert_eq!(plan.target.rows.len(), if directory { 3 } else { 1 });
-            let result =
-                apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, registry| {
+            let result = apply_relocate_steps(
+                &plan,
+                &fs,
+                &mut registry,
+                &lock,
+                |(step, registry): (RelocateStep, &Registry)| {
                     assert_move_rows(&plan, registry, step != RelocateStep::Deleted, true);
                     if step == crash {
                         Err(PlacementError::PlacementChanged.into())
                     } else {
                         Ok(())
                     }
-                });
+                },
+            );
             assert!(result.is_err());
             assert_eq!(
                 fixture.row.path.to_path_buf().exists(),

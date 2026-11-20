@@ -76,6 +76,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [signature](#signature)
 - [size](#size)
 - [stage](#stage)
+- [StepHook](#stephook)
 - [tag](#tag)
 - [TempFile](#tempfile)
 - [test_support](#test_support)
@@ -557,6 +558,15 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Status:** decided
 
 ## Code structure
+
+### StepHook
+
+- **Layer:** Code structure
+- **Definition:** The crate-private `StepHook<S, E>` trait observes an operation step through `on_step`, taking payload `S` and returning `Result<(), E>`. `NoHook` implements it for every payload and error type and always returns `Ok(())`; any `FnMut(S) -> Result<(), E>` implements it by calling the closure.
+- **Code:** `crates/folt-core/src/ops/step_hook.rs`
+- **Related:** [ops](#ops), [plan and apply](#plan-and-apply).
+- **Not:** A change to operation step order or payloads.
+- **Status:** decided
 
 ### fsx
 

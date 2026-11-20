@@ -4,6 +4,7 @@ use crate::config::settings::Settings;
 use crate::folio_dir::Durability;
 use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::{Home, HomeLock};
+use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement_path::RegistryError;
 
 use super::error::RegisterError;
@@ -16,7 +17,7 @@ pub fn apply_register(
     plan: &RegisterPlan,
     confirm_large: bool,
 ) -> Result<RegisterPlan, RegisterError> {
-    apply_with_hook(&RealFileSystem, home, plan, confirm_large, |_| Ok(()))
+    apply_steps(&RealFileSystem, home, plan, confirm_large, NoHook)
 }
 
 // Hook payloads are observed by the regression tests.
@@ -30,12 +31,12 @@ pub(super) enum Step<'a> {
     Commit,
 }
 
-pub(super) fn apply_with_hook(
+pub(super) fn apply_steps(
     fs: &dyn FileSystem,
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,
-    hook: impl FnMut(Step<'_>) -> Result<(), RegistryError>,
+    hook: impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<RegisterPlan, RegisterError> {
     let lock = home.lock()?;
     apply_locked(fs, home, plan, confirm_large, &lock, hook)
@@ -47,7 +48,7 @@ pub(super) fn apply_locked(
     plan: &RegisterPlan,
     confirm_large: bool,
     lock: &HomeLock,
-    mut hook: impl FnMut(Step<'_>) -> Result<(), RegistryError>,
+    mut hook: impl for<'a> StepHook<Step<'a>, RegistryError>,
 ) -> Result<RegisterPlan, RegisterError> {
     let settings = Settings::load(home)?;
     let mut current = block_changed(

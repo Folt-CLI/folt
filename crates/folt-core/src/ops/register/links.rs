@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::config::settings::Settings;
 use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::{Home, HomeLock};
+use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement::{Observation, PlacementKind};
 use crate::placement_fs::PlacementFs;
 use crate::placement_path::PlacementPath;
@@ -32,12 +33,18 @@ pub fn apply_register_links(
     plan: &RegisterPlan,
     confirm_large: bool,
 ) -> Result<RegisterLinkOutcome, RegisterError> {
-    apply_links_with_hook(&RealFileSystem, home, plan, confirm_large, |step| {
-        if let LinkStep::Probe(path) = step {
-            PlacementFs::new(home).probe_link(path)?;
-        }
-        Ok(())
-    })
+    apply_links_steps(
+        &RealFileSystem,
+        home,
+        plan,
+        confirm_large,
+        |step: LinkStep<'_>| {
+            if let LinkStep::Probe(path) = step {
+                PlacementFs::new(home).probe_link(path)?;
+            }
+            Ok(())
+        },
+    )
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -47,12 +54,12 @@ pub(super) enum LinkStep<'a> {
     Convert(&'a Path),
 }
 
-pub(super) fn apply_links_with_hook(
+pub(super) fn apply_links_steps(
     fs: &dyn FileSystem,
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,
-    mut hook: impl FnMut(LinkStep<'_>) -> Result<(), RegisterError>,
+    mut hook: impl for<'a> StepHook<LinkStep<'a>, RegisterError>,
 ) -> Result<RegisterLinkOutcome, RegisterError> {
     let lock = home.lock()?;
     let settings = Settings::load(home)?;
@@ -68,21 +75,22 @@ pub(super) fn apply_links_with_hook(
         });
     }
     for entry in &current.entries {
-        hook(LinkStep::Probe(&entry.path))?;
+        hook.on_step(LinkStep::Probe(&entry.path))?;
     }
-    let registration = apply_locked(fs, home, &current, confirm_large, &lock, |_| Ok(()))?;
+    let registration = apply_locked(fs, home, &current, confirm_large, &lock, NoHook)?;
     if blocked(&registration, confirm_large) {
         return Ok(RegisterLinkOutcome {
             registration,
             paths: Vec::new(),
         });
     }
-    hook(LinkStep::Registered)?;
+    hook.on_step(LinkStep::Registered)?;
     let paths = registration
         .entries
         .iter()
         .map(|entry| {
-            let result = hook(LinkStep::Convert(&entry.path))
+            let result = hook
+                .on_step(LinkStep::Convert(&entry.path))
                 .map_err(|error| error.to_string())
                 .and_then(|()| {
                     register_link(fs, home, &entry.path, &lock).map_err(|error| error.to_string())

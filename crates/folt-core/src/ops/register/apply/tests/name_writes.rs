@@ -3,9 +3,10 @@ use std::fs;
 use crate::config::names::MARKER_FILE;
 use crate::front_matter::{self};
 use crate::fsx::RealFileSystem;
-use crate::ops::register::apply::{Step, apply_with_hook};
+use crate::ops::register::apply::{Step, apply_steps};
 use crate::ops::register::tests::injected;
 use crate::ops::register::{RegisterRefusalReason, RegisterStatus, apply_register, plan_register};
+use crate::ops::step_hook::NoHook;
 use crate::registry::Registry;
 use crate::test_support::TempHome;
 
@@ -22,27 +23,33 @@ fn name_writes_restore_the_whole_batch_at_transaction_and_commit_failures() {
         let marker = directory.join(MARKER_FILE);
         let plan = plan_register(&fixture.home, [&paths[0], &paths[1], &directory]).unwrap();
         let mut reached = false;
-        let error = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            if matches!(step, Step::Transaction) && !fail_commit
-                || matches!(step, Step::Commit) && fail_commit
-            {
-                reached = true;
-                for (path, expected) in paths.iter().zip(["one", "two"]) {
+        let error = apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                if matches!(step, Step::Transaction) && !fail_commit
+                    || matches!(step, Step::Commit) && fail_commit
+                {
+                    reached = true;
+                    for (path, expected) in paths.iter().zip(["one", "two"]) {
+                        assert_eq!(
+                            front_matter::read_name(&fs::read(path).unwrap())
+                                .unwrap()
+                                .as_deref(),
+                            Some(expected)
+                        );
+                    }
                     assert_eq!(
-                        front_matter::read_name(&fs::read(path).unwrap())
-                            .unwrap()
-                            .as_deref(),
-                        Some(expected)
+                        fs::read(&marker).unwrap(),
+                        b"---\nfolio-name: \"directory\"\n---\n"
                     );
+                    return Err(injected());
                 }
-                assert_eq!(
-                    fs::read(&marker).unwrap(),
-                    b"---\nfolio-name: \"directory\"\n---\n"
-                );
-                return Err(injected());
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+        )
         .unwrap_err();
         assert!(reached);
         assert!(error.to_string().contains("injected failure"));
@@ -67,19 +74,25 @@ fn restore_preserves_external_edits_and_reports_the_retained_name() {
     let path = fixture.root.join("file.md");
     fs::write(&path, b"body").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
-    let error = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        if matches!(step, Step::Transaction) {
-            assert_eq!(
-                front_matter::read_name(&fs::read(&path).unwrap())
-                    .unwrap()
-                    .as_deref(),
-                Some("file")
-            );
-            fs::write(&path, b"---\nfolio-name: file\n---\nuser edit").unwrap();
-            return Err(injected());
-        }
-        Ok(())
-    })
+    let error = apply_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: Step<'_>| {
+            if matches!(step, Step::Transaction) {
+                assert_eq!(
+                    front_matter::read_name(&fs::read(&path).unwrap())
+                        .unwrap()
+                        .as_deref(),
+                    Some("file")
+                );
+                fs::write(&path, b"---\nfolio-name: file\n---\nuser edit").unwrap();
+                return Err(injected());
+            }
+            Ok(())
+        },
+    )
     .unwrap_err();
     assert!(error.to_string().contains("keeps the name"));
     assert!(
@@ -109,12 +122,18 @@ fn changed_after_refresh_blocks_without_writing_and_restores_earlier_files() {
     fs::write(&first, b"first body").unwrap();
     fs::write(&second, b"second body").unwrap();
     let plan = plan_register(&fixture.home, [&first, &second]).unwrap();
-    let result = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        if matches!(step, Step::Refreshed(_)) {
-            fs::write(&second, b"user edit").unwrap();
-        }
-        Ok(())
-    })
+    let result = apply_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: Step<'_>| {
+            if matches!(step, Step::Refreshed(_)) {
+                fs::write(&second, b"user edit").unwrap();
+            }
+            Ok(())
+        },
+    )
     .unwrap();
     assert_eq!(
         result.entries[1].status,
@@ -137,21 +156,27 @@ fn missing_refreshed_marker_signature_blocks_and_rolls_back_earlier_files() {
     let marker = &plan.entries[1].path;
     let mut folios_started = 0;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-            match step {
-                Step::MarkerSynced => fs::remove_file(marker).unwrap(),
-                Step::Refreshed(refreshed) => {
-                    assert!(refreshed.entries[1].signature.is_none());
-                    fs::write(marker, b"").unwrap();
+        apply_steps(
+            &RealFileSystem,
+            &fixture.home,
+            &plan,
+            false,
+            |step: Step<'_>| {
+                match step {
+                    Step::MarkerSynced => fs::remove_file(marker).unwrap(),
+                    Step::Refreshed(refreshed) => {
+                        assert!(refreshed.entries[1].signature.is_none());
+                        fs::write(marker, b"").unwrap();
+                    }
+                    Step::Folio(_) => {
+                        folios_started += 1;
+                        assert_ne!(fs::read(first).unwrap(), original);
+                    }
+                    _ => {}
                 }
-                Step::Folio(_) => {
-                    folios_started += 1;
-                    assert_ne!(fs::read(first).unwrap(), original);
-                }
-                _ => {}
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+        )
     }));
     let result = result.expect("a missing refreshed signature must not panic");
     if let Ok(blocked) = result {
@@ -215,7 +240,7 @@ fn metadata_failure_after_name_publish_restores_or_reports_retained_name() {
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let path = &plan.entries[0].path;
     let fs = crate::fsx::fault::FaultFileSystem::new().rewrite_metadata_failure(path);
-    let error = apply_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(())).unwrap_err();
+    let error = apply_steps(&fs, &fixture.home, &plan, false, NoHook).unwrap_err();
     let message = error.to_string();
     assert!(message.contains("injected rewrite metadata failure"));
     if fs::read(path).unwrap() != original {
@@ -242,13 +267,19 @@ fn restore_failure_before_publication_reports_the_retained_name_with_path() {
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let path = &plan.entries[0].path;
     let edited = b"---\nfolio-name: \"file\"\n---\nbody with user edits";
-    let error = apply_with_hook(&RealFileSystem, &fixture.home, &plan, false, |step| {
-        if matches!(step, Step::Transaction) {
-            fs::write(path, edited).unwrap();
-            return Err(injected());
-        }
-        Ok(())
-    })
+    let error = apply_steps(
+        &RealFileSystem,
+        &fixture.home,
+        &plan,
+        false,
+        |step: Step<'_>| {
+            if matches!(step, Step::Transaction) {
+                fs::write(path, edited).unwrap();
+                return Err(injected());
+            }
+            Ok(())
+        },
+    )
     .unwrap_err();
     let message = error.to_string();
     assert!(
@@ -270,7 +301,7 @@ fn directory_sync_failure_after_name_publish_still_attempts_restore() {
     fs::write(&path, b"body").unwrap();
     let plan = plan_register(&fixture.home, [&path]).unwrap();
     let fs = crate::fsx::fault::FaultFileSystem::new().sync_failure(&fixture.root, 0);
-    let error = apply_with_hook(&fs, &fixture.home, &plan, false, |_| Ok(())).unwrap_err();
+    let error = apply_steps(&fs, &fixture.home, &plan, false, NoHook).unwrap_err();
     assert!(
         error
             .to_string()
