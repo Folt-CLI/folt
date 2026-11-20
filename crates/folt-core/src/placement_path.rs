@@ -119,9 +119,18 @@ fn resolve(input: &Path, mode: ResolveMode) -> Result<PathBuf, RegistryError> {
         ResolveMode::ResolveExistingAncestor => {
             let mut ancestor = absolute.as_path();
             let mut missing = Vec::new();
+            let mut missing_error = None;
             loop {
                 match fs::canonicalize(ancestor) {
                     Ok(mut resolved) => {
+                        // Windows can report NotFound beneath a regular file.
+                        // Only a directory can contain the missing names; keep
+                        // the original filesystem error when it cannot.
+                        if let Some(error) = missing_error
+                            && !fs::metadata(&resolved)?.is_dir()
+                        {
+                            return Err(RegistryError::Io(error));
+                        }
                         for name in missing.iter().rev() {
                             resolved.push(name);
                         }
@@ -132,7 +141,11 @@ fn resolve(input: &Path, mode: ResolveMode) -> Result<PathBuf, RegistryError> {
                             return Err(error.into());
                         };
                         missing.push(name);
-                        ancestor = ancestor.parent().ok_or(error)?;
+                        let Some(parent) = ancestor.parent() else {
+                            return Err(error.into());
+                        };
+                        ancestor = parent;
+                        missing_error.get_or_insert(error);
                     }
                     Err(error) => return Err(error.into()),
                 }
