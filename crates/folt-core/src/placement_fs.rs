@@ -130,7 +130,7 @@ impl<'a> PlacementFs<'a> {
         let prepare = if replace {
             match fs::symlink_metadata(&placement.path) {
                 Ok(existing) if existing.is_file() => {
-                    fs::set_permissions(temporary.path(), existing.permissions())
+                    crate::fsx::set_permissions(temporary.path(), existing.permissions())
                         .map_err(|error| failure(temporary.path(), error))
                 }
                 Ok(_) => Err(failure(
@@ -169,7 +169,7 @@ impl<'a> PlacementFs<'a> {
             prepare?;
             temporary.publish(&placement.path)
         } else {
-            let linked = match fs::hard_link(temporary.path(), &placement.path) {
+            let linked = match crate::fsx::hard_link(temporary.path(), &placement.path) {
                 Ok(()) => Ok(()),
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
                 Err(error) if hard_links_unsupported(&error) => {
@@ -323,11 +323,9 @@ impl PlacementOps for PlacementFs<'_> {
                         .map_err(|error| failure(temporary.path(), error))?;
                     let metadata = fs::metadata(&placement.path)
                         .map_err(|error| failure(&placement.path, error))?;
-                    output
-                        .set_permissions(metadata.permissions())
+                    crate::fsx::set_file_permissions(&output, metadata.permissions())
                         .map_err(|error| failure(temporary.path(), error))?;
-                    output
-                        .sync_all()
+                    crate::fsx::sync_file(&output)
                         .map_err(|error| failure(temporary.path(), error))?;
                     temporary
                 }
@@ -410,7 +408,8 @@ impl PlacementOps for PlacementFs<'_> {
         }
         match expected {
             Observation::IntactLink | Observation::OtherLink { .. } | Observation::File { .. } => {
-                fs::remove_file(&placement.path).map_err(|error| failure(&placement.path, error))
+                crate::fsx::remove_file(&placement.path)
+                    .map_err(|error| failure(&placement.path, error))
             }
             _ => Err(PlacementError::PlacementChanged),
         }
@@ -487,7 +486,7 @@ fn write_copy(
         .get_to(content, ObjectKind::Blob, &mut *output)
         .map_err(PlacementError::Store)?;
     output.flush().map_err(|error| failure(&path, error))?;
-    output.sync_all().map_err(|error| failure(&path, error))?;
+    crate::fsx::sync_file(output).map_err(|error| failure(&path, error))?;
     temporary.close();
     Ok(())
 }

@@ -75,7 +75,7 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), LowerRefErro
     let parent = path
         .parent()
         .ok_or_else(|| LowerRefError::InvalidRef(path.into()))?;
-    fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
+    crate::fsx::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
     let mut temporary = TempFile::create(parent, TEMP_PREFIX_REF, '.', TempMode::Default)
         .map_err(|(path, source)| io_error(&path, source))?;
     temporary
@@ -127,7 +127,7 @@ pub(crate) fn clean_directory(path: &Path, recursive: bool) -> Result<(), LowerR
             .file_type()
             .map_err(|source| io_error(&child, source))?;
         if ty.is_file() && entry.file_name().to_str().is_some_and(temporary_name) {
-            fs::remove_file(&child).map_err(|source| io_error(&child, source))?;
+            crate::fsx::remove_file(&child).map_err(|source| io_error(&child, source))?;
         } else if recursive && ty.is_dir() {
             clean_directory(&child, true)?;
         } else if recursive && !ty.is_file() {
