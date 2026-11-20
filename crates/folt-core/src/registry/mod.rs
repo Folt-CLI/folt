@@ -4,8 +4,6 @@ use rusqlite::Connection;
 
 use crate::fsx::TempFile;
 use crate::home::HomeLock;
-#[cfg(test)]
-use crate::placement_path::PlacementPath;
 use crate::placement_path::RegistryError;
 
 mod codec;
@@ -34,29 +32,6 @@ impl Registry {
     pub(crate) fn home_path(&self) -> &Path {
         &self.home
     }
-    #[cfg(test)]
-    pub(crate) fn fail_writes_at(&self, path: &PlacementPath, insert: bool) {
-        let operation = if insert { "INSERT" } else { "DELETE" };
-        let row = if insert { "NEW" } else { "OLD" };
-        let hex: String = path
-            .as_bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        self.connection.as_ref().unwrap().execute_batch(&format!(
-            "CREATE TRIGGER injected_failure BEFORE {operation} ON placements WHEN {row}.path = X'{hex}' BEGIN SELECT RAISE(ABORT, 'injected failure'); END;"
-        )).unwrap();
-    }
-
-    #[cfg(test)]
-    pub(crate) fn clear_write_failure(&self) {
-        self.connection
-            .as_ref()
-            .unwrap()
-            .execute_batch("DROP TRIGGER injected_failure")
-            .unwrap();
-    }
-
     /// Runs a caller's read/decision/write operation in one immediate transaction.
     pub fn write<T>(
         &mut self,

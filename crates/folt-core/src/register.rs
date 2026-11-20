@@ -25,7 +25,7 @@ use crate::config::names::{DEFAULT_BRANCH, MARKDOWN_EXTENSIONS, MARKER_FILE};
 use crate::config::settings::Settings;
 use crate::folio::format::FolioFormat;
 use crate::folio::row::NewFolio;
-use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio};
+use crate::folio_dir::{Durability, FolioDirError, FolioSpec, create_folio_with};
 use crate::folio_name::{FolioName, FolioNameError, StemError};
 use crate::front_matter::{self, Block, Edit, FrontMatterError};
 use crate::fsx::{FileSystem, RealFileSystem};
@@ -705,7 +705,7 @@ pub fn apply_register(
     plan: &RegisterPlan,
     confirm_large: bool,
 ) -> Result<RegisterPlan, RegisterError> {
-    apply_with_hook(home, plan, confirm_large, |_| Ok(()))
+    apply_with_hook(&RealFileSystem, home, plan, confirm_large, |_| Ok(()))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -727,7 +727,7 @@ pub fn apply_register_links(
     plan: &RegisterPlan,
     confirm_large: bool,
 ) -> Result<RegisterLinkOutcome, RegisterError> {
-    apply_links_with_hook(home, plan, confirm_large, |step| {
+    apply_links_with_hook(&RealFileSystem, home, plan, confirm_large, |step| {
         if let LinkStep::Probe(path) = step {
             PlacementFs::new(home).probe_link(path)?;
         }
@@ -743,6 +743,7 @@ enum LinkStep<'a> {
 }
 
 fn apply_links_with_hook(
+    fs: &dyn FileSystem,
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,
@@ -764,7 +765,7 @@ fn apply_links_with_hook(
     for entry in &current.entries {
         hook(LinkStep::Probe(&entry.path))?;
     }
-    let registration = apply_locked(home, &current, confirm_large, &lock, |_| Ok(()))?;
+    let registration = apply_locked(fs, home, &current, confirm_large, &lock, |_| Ok(()))?;
     if blocked(&registration, confirm_large) {
         return Ok(RegisterLinkOutcome {
             registration,
@@ -779,7 +780,7 @@ fn apply_links_with_hook(
             let result = hook(LinkStep::Convert(&entry.path))
                 .map_err(|error| error.to_string())
                 .and_then(|()| {
-                    register_link(home, &entry.path, &lock).map_err(|error| error.to_string())
+                    register_link(fs, home, &entry.path, &lock).map_err(|error| error.to_string())
                 });
             let result = match result {
                 Ok(()) => RegisterLinkResult::Linked,
@@ -794,7 +795,12 @@ fn apply_links_with_hook(
     })
 }
 
-fn register_link(home: &Home, path: &Path, lock: &HomeLock) -> Result<(), Box<dyn Error>> {
+fn register_link(
+    fs: &dyn FileSystem,
+    home: &Home,
+    path: &Path,
+    lock: &HomeLock,
+) -> Result<(), Box<dyn Error>> {
     use crate::placement_rules::{apply_convert, gather_convert, judge_convert};
     let mut registry = Registry::open_or_create(home, lock)?;
     let row = registry
@@ -806,13 +812,13 @@ fn register_link(home: &Home, path: &Path, lock: &HomeLock) -> Result<(), Box<dy
     let directory = crate::folio_dir::validate(home.path(), &folio)?;
     let objects = crate::store::ObjectStore::open(&directory, &folio.format)?;
     let refs = crate::refs::RefStore::open(&directory, &folio.format)?;
-    let fs = PlacementFs::new(home);
-    let facts = gather_convert(&row, &fs, |_| Ok(&refs))?;
+    let placement_fs = PlacementFs::with_fs(home, fs);
+    let facts = gather_convert(&row, &placement_fs, |_| Ok(&refs))?;
     if row.kind == PlacementKind::Link && facts.observation == Observation::IntactLink {
         return Ok(());
     }
     let plan = judge_convert(&facts, PlacementKind::Link, None, None)?;
-    apply_convert(&plan, &fs, &objects, &mut registry, lock)?;
+    apply_convert(&plan, &placement_fs, &objects, &mut registry, lock)?;
     Ok(())
 }
 
@@ -828,18 +834,20 @@ enum Step<'a> {
 }
 
 fn apply_with_hook(
+    fs: &dyn FileSystem,
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,
     hook: impl FnMut(Step<'_>) -> Result<(), RegistryError>,
 ) -> Result<RegisterPlan, RegisterError> {
     let lock = home.lock()?;
-    apply_locked(home, plan, confirm_large, &lock, hook)
+    apply_locked(fs, home, plan, confirm_large, &lock, hook)
 }
 
 // split in the folt-core refactor (#203)
 #[allow(clippy::too_many_lines)]
 fn apply_locked(
+    fs: &dyn FileSystem,
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,
@@ -873,7 +881,7 @@ fn apply_locked(
                         file.sync_all()?;
                         drop(file);
                         if let Some(parent) = entry.path.parent() {
-                            RealFileSystem.sync_directory(parent)?;
+                            fs.sync_directory(parent)?;
                         }
                         hook(Step::MarkerSynced)?;
                     }
@@ -979,7 +987,7 @@ fn apply_locked(
                     return Ok(false);
                 };
                 let write =
-                    crate::fsx::atomic_rewrite(&entry.path, &updated, expected, |signature| {
+                    crate::fsx::atomic_rewrite(fs, &entry.path, &updated, expected, |signature| {
                         rewritten.push((entry.path.clone(), content.clone(), signature.clone()));
                         if let Some((_, marker_signature)) =
                             markers.iter_mut().find(|(path, _)| path == &entry.path)
@@ -1025,7 +1033,8 @@ fn apply_locked(
             let hash = hash_blob(&content);
             let durability = Durability::DataAndDirectories;
             hook(Step::Folio(durability))?;
-            let folio = create_folio(home.path(), lock, FolioSpec { content }, durability)?;
+            let folio =
+                create_folio_with(fs, home.path(), lock, FolioSpec { content }, durability)?;
             directories.push(folio.path().to_path_buf());
             let mut internal = registry::internal_placement(home, folio.id())?;
             let mut copy = NewPlacement {
@@ -1045,7 +1054,7 @@ fn apply_locked(
                     commit_id: None,
                     base: None,
                 };
-                let Observation::File { signature } = PlacementFs::new(home)
+                let Observation::File { signature } = PlacementFs::with_fs(home, fs)
                     .read(folio.id(), &placement)
                     .map_err(|error| RegisterError::Io(io::Error::other(error)))?
                 else {
@@ -1072,7 +1081,7 @@ fn apply_locked(
             return Ok(true);
         }
         // Persist the home entry too when create_folio first created folios/.
-        RealFileSystem.sync_directory(home.path())?;
+        fs.sync_directory(home.path())?;
         hook(Step::Transaction)?;
         let mut registry = Registry::open_or_create(home, lock)?;
         registry.write(lock, |tx| {
@@ -1109,7 +1118,7 @@ fn apply_locked(
             }
             let mut restoration_published = false;
             if let Err(error) =
-                crate::fsx::atomic_rewrite(&path, &original, &signature, |restored| {
+                crate::fsx::atomic_rewrite(fs, &path, &original, &signature, |restored| {
                     restoration_published = true;
                     if let Some((_, marker_signature)) =
                         markers.iter_mut().find(|(marker, _)| marker == &path)

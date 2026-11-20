@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::config::limits::REF_FILE_MAX_BYTES;
 use crate::config::names::{HEADS_DIR, PINS_DIR, REFS_DIR, TAGS_DIR, TEMP_PREFIX_REF};
-use crate::fsx::{FileSystem, RealFileSystem};
+use crate::fsx::FileSystem;
 use crate::fsx::{TempFile, TempMode};
 use crate::id::ObjectId;
 use crate::ref_name::{LowerRefError, RefKind, RefName};
@@ -136,12 +136,11 @@ pub(crate) fn clean_directory(path: &Path, recursive: bool) -> Result<(), LowerR
     }
     Ok(())
 }
-fn sync_directory(path: &Path) -> Result<(), LowerRefError> {
-    RealFileSystem
-        .sync_directory(path)
+fn sync_directory(fs: &dyn FileSystem, path: &Path) -> Result<(), LowerRefError> {
+    fs.sync_directory(path)
         .map_err(|source| io_error(path, source))
 }
-pub(crate) fn sync_directories(path: &Path) -> Result<(), LowerRefError> {
+pub(crate) fn sync_directories(fs: &dyn FileSystem, path: &Path) -> Result<(), LowerRefError> {
     for entry in entries(path)? {
         let child = entry.path();
         if entry
@@ -149,11 +148,11 @@ pub(crate) fn sync_directories(path: &Path) -> Result<(), LowerRefError> {
             .map_err(|source| io_error(&child, source))?
             .is_dir()
         {
-            sync_directories(&child)?;
+            sync_directories(fs, &child)?;
         }
     }
     if metadata(path)?.is_some() {
-        sync_directory(path)?;
+        sync_directory(fs, path)?;
     }
     Ok(())
 }

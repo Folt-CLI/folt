@@ -11,6 +11,7 @@ use crate::folio::refs_dir::{
     sync_directories, walk,
 };
 use crate::folio_dir::FolioDir;
+use crate::fsx::{FileSystem, RealFileSystem};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::ObjectKind;
@@ -39,13 +40,23 @@ impl Expect {
 
 /// Loose refs belonging to one Folio.
 pub struct RefStore {
+    fs: Box<dyn FileSystem>,
     root: PathBuf,
     objects: ObjectStore,
 }
 impl RefStore {
     pub fn open(folio: &FolioDir, format: &FolioFormat) -> Result<Self, RefError> {
+        Self::open_with(folio, format, Box::new(RealFileSystem))
+    }
+
+    pub(crate) fn open_with(
+        folio: &FolioDir,
+        format: &FolioFormat,
+        fs: Box<dyn FileSystem>,
+    ) -> Result<Self, RefError> {
         check_format(format).map_err(RefError::Format)?;
         Ok(Self {
+            fs,
             root: folio.path().to_path_buf(),
             objects: ObjectStore::open(folio, format).map_err(RefError::Store)?,
         })
@@ -160,7 +171,10 @@ impl RefStore {
     }
     /// Sync containing directories once after a batch.
     pub fn sync_refs(&self) -> Result<(), RefError> {
-        Ok(sync_directories(&self.root.join(REFS_DIR))?)
+        Ok(sync_directories(
+            self.fs.as_ref(),
+            &self.root.join(REFS_DIR),
+        )?)
     }
     /// Removes abandoned ref staging files with exclusive access to the home lock guard.
     pub fn clean_temporary_files(&self, _lock: &mut HomeLock) -> Result<(), RefError> {
