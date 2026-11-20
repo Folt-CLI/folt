@@ -1,8 +1,8 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
+use crate::fsx::TempFile;
 use crate::home::HomeLock;
 #[cfg(test)]
 use crate::placement_path::PlacementPath;
@@ -85,10 +85,13 @@ impl Registry {
             .as_ref()
             .ok_or_else(|| RegistryError::MissingDatabase(self.path.clone()))?;
         let destination = destination.as_ref();
-        let temporary = destination.with_extension(format!("{}.tmp", std::process::id()));
-        let escaped = temporary.to_string_lossy().replace('\'', "''");
+        // VACUUM INTO refuses an existing file, so the guard holds the name without creating it.
+        let temporary = TempFile::sibling_at(
+            &destination.with_extension(format!("{}.tmp", std::process::id())),
+        )?;
+        let escaped = temporary.path().to_string_lossy().replace('\'', "''");
         connection.execute(&format!("VACUUM INTO '{escaped}'"), [])?;
-        fs::rename(&temporary, destination)?;
+        temporary.publish(destination)?;
         Ok(())
     }
 }

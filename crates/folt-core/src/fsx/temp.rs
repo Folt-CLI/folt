@@ -82,13 +82,6 @@ impl TempFile {
     }
 
     /// Guards an absent path without creating it or following a symbolic link there.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "adopted by the object store and placement writers in #279 and #280"
-        )
-    )]
     pub(crate) fn sibling_at(path: &Path) -> io::Result<Self> {
         match fs::symlink_metadata(path) {
             Ok(_) => return Err(io::ErrorKind::AlreadyExists.into()),

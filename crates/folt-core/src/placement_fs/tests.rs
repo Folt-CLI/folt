@@ -128,3 +128,41 @@ fn temporary_path_keeps_its_shape() {
         .unwrap();
     assert!(counter.parse::<u64>().is_ok());
 }
+
+fn entries(directory: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+#[cfg(unix)]
+#[test]
+fn link_probe_removes_its_temporary_link() {
+    let home = TempHome::new().unwrap();
+    let directory = home.dir("placements");
+    let fs = PlacementFs::new(&home.home);
+    fs.probe_link(&directory.join("link")).unwrap();
+    assert!(entries(&directory).is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn link_rewrite_removes_its_temporary_link_when_the_placement_changed() {
+    let home = TempHome::new().unwrap();
+    let directory = home.dir("placements");
+    let placement = PlacementSpec {
+        path: directory.join("link"),
+        kind: PlacementKind::Link,
+        head: "main".into(),
+        commit_id: None,
+        base: None,
+    };
+    let fs = PlacementFs::new(&home.home);
+    let id = FolioId::from_bytes([39; 16]);
+    let result = fs.rewrite_link(id, &placement, Some(&Observation::IntactLink));
+    assert!(matches!(result, Err(PlacementError::PlacementChanged)));
+    assert!(entries(&directory).is_empty());
+}

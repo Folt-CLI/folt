@@ -1,4 +1,6 @@
-use super::{FileSystem, RealFileSystem, Signature, require_single_link, signature, temp_name};
+use super::{
+    FileSystem, RealFileSystem, Signature, TempFile, require_single_link, signature, temp_name,
+};
 use crate::config::names::TEMP_TAG_NAME;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -31,8 +33,9 @@ pub(crate) fn atomic_rewrite(
     };
     let metadata = check()?;
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = parent.join(temp_name(&format!(".{TEMP_TAG_NAME}-"), '-'));
-    let mut output = create_rewrite_temp(&temporary, &metadata.permissions())?;
+    let temporary =
+        TempFile::sibling_at(&parent.join(temp_name(&format!(".{TEMP_TAG_NAME}-"), '-')))?;
+    let mut output = create_rewrite_temp(temporary.path(), &metadata.permissions())?;
     let result = (|| {
         output.write_all(bytes)?;
         output.sync_all()?;
@@ -41,7 +44,7 @@ pub(crate) fn atomic_rewrite(
         // Known limit: a rename cannot be conditional on content, so an edit made
         // between the check above and this rename is replaced. See "Known limit:
         // the write window" in docs/dev/library/register.md.
-        fs::rename(&temporary, path)?;
+        temporary.publish(path)?;
         let metadata = rewrite_metadata(&output, path);
         // Rename may change ctime. Prefer the post-rename signature, but always
         // record publication before propagating a metadata failure. The fallback
@@ -57,7 +60,6 @@ pub(crate) fn atomic_rewrite(
         RealFileSystem.sync_directory(parent)
     })();
     drop(output);
-    let _ = fs::remove_file(temporary);
     result
 }
 
