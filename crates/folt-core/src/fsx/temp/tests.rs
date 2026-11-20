@@ -264,14 +264,23 @@ fn sibling_uses_requested_names_retries_and_reports_attempted_path() {
 
     let parent_file = directory.path().join("parent-file");
     fs::write(&parent_file, b"parent").unwrap();
-    let expected = fs::symlink_metadata(parent_file.join("child")).unwrap_err();
-    match TempFile::sibling(&parent_file, "test.", '.') {
-        Err((path, error)) => {
-            assert_eq!(path.parent(), Some(parent_file.as_path()));
-            assert_eq!(error.kind(), expected.kind());
-            assert_eq!(error.raw_os_error(), expected.raw_os_error());
+    // Windows reports NotFound beneath a regular file; NUL is invalid on every platform.
+    for parent in [parent_file, directory.path().join("invalid\0")] {
+        let expected = fs::symlink_metadata(parent.join("child")).unwrap_err();
+        match TempFile::sibling(&parent, "test.", '.') {
+            Err((path, error)) => {
+                assert_ne!(expected.kind(), io::ErrorKind::NotFound);
+                assert_eq!(path.parent(), Some(parent.as_path()));
+                assert_eq!(error.kind(), expected.kind());
+                assert_eq!(error.raw_os_error(), expected.raw_os_error());
+            }
+            Ok(mut temporary) => {
+                assert_eq!(expected.kind(), io::ErrorKind::NotFound);
+                assert_eq!(temporary.path().parent(), Some(parent.as_path()));
+                assert!(!temporary.path().exists());
+                assert!(temporary.take_file().is_none());
+            }
         }
-        Ok(_) => panic!("sibling beneath a regular file succeeded"),
     }
 }
 
@@ -293,13 +302,22 @@ fn sibling_at_guards_absent_path_and_refuses_existing_entries() {
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists
     ));
     assert_eq!(fs::read(&path).unwrap(), b"existing");
-    let expected = fs::symlink_metadata(path.join("child")).unwrap_err();
-    match TempFile::sibling_at(&path.join("child")) {
-        Err(error) => {
-            assert_eq!(error.kind(), expected.kind());
-            assert_eq!(error.raw_os_error(), expected.raw_os_error());
+    // Accept NotFound as reported by the platform and preserve every other error.
+    for candidate in [path.join("child"), directory.path().join("invalid\0")] {
+        let expected = fs::symlink_metadata(&candidate).unwrap_err();
+        match TempFile::sibling_at(&candidate) {
+            Err(error) => {
+                assert_ne!(expected.kind(), io::ErrorKind::NotFound);
+                assert_eq!(error.kind(), expected.kind());
+                assert_eq!(error.raw_os_error(), expected.raw_os_error());
+            }
+            Ok(mut temporary) => {
+                assert_eq!(expected.kind(), io::ErrorKind::NotFound);
+                assert_eq!(temporary.path(), candidate);
+                assert!(!candidate.exists());
+                assert!(temporary.take_file().is_none());
+            }
         }
-        Ok(_) => panic!("sibling beneath a regular file succeeded"),
     }
     fs::remove_file(&path).unwrap();
     fs::create_dir(&path).unwrap();
