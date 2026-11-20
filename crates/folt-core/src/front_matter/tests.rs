@@ -16,6 +16,7 @@ mod ambiguous_keys;
 mod comments;
 mod document;
 mod explicit_keys;
+mod keys;
 mod owned_keys;
 mod reference_edits;
 mod references;
