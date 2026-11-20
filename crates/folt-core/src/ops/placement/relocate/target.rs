@@ -1,7 +1,7 @@
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::placement::{Observation, PlacementOps};
-use crate::placement_path::{self};
+use crate::placement_path::{self, resolve_existing_ancestor};
 use crate::registry::{self, Registry};
 
 /// Destination and registry facts collected while the home lock is held.
@@ -31,7 +31,7 @@ pub fn gather_relocate_target(
         path: from.clone(),
         reason: RefusalReason::Internal,
     };
-    if contains(&crate::placement_fs::resolved_path(registry.home_path())?) {
+    if contains(&resolve_existing_ancestor(registry.home_path())?) {
         return Err(refuse().into());
     }
     for id in registry.folios()? {
@@ -44,8 +44,9 @@ pub fn gather_relocate_target(
     let (id, mut placement) = row.to_placement();
     placement.path = destination;
     let observation = fs.read(id, &placement)?;
-    let mut originals =
-        registry.placements_under(&placement_path::PlacementPrefix::resolve(&from)?)?;
+    let mut originals = registry.placements_under(&placement_path::PlacementPrefix::from(
+        &placement_path::PlacementPath::resolve_directory(&from)?,
+    ))?;
     if registry.placement_at(&row.path)?.is_some() {
         originals = vec![row.clone()];
     } else if originals.is_empty() && fs.read(id, &row.to_placement().1)? != Observation::Directory
@@ -68,8 +69,9 @@ pub fn gather_relocate_target(
         rows.push((old, new));
     }
     // A prefix cannot absorb rows outside this move's pending set.
-    let destination_rows =
-        registry.placements_under(&placement_path::PlacementPrefix::resolve(to.to_path_buf())?)?;
+    let destination_rows = registry.placements_under(&placement_path::PlacementPrefix::from(
+        &placement_path::PlacementPath::resolve_directory(to.to_path_buf())?,
+    ))?;
     registered |= destination_rows
         .iter()
         .any(|row| !rows.iter().any(|(_, new)| new == row));
