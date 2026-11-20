@@ -1,5 +1,6 @@
 use super::*;
 use crate::object::hash_blob;
+use crate::placement::StagedBlob;
 use crate::test_support::facts;
 
 #[test]
@@ -31,7 +32,7 @@ fn links_have_no_behind_status() {
 }
 
 #[test]
-fn link_status_uses_shared_internal_working_state() {
+fn link_status_uses_shared_internal_working_status() {
     let mut link = facts();
     link.placement.kind = PlacementKind::Link;
     link.placement.base = None;
@@ -47,6 +48,37 @@ fn link_status_uses_shared_internal_working_state() {
     let status = judge_status(&[link, internal]);
     assert_eq!(status[0].drift, Drift::InSync);
     assert_eq!(status[0].behind, None);
-    assert_eq!(status[0].edit, crate::ops::working::Edit::Edited);
-    assert_eq!(status[0].staged, crate::ops::working::Staged::Staged);
+    assert_eq!(status[0].edit, crate::ops::status::Edit::Edited);
+    assert_eq!(status[0].staged, crate::ops::status::Staged::Staged);
+}
+
+#[test]
+fn edit_requires_matching_size_and_hash() {
+    let mut facts = facts();
+    assert_eq!(judge_working(&facts).edit, Edit::Clean);
+    facts.placement_hash = Some(hash_blob(b"edit"));
+    assert_eq!(judge_working(&facts).edit, Edit::Edited);
+    facts.placement_hash = facts.placement.base.as_ref().map(|base| base.hash);
+    if let Observation::File { signature } = &mut facts.observation {
+        signature.size += 1;
+    }
+    assert_eq!(judge_working(&facts).edit, Edit::Edited);
+    facts.placement.base = None;
+    assert_eq!(judge_working(&facts).edit, Edit::Edited);
+}
+
+#[test]
+fn stage_distinguishes_later_edits() {
+    let mut facts = facts();
+    assert_eq!(judge_working(&facts).staged, Staged::None);
+    facts.placement.staged = Some(StagedBlob {
+        hash: facts.placement_hash.unwrap(),
+        size: 4,
+    });
+    assert_eq!(judge_working(&facts).staged, Staged::Staged);
+    facts.placement_hash = Some(hash_blob(b"edit"));
+    assert_eq!(judge_working(&facts).staged, Staged::StagedThenModified);
+    facts.placement_hash = Some(facts.placement.staged.unwrap().hash);
+    facts.observation = Observation::Missing;
+    assert_eq!(judge_working(&facts).staged, Staged::StagedThenModified);
 }

@@ -1,6 +1,10 @@
 use super::*;
 use crate::config::env::Environment;
+use crate::id::FolioId;
+use crate::object::hash_blob;
+use crate::ops::status::{Edit, judge_working};
 use crate::placement::StagedBlob;
+use crate::placement::{Observation, PlacementKind};
 use crate::test_support::{TempDir, facts, target};
 
 fn commit_facts() -> CommitFacts {

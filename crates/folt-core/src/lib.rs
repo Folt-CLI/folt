@@ -1,14 +1,12 @@
 #![cfg_attr(test, allow(clippy::unreachable))]
 #![cfg_attr(test, allow(clippy::disallowed_methods))]
 
-pub mod checkout;
 pub mod config;
 pub mod folio;
 pub mod folio_dir;
 pub mod folio_name;
 pub mod front_matter;
 mod fsx;
-pub mod history;
 pub mod home;
 pub mod id;
 pub mod layout;
@@ -17,14 +15,11 @@ pub mod ops;
 pub mod placement;
 pub mod placement_fs;
 pub mod placement_path;
-pub mod prune;
 pub mod ref_name;
 pub mod refs;
 pub mod register;
 pub mod registry;
-pub mod rename;
 pub mod store;
-pub mod working_state;
 
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;

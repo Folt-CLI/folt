@@ -1,10 +1,10 @@
-use folt_core::history::{self, HistoryStores};
 use folt_core::object::{Commit, Tag};
+use folt_core::ops::history::{self, HistoryStores};
+use folt_core::ops::stage;
 use folt_core::placement::PlacementOps;
 use folt_core::placement_fs::PlacementFs;
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
-use folt_core::working_state;
 
 use crate::common::TempHome;
 use crate::support::{TestFolio, metadata};
@@ -39,7 +39,7 @@ fn resumes_commit_published_before_registry_update() {
     let row = folio.internal();
     std::fs::write(row.path.to_path_buf(), b"staged").unwrap();
     let fs = PlacementFs::new(&home.home);
-    working_state::stage(
+    stage::stage(
         &row,
         &fs,
         &folio.objects,

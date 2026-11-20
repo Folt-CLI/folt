@@ -7,7 +7,63 @@ use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
 use crate::refs::{RefError, RefStore};
 use crate::registry::{self, Registry};
 
-use crate::ops::working::{self, judge::judge_working, resolve::resolve_working};
+use crate::id::ObjectId;
+use crate::ops::working::{self, resolve_working};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Edit {
+    Clean,
+    Edited,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Staged {
+    None,
+    Staged,
+    StagedThenModified,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WorkingStatus {
+    pub edit: Edit,
+    pub staged: Staged,
+    pub behind: Behind,
+}
+
+/// Compares only the supplied observations; no commits or files are read.
+pub fn judge_working(facts: &PlacementFacts) -> WorkingStatus {
+    let row = &facts.placement;
+    let matches = |hash: ObjectId, size: u64| {
+        matches!(&facts.observation, Observation::File { signature } if signature.size == size)
+            && facts.placement_hash == Some(hash)
+    };
+    let edit = if row
+        .base
+        .as_ref()
+        .is_some_and(|base| matches(base.hash, base.signature.size))
+    {
+        Edit::Clean
+    } else {
+        Edit::Edited
+    };
+    let staged = match row.staged {
+        None => Staged::None,
+        Some(staged) if matches(staged.hash, staged.size) => Staged::Staged,
+        Some(_) => Staged::StagedThenModified,
+    };
+    let behind = match (row.commit_id, facts.tip) {
+        (None, None) => Behind::NoHistory,
+        (None, Some(_)) => Behind::Unrecorded,
+        (Some(_), None) => Behind::MissingTip,
+        (Some(commit), Some(tip)) if commit == tip => Behind::UpToDate,
+        (Some(_), Some(tip)) => Behind::Behind { tip },
+    };
+    WorkingStatus {
+        edit,
+        staged,
+        behind,
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlacementStatus {
@@ -15,8 +71,8 @@ pub struct PlacementStatus {
     pub drift: Drift,
     /// Links always show `folio.main` and have no recorded-commit comparison.
     pub behind: Option<Behind>,
-    pub staged: working::Staged,
-    pub edit: working::Edit,
+    pub staged: Staged,
+    pub edit: Edit,
 }
 
 /// Include internal-row facts to report an intact link's shared edit and stage.

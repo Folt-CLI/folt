@@ -3,19 +3,19 @@ use std::fs;
 use folt_core::folio::row::NewFolio;
 use folt_core::folio_name::FolioName;
 use folt_core::front_matter;
-use folt_core::history::{self, HistoryStores};
 use folt_core::home::HomeLock;
 use folt_core::id::FolioId;
 use folt_core::id::ObjectId;
 use folt_core::object::{Commit, hash_blob};
+use folt_core::ops::history::{self, HistoryStores};
+use folt_core::ops::rename::{self, RenameError};
+use folt_core::ops::stage;
 use folt_core::placement::{PlacementKind, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::{PlacementPath, RegistryError};
 use folt_core::ref_name::{RefKind, RefName};
 use folt_core::refs::Expect;
 use folt_core::registry::{NewPlacement, Placement};
-use folt_core::rename::{self, RenameError};
-use folt_core::working_state;
 
 use crate::common::TempHome;
 use crate::support::{TestFolio, metadata};
@@ -186,7 +186,7 @@ fn internal_edits_and_stages_refuse_before_registry_change() {
         let row = folio.internal();
         fs::write(row.path.to_path_buf(), b"user edit").unwrap();
         if stage {
-            working_state::stage(
+            stage::stage(
                 &row,
                 &PlacementFs::new(&home.home),
                 &folio.objects,
@@ -217,7 +217,7 @@ fn edited_and_staged_copies_do_not_block_or_change() {
     let mut folio = setup(&home, &mut lock, OLD);
     let row = copy(&home, &mut folio, &lock, "main");
     fs::write(row.path.to_path_buf(), b"edited copy").unwrap();
-    working_state::stage(
+    stage::stage(
         &row,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -254,7 +254,7 @@ fn staging_feature_copy_ignores_its_old_folio_name() {
     run(&home, &mut folio, &mut lock).unwrap();
     let bytes = [OLD, b"feature edit\n"].concat();
     fs::write(row.path.to_path_buf(), &bytes).unwrap();
-    working_state::stage(
+    stage::stage(
         &row,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -345,7 +345,7 @@ fn resumes_each_partial_rename_with_exactly_one_main_commit() {
             fs::write(row.path.to_path_buf(), NEW).unwrap();
         }
         if step >= 2 {
-            working_state::stage(
+            stage::stage(
                 &row,
                 &PlacementFs::new(&home.home),
                 &folio.objects,

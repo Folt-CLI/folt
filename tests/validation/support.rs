@@ -2,18 +2,18 @@ use folt_core::config::formats::OBJECT_ALGORITHM;
 use folt_core::folio::format::FolioFormat;
 use folt_core::folio::row::NewFolio;
 use folt_core::folio_dir::{Durability, FolioDir, FolioSpec, create_folio};
-use folt_core::history::{self, CommitMetadata, HistoryStores};
 use folt_core::home::HomeLock;
 use folt_core::id::ObjectId;
 use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::object::{Author, Commit, CommitTime, ObjectKind, hash_blob};
+use folt_core::ops::history::{self, CommitMetadata, HistoryStores};
+use folt_core::ops::stage;
 use folt_core::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
 use folt_core::refs::RefStore;
 use folt_core::registry::{self, NewPlacement, Placement, Registry};
 use folt_core::store::ObjectStore;
-use folt_core::working_state;
 
 use crate::common::TempHome;
 
@@ -150,7 +150,7 @@ impl TestFolio {
         let row = self.internal();
         std::fs::write(row.path.to_path_buf(), content).unwrap();
         let fs = PlacementFs::new(&home.home);
-        working_state::stage(
+        stage::stage(
             &row,
             &fs,
             &self.objects,

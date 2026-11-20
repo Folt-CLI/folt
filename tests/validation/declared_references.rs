@@ -4,10 +4,11 @@ use folt_core::config::limits::SCAN_LIMIT;
 use folt_core::folio::row::{FolioRow, NewFolio};
 use folt_core::folio_name::FolioName;
 use folt_core::front_matter::{FrontMatterError, Reference};
-use folt_core::history;
 use folt_core::id::FolioId;
 use folt_core::object::{ObjectKind, ObjectWriter, hash_blob};
+use folt_core::ops::history;
 use folt_core::ops::rules_error::RulesError;
+use folt_core::ops::stage;
 use folt_core::placement::PlacementKind;
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::{PlacementPath, RegistryError};
@@ -15,7 +16,6 @@ use folt_core::ref_name::{RefKind, RefName};
 use folt_core::register::{apply_register, plan_register};
 use folt_core::registry::{NewPlacement, Placement, ReferenceRow, Registry};
 use folt_core::store::ObjectStore;
-use folt_core::working_state;
 
 use crate::common::TempHome;
 use crate::support::TestFolio;
@@ -55,7 +55,7 @@ fn markdown_copy(
 fn stage(home: &TempHome, folio: &mut TestFolio, lock: &folt_core::home::HomeLock, bytes: &[u8]) {
     let row = markdown_copy(home, folio, lock);
     fs::write(row.path.to_path_buf(), bytes).unwrap();
-    working_state::stage(
+    stage::stage(
         &row,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -165,7 +165,7 @@ fn stage_replaces_only_the_selected_branch_and_unstage_keeps_edges() {
         };
         fs::write(copy.path.to_path_buf(), content).unwrap();
         copy = folio.registry.placement_at(&copy.path).unwrap().unwrap();
-        working_state::stage(
+        stage::stage(
             &copy,
             &fs,
             &folio.objects,
@@ -186,7 +186,7 @@ fn stage_replaces_only_the_selected_branch_and_unstage_keeps_edges() {
         );
     }
     copy = folio.registry.placement_at(&copy.path).unwrap().unwrap();
-    working_state::unstage(&copy, &fs, &mut folio.registry, &lock).unwrap();
+    stage::unstage(&copy, &fs, &mut folio.registry, &lock).unwrap();
     assert_eq!(
         folio
             .registry
@@ -239,7 +239,7 @@ fn refused_stages_preserve_placement_and_all_previous_rows() {
         (note("  bad-alias: {name: .invalid}\n"), "bad-alias"),
     ] {
         fs::write(before.path.to_path_buf(), content).unwrap();
-        let error = working_state::stage(
+        let error = stage::stage(
             &before,
             &PlacementFs::new(&home.home),
             &folio.objects,
@@ -282,7 +282,7 @@ fn empty_binary_and_plain_non_markdown_stages_clear_the_branch() {
     // An ordinary non-Markdown copy without a leading delimiter has no refs.
     let copy = folio.copy(&home, &lock);
     fs::write(copy.path.to_path_buf(), b"plain txt").unwrap();
-    working_state::stage(
+    stage::stage(
         &copy,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -715,7 +715,7 @@ fn selected_copy_extension_controls_reference_parsing() {
             })
             .unwrap();
         fs::write(row.path.to_path_buf(), &bytes).unwrap();
-        working_state::stage(
+        stage::stage(
             &row,
             &PlacementFs::new(&home.home),
             &folio.objects,
@@ -732,7 +732,7 @@ fn selected_copy_extension_controls_reference_parsing() {
         let internal = folio.internal();
         let references = folio.registry.references(row.id, "main").unwrap();
         fs::write(internal.path.to_path_buf(), b"---\nmalformed").unwrap();
-        let error = working_state::stage(
+        let error = stage::stage(
             &internal,
             &PlacementFs::new(&home.home),
             &folio.objects,
@@ -774,7 +774,7 @@ fn assert_internal_unreadable_block_preserves_stage_and_references(content: &[u8
         b"---\nfolio-name: named\nfolio-references: {edge: {name: target}}\n---\n",
     )
     .unwrap();
-    working_state::stage(
+    stage::stage(
         &row,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -791,7 +791,7 @@ fn assert_internal_unreadable_block_preserves_stage_and_references(content: &[u8
     assert_eq!(references[0].child_label, "target");
 
     fs::write(before.path.to_path_buf(), content).unwrap();
-    let error = working_state::stage(
+    let error = stage::stage(
         &before,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -833,7 +833,7 @@ fn internal_stage_detects_named_front_matter_and_clears_unnamed_or_binary_conten
         for (content, count) in [(named.as_slice(), 1), (bytes, 0)] {
             let row = folio.internal();
             fs::write(row.path.to_path_buf(), content).unwrap();
-            working_state::stage(
+            stage::stage(
                 &row,
                 &PlacementFs::new(&home.home),
                 &folio.objects,
@@ -859,7 +859,7 @@ fn internal_stage_detects_named_front_matter_and_clears_unnamed_or_binary_conten
     )
     .unwrap();
     assert!(
-        working_state::stage(
+        stage::stage(
             &row,
             &PlacementFs::new(&home.home),
             &folio.objects,
@@ -883,7 +883,7 @@ fn internal_stage_front_matter_errors_preserve_stage_and_cached_references() {
         b"---\nfolio-name: named\nfolio-references: {edge: {name: target}}\n---\n",
     )
     .unwrap();
-    working_state::stage(
+    stage::stage(
         &row,
         &PlacementFs::new(&home.home),
         &folio.objects,
@@ -918,7 +918,7 @@ fn internal_stage_front_matter_errors_preserve_stage_and_cached_references() {
         (over_limit.as_slice(), FrontMatterError::Unterminated),
     ] {
         fs::write(before.path.to_path_buf(), bytes).unwrap();
-        let error = working_state::stage(
+        let error = stage::stage(
             &before,
             &PlacementFs::new(&home.home),
             &folio.objects,
@@ -960,7 +960,7 @@ fn registered_markdown_references_are_read_when_staging_the_internal_row() {
             .as_deref(),
         Some("note")
     );
-    working_state::stage(
+    stage::stage(
         &internal,
         &PlacementFs::new(&home.home),
         &objects,
@@ -1091,7 +1091,7 @@ fn stage_purges_only_own_dead_branches_and_unstage_does_not_purge() {
             tx.rebuild_references(other, "dead", &[reference])
         })
         .unwrap();
-    working_state::unstage(
+    stage::unstage(
         &copy,
         &PlacementFs::new(&home.home),
         &mut folio.registry,
@@ -1235,7 +1235,7 @@ fn create_branch_keeps_staged_before_ref_edges_on_failure_and_success() {
         note(&format!("  edge: {{id: {target}}}\n")),
     )
     .unwrap();
-    working_state::stage(
+    stage::stage(
         &copy,
         &PlacementFs::new(&home.home),
         &folio.objects,

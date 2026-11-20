@@ -24,15 +24,15 @@ A module may import from another module only when its table row lists that modul
 | L6 | placement, placement_fs | config, layout, id, object, folio, folio_dir, folio_name, store, fsx, home |
 | L6 | refs | config, id, ref_name, object, folio, folio_dir, folio_name, store, fsx, home |
 | L7 | registry | config, layout, id, object, folio, folio_dir, folio_name, placement, placement_fs, placement_path, front_matter, fsx, home |
-| L8 | ops, working_state, register, rename, checkout, prune, history | config, layout, id, fsx, ref_name, front_matter, object, home, folio, folio_dir, folio_name, store, placement_path, placement, placement_fs, refs, registry |
+| L8 | ops, register | config, layout, id, fsx, ref_name, front_matter, object, home, folio, folio_dir, folio_name, store, placement_path, placement, placement_fs, refs, registry |
 
 `none` means std and external crates only.
 
-The target `ops` internal order is `refusal`, `facts`, `working`, `status`, `placement`, `stage`, `history`, then `register`, `rename`, `checkout`, `prune`.
+The target `ops` internal order is `refusal`, `facts`, `working`, `status`, `stage`, `history`, `rename`, `checkout`, `prune`; existing `placement` operations follow `status` and precede `stage`, and `register` will follow `history`.
 
 `test_support` and all `cfg(test)` code are outside the table.
 
-`folio_dir` and `folio_name` will move into `folio`, which already holds format, row and ref-file items. `placement_fs` will become `placement/fs`. The remaining ref-store code in `refs` belongs to the future L6 `history`; the current L8 `history` holds operations that will move into `ops/history`. `working_state`, `register`, `rename`, `checkout` and `prune` will move into `ops`.
+`folio_dir` and `folio_name` will move into `folio`, which already holds format, row and ref-file items. `placement_fs` will become `placement/fs`. The remaining ref-store code in `refs` belongs to the future L6 `history`; the L8 history operations now live in `ops/history`. Working-file gathering and resolution live in `ops/working`, working status in `ops/status`, and stage, rename, checkout and prune operations in their own `ops` modules. `register` will move into `ops`.
 
 The file-level corrections are `id` importing `config`, the existing `folio` in the L4 unit and its import permissions in dependent rows, and the existing `placement_path` at L5 with imports from `config`, `id` and L4 `folio_name`. `registry` also imports `placement_path`. The current `home -> placement_path` import is upward and remains a reported violation; listing it cannot make a higher-layer import conform to the rule.
 
