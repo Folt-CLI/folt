@@ -75,7 +75,7 @@ mod relocation {
             let mut registry = Registry::open_or_create(&home, &lock).unwrap();
             let mut row = facts().placement;
             row.path = PlacementPath::resolve(root.join("source")).unwrap();
-            let fs = crate::placement::fs::PlacementFs::new(&home);
+            let fs = crate::placement_fs::PlacementFs::new(&home);
             if directory {
                 std::fs::create_dir(row.path.to_path_buf()).unwrap();
             }
@@ -125,7 +125,7 @@ mod relocation {
         }
 
         pub(crate) fn facts(&self) -> PlacementFacts {
-            let fs = crate::placement::fs::PlacementFs::new(&self.home);
+            let fs = crate::placement_fs::PlacementFs::new(&self.home);
             let observation = fs.read(self.row.id, &self.row.to_placement().1).unwrap();
             let placement_hash = matches!(observation, Observation::File { .. })
                 .then(|| fs.hash_placement(&self.row.to_placement().1).unwrap());
@@ -138,7 +138,7 @@ mod relocation {
         }
 
         pub(crate) fn plan(&self, registry: &Registry) -> RelocatePlan {
-            let fs = crate::placement::fs::PlacementFs::new(&self.home);
+            let fs = crate::placement_fs::PlacementFs::new(&self.home);
             let to = PlacementPath::resolve_directory(self.root.join("destination")).unwrap();
             let target = gather_relocate_target(&self.row, &to, &fs, registry).unwrap();
             judge_relocate(&self.facts(), &target).unwrap()

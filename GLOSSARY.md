@@ -102,7 +102,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The SQLite database `registry.db` in the home records Folio existence, names, placements and cached references. Its tables are `folios`, `placements`, `refs` and `folt_metadata`.
-- **Code:** `crates/folt-core/src/registry.rs:107` (`Registry`)
+- **Code:** `crates/folt-core/src/registry/mod.rs:27` (`Registry`)
 - **Related:** [home](#home), [Folio](#folio), [placement](#placement), [refs table](#refs-table).
 - **Not:** Just the placements table, a tracked-roots list or the on-disk history refs.
 - **Status:** decided
@@ -111,7 +111,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** A document managed by Folt, identified by its own registry row rather than by a path. Explicit registration supports files with arbitrary bytes and directories anchored at a marker.
-- **Code:** `crates/folt-core/src/folio/row.rs:11` (`FolioRow`); `crates/folt-core/src/registry.rs:311` (`folio_exists`)
+- **Code:** `crates/folt-core/src/folio/row.rs:11` (`FolioRow`); `crates/folt-core/src/registry/lookup.rs:27` (`folio_exists`)
 - **Related:** [Folio id](#folio-id), [folio-name](#folio-name), [placement](#placement), [directory Folio](#directory-folio).
 - **Not:** A placement or an automatically discovered Markdown file; missing, moved and deleted Folio lifecycle rules remain open in [#15](https://github.com/Folt-CLI/folt/issues/15).
 - **Status:** decided
@@ -129,7 +129,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Storage and identity
 - **Definition:** The readable, unique Folio label: 1 to 64 ASCII letters, digits, dots, underscores or hyphens, with no leading or trailing dot or hyphen and no 64-digit hexadecimal value. The code accepts upper case, preserves case when slugging and indexes names with binary collation; Markdown content carries the `folio-name` key.
-- **Code:** `crates/folt-core/src/folio_name.rs:9` (`FolioName`); `crates/folt-core/src/folio_name.rs:46` (`parse`); `crates/folt-core/src/registry.rs:154` (`folios_name`)
+- **Code:** `crates/folt-core/src/folio_name.rs:9` (`FolioName`); `crates/folt-core/src/folio_name.rs:46` (`parse`); `crates/folt-core/src/registry/schema.rs:36` (`folios_name`)
 - **Related:** [Folio id](#folio-id), [front matter](#front-matter), [rename](#rename).
 - **Not:** A file name, title, branch name or cached child label; the lowercase-only wording in [#47](https://github.com/Folt-CLI/folt/issues/47) is unconfirmed.
 - **Status:** open: #47
@@ -250,7 +250,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base and optional stage. The path is the key, and the kind is link, copy or internal.
-- **Code:** `crates/folt-core/src/registry.rs:47` (`Placement`); `crates/folt-core/src/placement/kind.rs:3` (`PlacementKind`); `crates/folt-core/src/placement/model.rs:8` (`PlacementSpec`)
+- **Code:** `crates/folt-core/src/registry/rows.rs:13` (`Placement`); `crates/folt-core/src/placement.rs:9` (`PlacementKind`); `crates/folt-core/src/placement.rs:57` (`PlacementSpec`)
 - **Related:** [link](#link), [copy](#copy), [internal row](#internal-row), [base](#base), [stage](#stage).
 - **Not:** The file itself or `PlacementSpec`, the in-memory record the file-system layer reads, which has no Folio id or stage.
 - **Status:** decided
@@ -268,7 +268,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A placement whose path is a symbolic link to `folio.main`, always on `main` and without a base, recorded commit or stage of its own. Working operations through an intact link use the internal row.
-- **Code:** `crates/folt-core/src/placement/kind.rs:4` (`Link`); `crates/folt-core/src/working_state.rs:259` (`resolve_working`); `crates/folt-core/src/placement/fs/mod.rs:52` (`link_target`)
+- **Code:** `crates/folt-core/src/placement.rs:10` (`Link`); `crates/folt-core/src/working_state.rs:259` (`resolve_working`); `crates/folt-core/src/placement_fs.rs:40` (`link_target`)
 - **Related:** [placement](#placement), [internal row](#internal-row), [copy](#copy), [drift](#drift).
 - **Not:** A Markdown link, hard link or declared reference.
 - **Status:** decided
@@ -277,7 +277,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A placement whose path holds a regular file with its own bytes and working state. It is the default user placement kind and can follow a branch independently of other copies.
-- **Code:** `crates/folt-core/src/placement/kind.rs:5` (`Copy`); `crates/folt-core/src/placement/kind.rs:11` (`DEFAULT`); `crates/folt-core/src/placement/fs/copy.rs:17` (`copy_content`)
+- **Code:** `crates/folt-core/src/placement.rs:11` (`Copy`); `crates/folt-core/src/placement.rs:17` (`DEFAULT`)
 - **Related:** [placement](#placement), [base](#base), [stage](#stage), [behind](#behind).
 - **Not:** A definition of duplicating a Folio’s identity; that remains open in [#16](https://github.com/Folt-CLI/folt/issues/16).
 - **Status:** decided
@@ -286,7 +286,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The registry placement of kind internal for `<home>/folios/<Folio id>/folio.main`, constrained to branch `main`. It holds that file’s working state, shared by links, and is never a user-selected placement kind.
-- **Code:** `crates/folt-core/src/registry.rs:87` (`internal_placement`); `crates/folt-core/src/placement/kind.rs:6` (`Internal`)
+- **Code:** `crates/folt-core/src/registry/rows.rs:53` (`internal_placement`); `crates/folt-core/src/placement.rs:12` (`Internal`)
 - **Related:** [placement](#placement), [link](#link), [branch](#branch), [Folio directory](#folio-directory).
 - **Not:** The file itself: call the file `folio.main` and the row the internal row on `main`.
 - **Status:** decided
@@ -295,7 +295,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The content hash and file signature captured when a copy or internal working file is created or refreshed. The signature contains size, modification time, change time and inode, with unavailable metadata represented as absent.
-- **Code:** `crates/folt-core/src/placement/model.rs:35` (`PlacementBase`); `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
+- **Code:** `crates/folt-core/src/placement.rs:86` (`PlacementBase`); `crates/folt-core/src/fsx/signature.rs:5` (`Signature`)
 - **Related:** [copy](#copy), [internal row](#internal-row), [drift](#drift), [stage](#stage).
 - **Not:** A merge base, PR base branch or name prefix before a numeric suffix; links have no base.
 - **Status:** decided
@@ -304,7 +304,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The caller-supplied description of what was found at a placement path: Missing, IntactLink, OtherLink (with its target), File (with its signature), Directory or NotAFile.
-- **Code:** `crates/folt-core/src/placement/model.rs:18` (`Observation`)
+- **Code:** `crates/folt-core/src/placement.rs:67` (`Observation`)
 - **Related:** [placement path](#placement-path), [signature](#signature), [facts](#facts), [drift](#drift).
 - **Not:** A drift decision, content hash or registry placement kind.
 - **Status:** decided
@@ -322,7 +322,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** The result of comparing a copy or internal working file with its base, or observing a link. The states are InSync, PlacementEdited, Gone, Detached and Unusable.
-- **Code:** `crates/folt-core/src/placement/drift.rs:6` (`Drift`); `crates/folt-core/src/placement/drift.rs:22` (`classify`)
+- **Code:** `crates/folt-core/src/placement.rs:78` (`Drift`); `crates/folt-core/src/placement.rs:114` (`classify`)
 - **Related:** [base](#base), [link](#link), [copy](#copy), [behind](#behind).
 - **Not:** Whether a branch tip moved; the working-status edit enum means Clean or Edited, while the front matter edit type represents a byte-span replacement.
 - **Status:** decided
@@ -331,7 +331,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage; later changes to staged bytes show StagedThenModified.
-- **Code:** `crates/folt-core/src/working_state.rs:94` (`stage`); `crates/folt-core/src/placement/model.rs:42` (`StagedBlob`); `crates/folt-core/src/working_state.rs:21` (`Staged`)
+- **Code:** `crates/folt-core/src/working_state.rs:94` (`stage`); `crates/folt-core/src/placement.rs:101` (`StagedBlob`); `crates/folt-core/src/working_state.rs:21` (`Staged`)
 - **Related:** [blob](#blob), [commit](#commit), [unstage](#unstage), [refs table](#refs-table).
 - **Not:** Git staging or a development workflow stage; staging does not change the base.
 - **Status:** decided
@@ -369,7 +369,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The optional YAML-subset block at the start of Markdown content, after an optional UTF-8 BOM, opens with a `---` line and closes with a `---` or `...` line. Its closing delimiter must start before byte 65536; Folt edits owned keys while preserving foreign content.
-- **Code:** `crates/folt-core/src/front_matter.rs:76` (`locate`); `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`)
+- **Code:** `crates/folt-core/src/front_matter/locate.rs:10` (`locate`); `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`)
 - **Related:** [owned key](#owned-key), [folio-name](#folio-name), [reference](#reference), [marker](#marker).
 - **Not:** General YAML support or a separate metadata file.
 - **Status:** decided
@@ -387,7 +387,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The private `front_matter::tree` module containing `Block`, `Node` and `build`, which builds the front matter syntax tree from scan helpers while retaining original byte spans and resolving explicit keys.
-- **Code:** `crates/folt-core/src/front_matter/tree.rs:32` (`build`)
+- **Code:** `crates/folt-core/src/front_matter/tree.rs:42` (`build`)
 - **Related:** [front matter](#front-matter), [scan](#scan), [Node (syntax tree node)](#node-syntax-tree-node).
 - **Not:** A general YAML representation, a directory hierarchy or a history object.
 - **Status:** decided
@@ -396,7 +396,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A top-level front matter syntax tree node carrying its decoded key, ambiguity flag and original byte ranges for the key spelling, value, comment, continuation and entire node. All ranges are offsets into the input within the block body; foreign values remain opaque.
-- **Code:** `crates/folt-core/src/front_matter/tree.rs:12` (`Node`)
+- **Code:** `crates/folt-core/src/front_matter/tree.rs:14` (`Node`)
 - **Related:** [front matter](#front-matter), [tree](#tree), [owned key](#owned-key), [explicit key](#explicit-key).
 - **Not:** A Folio, a declared reference entry or a decoded general YAML value.
 - **Status:** decided
@@ -405,7 +405,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The number of leading bytes scanned for a front matter block: 65,536 (`64 * 1024`). The closing delimiter must start before this boundary; readers can take eight extra bytes to recognize a delimiter crossing it.
-- **Code:** `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`); `crates/folt-core/src/front_matter.rs:76` (`locate`)
+- **Code:** `crates/folt-core/src/config/limits.rs:4` (`SCAN_LIMIT`); `crates/folt-core/src/front_matter/locate.rs:10` (`locate`)
 - **Related:** [front matter](#front-matter), [Folio](#folio).
 - **Not:** A size limit on a Folio.
 - **Status:** decided
@@ -441,7 +441,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A declared relationship from one Folio to another under `folio-references`, keyed by an alias and naming exactly one target name or id, with an optional pin field. Staging caches declared references per parent Folio and branch.
-- **Code:** `crates/folt-core/src/front_matter.rs:243` (`Reference`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/front_matter/reference/mod.rs:20` (`Reference`); `crates/folt-core/src/registry/tx/references.rs:53` (`rebuild_references`)
 - **Related:** [alias](#alias), [pin (reference field)](#pin-reference-field), [unresolved reference](#unresolved-reference), [refs table](#refs-table).
 - **Not:** An on-disk history ref or a computed Markdown-body link; local path selection remains open in [#28](https://github.com/Folt-CLI/folt/issues/28).
 - **Status:** decided
@@ -450,7 +450,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The key assigned to a declared reference inside one parent’s `folio-references` block. It is unique within that block and is stored as the reference row’s key.
-- **Code:** `crates/folt-core/src/front_matter.rs:244` (`alias`); `crates/folt-core/src/registry.rs:38` (`key`)
+- **Code:** `crates/folt-core/src/front_matter/reference/mod.rs:21` (`alias`); `crates/folt-core/src/registry/references.rs:22` (`key`)
 - **Related:** [reference](#reference), [refs table](#refs-table), [folio-name](#folio-name).
 - **Not:** A Folio name, symbolic link or the older local-path alias concept.
 - **Status:** decided
@@ -459,7 +459,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The optional pin text attached to a declared reference. The parser and registry currently preserve it as opaque text; resolving tags and storing validated commit hashes is pending work.
-- **Code:** `crates/folt-core/src/front_matter.rs:247` (`pin`); `crates/folt-core/src/registry.rs:42` (`pin`)
+- **Code:** `crates/folt-core/src/front_matter/reference/mod.rs:24` (`pin`); `crates/folt-core/src/registry/references.rs:26` (`pin`)
 - **Related:** [reference](#reference), [pin (retention ref)](#pin-retention-ref), [commit](#commit).
 - **Not:** A retention ref or a commit hash already validated by the current stage operation; [#13](https://github.com/Folt-CLI/folt/issues/13) supplies the intended model and [#152](https://github.com/Folt-CLI/folt/issues/152) owns its implementation.
 - **Status:** decided
@@ -468,7 +468,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** A cached reference whose name does not resolve to a registered Folio. Its row keeps the target name in child_label and an empty child id; edge is an informal synonym for reference.
-- **Code:** `crates/folt-core/src/registry.rs:37` (`ReferenceRow`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/registry/references.rs:21` (`ReferenceRow`); `crates/folt-core/src/registry/tx/references.rs:53` (`rebuild_references`)
 - **Related:** [reference](#reference), [alias](#alias), [refs table](#refs-table).
 - **Not:** An undecodable front matter key, which the parser calls an unresolved key.
 - **Status:** decided
@@ -477,7 +477,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Front matter and references
 - **Definition:** The registry table caching declared references, keyed by parent Folio id, branch and alias key. Staging replaces that branch’s rows with parsed targets, labels and optional pin text.
-- **Code:** `crates/folt-core/src/registry.rs:157` (`refs`); `crates/folt-core/src/registry.rs:560` (`rebuild_references`)
+- **Code:** `crates/folt-core/src/registry/schema.rs:39` (`refs`); `crates/folt-core/src/registry/tx/references.rs:53` (`rebuild_references`)
 - **Related:** [registry](#registry), [reference](#reference), [stage](#stage), [unresolved reference](#unresolved-reference).
 - **Not:** The `refs/` directory or the history ref store of branches, tags and retention pins.
 - **Status:** decided
@@ -542,7 +542,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Operations
 - **Definition:** To make prepared filesystem content visible at its final path. Folio directory creation renames a temporary directory to its final name; registration name writes rename a temporary file over the working file; a new copy placement is published by hard link with a copy fallback. Publication precedes the final directory sync.
-- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement/fs/copy.rs:17` (`copy_content`)
+- **Code:** `crates/folt-core/src/folio_dir.rs:101` (`build_and_publish`); `crates/folt-core/src/fsx/atomic.rs:12` (`atomic_rewrite`); `crates/folt-core/src/placement_fs.rs:105` (`copy_content`)
 - **Related:** [Folio directory](#folio-directory), [register](#register), [plan and apply](#plan-and-apply).
 - **Not:** Publishing this repository or a guarantee that the subsequent durability step has succeeded.
 - **Status:** decided
@@ -616,7 +616,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Code structure
 - **Definition:** A guard that owns a temporary file in the home `tmp/` and removes it unless it was published.
-- **Code:** planned in [#203](https://github.com/Folt-CLI/folt/issues/203)
+- **Code:** `crates/folt-core/src/fsx/temp.rs` (`TempFile`)
 - **Related:** [home](#home), [publish](#publish).
 - **Not:** A published file.
 - **Status:** decided

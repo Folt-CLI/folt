@@ -10,8 +10,8 @@ use crate::id::ObjectId;
 use crate::ops::facts::{Behind, PlacementFacts, needs_hash};
 use crate::ops::refusal::{Refusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
-use crate::placement::fs::resolved_path;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
+use crate::placement_fs::resolved_path;
 use crate::placement_path::{self, RegistryError};
 use crate::ref_name::{RefKind, RefName};
 use crate::refs::{RefError, RefStore};
@@ -525,7 +525,7 @@ pub fn gather_relocate_target(
         path: from.clone(),
         reason: RefusalReason::Internal,
     };
-    if contains(&crate::placement::fs::resolved_path(registry.home_path())?) {
+    if contains(&crate::placement_fs::resolved_path(registry.home_path())?) {
         return Err(refuse().into());
     }
     for id in registry.folios()? {

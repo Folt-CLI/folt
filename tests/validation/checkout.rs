@@ -1,6 +1,6 @@
 use folt_core::checkout::{self, CheckoutStores};
 use folt_core::history;
-use folt_core::placement::fs::PlacementFs;
+use folt_core::placement_fs::PlacementFs;
 use folt_core::ref_name::RefName;
 
 use crate::common::TempHome;

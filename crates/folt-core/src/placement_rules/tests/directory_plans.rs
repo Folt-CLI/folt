@@ -5,7 +5,7 @@ fn pending_copy_requires_every_field_to_match() {
     for field in 0..5 {
         let (fixture, lock, mut registry) = RelocateFixture::new(false);
         let plan = fixture.plan(&registry);
-        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let mut other = plan.target.rows[0].1.clone();
         match field {
             0 => other.head = "other".into(),
@@ -44,7 +44,7 @@ fn pending_copy_requires_every_field_to_match() {
 #[test]
 fn directory_plan_refuses_inside_source_and_unrelated_destination_rows() {
     let (fixture, lock, mut registry) = RelocateFixture::new(true);
-    let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+    let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
     let path =
         crate::placement_path::PlacementPath::resolve(fixture.row.path.to_path_buf().join("child"))
             .unwrap();
@@ -78,7 +78,7 @@ fn a_registered_copy_replaced_by_a_directory_is_refused() {
     let (fixture, _lock, registry) = RelocateFixture::new(false);
     std::fs::remove_file(fixture.row.path.to_path_buf()).unwrap();
     std::fs::create_dir(fixture.row.path.to_path_buf()).unwrap();
-    let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+    let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
     let to =
         crate::placement_path::PlacementPath::resolve(fixture.root.join("destination")).unwrap();
     let target = gather_relocate_target(&fixture.row, &to, &fs, &registry).unwrap();

@@ -1,5 +1,5 @@
-use folt_core::placement::fs::PlacementFs;
 use folt_core::placement::{Drift, Observation, PlacementOps, classify};
+use folt_core::placement_fs::PlacementFs;
 
 use crate::common::TempHome;
 use crate::support::TestFolio;

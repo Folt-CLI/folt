@@ -4,7 +4,7 @@ use super::*;
 fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
     for crash in [RelocateStep::Inserted, RelocateStep::Renamed] {
         let (fixture, lock, mut registry) = RelocateFixture::new(false);
-        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         assert!(
             apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
@@ -43,7 +43,7 @@ fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
         }
     }
     let (fixture, lock, mut registry) = RelocateFixture::new(true);
-    let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+    let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
     let rows = registry.all_placements().unwrap();
     for row in &rows {
         std::fs::remove_file(row.path.to_path_buf()).unwrap();
@@ -69,7 +69,7 @@ fn prune_interrupted_moves_and_rollback_with_existing_hooks() {
 fn prune_preserves_missing_parents_after_directory_move_interruptions() {
     for crash in [RelocateStep::Inserted, RelocateStep::Renamed] {
         let (fixture, lock, mut registry) = RelocateFixture::new(true);
-        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = fixture.plan(&registry);
         assert!(
             apply_relocate_steps(&plan, &fs, &mut registry, &lock, |step, _| {
@@ -115,7 +115,7 @@ fn move_crash_windows_reopen_and_reuse_pending_rows() {
             RelocateStep::Deleted,
         ] {
             let (fixture, lock, mut registry) = RelocateFixture::new(directory);
-            let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+            let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
             let plan = fixture.plan(&registry);
             assert_eq!(plan.target.rows.len(), if directory { 3 } else { 1 });
             let result =
@@ -170,7 +170,7 @@ fn move_crash_windows_reopen_and_reuse_pending_rows() {
 fn remove_crash_leaves_only_an_unregistered_file() {
     for delete_file in [false, true] {
         let (fixture, lock, mut registry) = RelocateFixture::new(false);
-        let fs = crate::placement::fs::PlacementFs::new(&fixture.home);
+        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = judge_remove(&fixture.facts(), delete_file, true).unwrap();
         assert!(
             apply_remove_after_row(&plan, &fs, &mut registry, &lock, || {

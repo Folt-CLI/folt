@@ -34,8 +34,8 @@ use crate::home::{Home, HomeError, HomeLock};
 use crate::id::FolioId;
 use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::hash_blob;
-use crate::placement::fs::PlacementFs;
 use crate::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
+use crate::placement_fs::PlacementFs;
 use crate::placement_path::{PlacementPath, RegistryError};
 use crate::registry::{self, NewPlacement, Registry};
 
@@ -447,7 +447,7 @@ fn resolve_names(
                 let reason = if meta.permissions().readonly() {
                     Some("read-only file".to_owned())
                 } else {
-                    crate::placement::fs::require_single_link(&entry.path)
+                    crate::placement_fs::require_single_link(&entry.path)
                         .err()
                         .map(|e| e.to_string())
                 };
