@@ -182,9 +182,9 @@ impl Home {
                 })?
                 .is_dir()
             {
-                fs::remove_dir_all(&path)
+                crate::fsx::remove_dir_all(&path)
             } else {
-                fs::remove_file(&path)
+                crate::fsx::remove_file(&path)
             };
             result.map_err(|source| HomeError::CannotCreate {
                 path: path.clone(),

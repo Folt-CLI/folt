@@ -1,4 +1,5 @@
 #![cfg_attr(test, allow(clippy::unreachable))]
+#![cfg_attr(test, allow(clippy::disallowed_methods))]
 
 pub mod checkout;
 pub mod config;

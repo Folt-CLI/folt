@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+#[cfg(test)]
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -119,14 +120,14 @@ impl RefStore {
         if actual.is_none() {
             return Ok(());
         }
-        fs::remove_file(&path).map_err(|source| io_error(&path, source))?;
+        crate::fsx::remove_file(&path).map_err(|source| io_error(&path, source))?;
         let base = self.root.join(REFS_DIR).join(kind.directory());
         let mut parent = path.parent();
         while let Some(path) = parent {
             if path == base {
                 break;
             }
-            match fs::remove_dir(path) {
+            match crate::fsx::remove_dir(path) {
                 Ok(()) => parent = path.parent(),
                 Err(e) if e.kind() == io::ErrorKind::DirectoryNotEmpty => break,
                 Err(source) => return Err(io_error(path, source).into()),

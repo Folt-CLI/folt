@@ -1,4 +1,3 @@
-use std::fs;
 use std::io;
 use std::path::PathBuf;
 
@@ -14,7 +13,7 @@ impl Home {
     ) -> Result<Self, HomeError> {
         let settings = Settings::resolve(environment, FileSettings::default())?;
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|source| HomeError::CannotCreate {
+            crate::fsx::create_dir_all(parent).map_err(|source| HomeError::CannotCreate {
                 path: parent.to_path_buf(),
                 source,
             })?;

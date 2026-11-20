@@ -93,7 +93,7 @@ pub fn create_folio(
         .map_err(|source| io_error(&temporary, source))?;
     let result = build_and_publish(home, lock, &folios, &temporary, id, spec, durability);
     if result.is_err() {
-        let _ = fs::remove_dir_all(&temporary);
+        let _ = crate::fsx::remove_dir_all(&temporary);
     }
     result
 }
@@ -130,13 +130,14 @@ fn build_and_publish(
     }
     // Windows cannot rename the staging directory while its content file is open.
     file.keep();
-    fs::rename(temporary, &destination).map_err(|source| io_error(&destination, source))?;
+    crate::fsx::rename(temporary, &destination).map_err(|source| io_error(&destination, source))?;
     if durability == Durability::DataAndDirectories
         && let Err(source) = RealFileSystem.sync_directory(folios)
     {
         // The rename already published this call's directory. The caller has
         // no FolioDir to roll back when creation returns an error.
-        fs::remove_dir_all(&destination).map_err(|source| io_error(&destination, source))?;
+        crate::fsx::remove_dir_all(&destination)
+            .map_err(|source| io_error(&destination, source))?;
         return Err(io_error(folios, source));
     }
     let _ = home;
@@ -159,9 +160,9 @@ pub fn sweep_new(home: &Path, _lock: &mut super::home::HomeLock) -> Result<(), F
                     .file_type()
                     .map_err(|source| io_error(&path, source))?;
                 if ty.is_dir() {
-                    fs::remove_dir_all(&path)
+                    crate::fsx::remove_dir_all(&path)
                 } else {
-                    fs::remove_file(&path)
+                    crate::fsx::remove_file(&path)
                 }
                 .map_err(|source| io_error(&path, source))?;
             }
