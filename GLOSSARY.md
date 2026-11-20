@@ -260,7 +260,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - **Layer:** Placements and working state
 - **Definition:** A path whose filesystem spelling is resolved before registry access. Resolution produces an absolute key, canonicalizes the parent and resolves the final component’s on-disk spelling without following that component. A directory Folio resolves to its marker. “Resolved path” means the same.
-- **Code:** `crates/folt-core/src/placement_path.rs:17` (`PlacementPath`); `crates/folt-core/src/placement_path.rs:82` (`resolve_path`)
+- **Code:** `crates/folt-core/src/placement_path.rs:17` (`PlacementPath`); `crates/folt-core/src/placement_path.rs:115` (`resolve`)
 - **Related:** [placement](#placement), [registry](#registry), [directory Folio](#directory-folio), [marker](#marker).
 - **Not:** An unresolved input spelling or the target obtained by following the final symbolic link.
 - **Status:** decided

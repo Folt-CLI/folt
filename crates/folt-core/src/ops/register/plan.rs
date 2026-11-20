@@ -2,12 +2,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::config::env::Environment;
 use crate::config::settings::Settings;
 use crate::folio_name::FolioName;
 use crate::front_matter::Edit;
 use crate::home::Home;
-use crate::placement_path::PlacementPath;
+use crate::placement_path::{PlacementPath, absolute, path_bytes};
 use crate::registry::Registry;
 
 use super::destination::{destination, is_marker, register_destination};
@@ -82,7 +81,7 @@ pub struct RegisterPlan {
     pub summary: RegisterSummary,
     pub(super) requests: Vec<RegisterRequest>,
     // Resolved paths aligned with original requests, before entry deduplication.
-    pub(super) destinations: Vec<PathBuf>,
+    pub(super) destinations: Vec<PlacementPath>,
 }
 
 pub fn plan_register(
@@ -99,11 +98,7 @@ pub fn plan_register(
     let mut destinations = Vec::new();
     for input in paths {
         let mut request = input.into();
-        let absolute = if request.path.is_absolute() {
-            request.path.clone()
-        } else {
-            Environment::current_dir()?.join(&request.path)
-        };
+        let absolute = absolute(&request.path)?;
         request.path = absolute.clone();
         replay.push(request.clone());
         let resolved = PlacementPath::resolve(&absolute);
@@ -111,7 +106,9 @@ pub fn plan_register(
             .as_ref()
             .map_or_else(|_| absolute.clone(), PlacementPath::to_path_buf);
         let directory = fs::symlink_metadata(&absolute).is_ok_and(|m| m.is_dir());
-        destinations.push(register_destination(directory, &path, resolved.is_ok()).to_path_buf());
+        destinations.push(PlacementPath::from_stored(path_bytes(
+            register_destination(directory, &path, resolved.is_ok()),
+        )));
         if let Some(&index) = seen.get(&path) {
             let previous: &mut RegisterRequest = &mut requests[index];
             if previous.name.is_some() && request.name.is_some() && previous.name != request.name {
@@ -158,23 +155,24 @@ pub(super) fn block_changed(
     let mut previous_by_destination = HashMap::<_, Vec<_>>::new();
     for entry in &previous.entries {
         previous_by_destination
-            .entry(destination(entry))
+            .entry(PlacementPath::from_stored(path_bytes(destination(entry))))
             .or_default()
             .push(entry);
     }
     for entry in &mut current.entries {
+        let destination = PlacementPath::from_stored(path_bytes(destination(entry)));
         let request_moved = previous
             .destinations
             .iter()
             .zip(&current.destinations)
-            .any(|(old, new)| new == destination(entry) && old != new);
+            .any(|(old, new)| new == &destination && old != new);
         if request_moved {
             let path = entry.path.clone();
             refuse_name(entry, RegisterRefusalReason::DestinationChanged { path });
             continue;
         }
         let old = previous_by_destination
-            .get(destination(entry))
+            .get(&destination)
             .and_then(|candidates| {
                 // Distinct case-variant marker files retain their full path identities.
                 // Accept a changed marker spelling only for an unambiguous destination.

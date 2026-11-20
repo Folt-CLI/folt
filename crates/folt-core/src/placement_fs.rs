@@ -16,6 +16,7 @@ use crate::object::{ObjectHasher, ObjectKind};
 use crate::placement::{
     Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
 };
+use crate::placement_path;
 use crate::store::ObjectStore;
 
 /// Filesystem implementation of link and copy placement operations.
@@ -241,7 +242,10 @@ impl PlacementOps for PlacementFs<'_> {
                         .join(&found);
                     // Resolving a detached target can fail (for example, a file
                     // used as a directory). The link itself is still observable.
-                    let intact = match (resolved_path(&found_path), resolved_path(&target)) {
+                    let intact = match (
+                        placement_path::resolve_existing_ancestor(&found_path),
+                        placement_path::resolve_existing_ancestor(&target),
+                    ) {
                         (Ok(found), Ok(expected)) => found == expected,
                         _ => false,
                     };
@@ -417,30 +421,6 @@ impl PlacementOps for PlacementFs<'_> {
 
     fn hash_placement(&self, placement: &PlacementSpec) -> Result<ObjectId, PlacementError> {
         hash_file(&placement.path)
-    }
-}
-
-/// Resolve existing ancestors even when a former home has been moved or removed.
-pub(crate) fn resolved_path(path: &Path) -> Result<PathBuf, PlacementError> {
-    let mut ancestor = path;
-    let mut missing = Vec::new();
-    loop {
-        match fs::canonicalize(ancestor) {
-            Ok(mut resolved) => {
-                for name in missing.iter().rev() {
-                    resolved.push(name);
-                }
-                return Ok(resolved);
-            }
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                let Some(name) = ancestor.file_name() else {
-                    return Err(failure(path, error));
-                };
-                missing.push(name);
-                ancestor = ancestor.parent().ok_or_else(|| failure(path, error))?;
-            }
-            Err(error) => return Err(failure(path, error)),
-        }
     }
 }
 
