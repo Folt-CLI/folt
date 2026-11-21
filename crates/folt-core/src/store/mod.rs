@@ -11,6 +11,7 @@ mod error;
 mod maintenance;
 mod probe;
 mod read;
+mod source;
 mod write;
 
 pub use error::StoreError;
