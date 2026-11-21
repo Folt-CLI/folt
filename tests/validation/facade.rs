@@ -2,10 +2,12 @@
 
 use folt_core::folio::name::FolioName;
 use folt_core::ops::checkout::{CheckoutError, CheckoutStores};
+use folt_core::ops::facts::Behind;
 use folt_core::ops::history::{HistoryError, HistoryRefusal, HistoryStores};
 use folt_core::ops::prune::PruneOptions;
 use folt_core::ops::refusal::RefusalReason;
 use folt_core::ops::rename::RenameError;
+use folt_core::ops::status::{Edit, Staged};
 use folt_core::placement::Drift;
 use folt_core::placement_fs::PlacementFs;
 use folt_core::ref_name::RefName;
@@ -177,7 +179,6 @@ fn history_family_resets_to_an_earlier_commit() {
         .apply_reset(&plan, &fs, &stores, &mut folio.registry, &mut lock)
         .unwrap();
     assert_eq!(folio.internal().commit_id, Some(first));
-    let _ = metadata();
 }
 
 #[test]
@@ -427,5 +428,8 @@ fn status_family_reports_in_sync_and_gone_copies() {
         .gather_facts(std::slice::from_ref(&row), &fs, |_| Ok(&folio.refs))
         .unwrap();
     assert_eq!(home.home.judge_status(&facts)[0].drift, Drift::Gone);
-    let _ = home.home.judge_working(&facts[0]);
+    let working = home.home.judge_working(&facts[0]);
+    assert_eq!(working.edit, Edit::Edited);
+    assert_eq!(working.staged, Staged::None);
+    assert_eq!(working.behind, Behind::NoHistory);
 }
