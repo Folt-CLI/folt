@@ -41,7 +41,7 @@ jobs:
           bash scripts/check-layers-test.sh
           scripts/check-layers.sh --enforce
           bash scripts/check-file-size-test.sh
-          scripts/check-file-size.sh
+          bash scripts/check-file-size.sh
       - name: Decide whether to skip the build
         id: plan
         env:

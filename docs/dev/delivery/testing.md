@@ -35,7 +35,7 @@ cargo test-full --locked
 bash scripts/check-layers-test.sh
 scripts/check-layers.sh --enforce
 bash scripts/check-file-size-test.sh
-scripts/check-file-size.sh
+bash scripts/check-file-size.sh
 ```
 
 Three checks are enforced by these commands. The layer check fails on any violation of the layer table, `too_many_lines` is denied at 100 lines, and a production file over 200 lines fails the size check. None has an exception list. CI runs the script checks in the `plan` job and Clippy in the `verify` job.
