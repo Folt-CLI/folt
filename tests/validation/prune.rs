@@ -1,6 +1,6 @@
 use folt_core::home::HomeLock;
 use folt_core::object::hash_blob;
-use folt_core::ops::prune::{self, PruneError, PruneOptions};
+use folt_core::ops::prune::{PruneError, PruneOptions};
 #[cfg(unix)]
 use folt_core::placement::PlacementKind;
 use folt_core::placement::StagedBlob;
@@ -78,19 +78,22 @@ fn gone_copies_drop_regardless_of_edits_or_stage_and_preserve_objects() {
                 }
                 std::fs::remove_file(row.path.to_path_buf()).unwrap();
                 let fs = PlacementFs::new(&home.home);
-                let dry = prune::prune_placements(
-                    &mut folio.registry,
-                    &fs,
-                    &lock,
-                    &[],
-                    PruneOptions::default(),
-                )
-                .unwrap();
+                let dry = home
+                    .home
+                    .prune_placements(
+                        &mut folio.registry,
+                        &fs,
+                        &lock,
+                        &[],
+                        PruneOptions::default(),
+                    )
+                    .unwrap();
                 assert!(dry.dry_run);
                 assert!(folio.registry.placement_at(&row.path).unwrap().is_some());
-                let mut applied =
-                    prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
-                        .unwrap();
+                let mut applied = home
+                    .home
+                    .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+                    .unwrap();
                 assert!(!applied.dry_run);
                 assert_eq!(applied.dropped.len(), 1);
                 let expected_blobs = if staged && !has_twin {
@@ -118,7 +121,8 @@ fn gone_copies_drop_regardless_of_edits_or_stage_and_preserve_objects() {
                     b"stage"
                 );
                 assert!(
-                    prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+                    home.home
+                        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
                         .unwrap()
                         .dropped
                         .is_empty()
@@ -149,20 +153,24 @@ fn staged_copy_dry_run_and_apply_reports_differ_only_in_dry_run_flag() {
     std::fs::remove_file(row.path.to_path_buf()).unwrap();
     let fs = PlacementFs::new(&home.home);
 
-    let dry = prune::prune_placements(
-        &mut folio.registry,
-        &fs,
-        &lock,
-        &[],
-        PruneOptions::default(),
-    )
-    .unwrap();
+    let dry = home
+        .home
+        .prune_placements(
+            &mut folio.registry,
+            &fs,
+            &lock,
+            &[],
+            PruneOptions::default(),
+        )
+        .unwrap();
     assert_eq!(
         folio.registry.placement_at(&row.path).unwrap(),
         Some(row.clone())
     );
-    let mut applied =
-        prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+    let mut applied = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+        .unwrap();
 
     assert!(dry.dry_run);
     assert!(!applied.dry_run);
@@ -184,7 +192,10 @@ fn live_edited_copies_and_unusable_paths_are_kept() {
     let row = folio.copy(&home, &lock);
     let fs = PlacementFs::new(&home.home);
     std::fs::write(row.path.to_path_buf(), b"different").unwrap();
-    let result = prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+    let result = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+        .unwrap();
     assert_eq!(
         result
             .kept
@@ -197,7 +208,10 @@ fn live_edited_copies_and_unusable_paths_are_kept() {
     assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), b"different");
     std::fs::remove_file(row.path.to_path_buf()).unwrap();
     std::fs::create_dir(row.path.to_path_buf()).unwrap();
-    let result = prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+    let result = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+        .unwrap();
     assert_eq!(
         result
             .kept
@@ -224,7 +238,10 @@ fn missing_parent_and_internal_rows_are_preserved() {
     let internal = folio.internal();
     std::fs::remove_file(internal.path.to_path_buf()).unwrap();
     let fs = PlacementFs::new(&home.home);
-    let result = prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+    let result = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+        .unwrap();
     assert!(result.dropped.is_empty());
     assert_eq!(
         result
@@ -255,18 +272,22 @@ fn mass_deletion_requires_confirmation_and_counts_every_scoped_row() {
     std::fs::remove_file(row.path.to_path_buf()).unwrap();
     let before = folio.registry.all_placements().unwrap();
     let fs = PlacementFs::new(&home.home);
-    let dry = prune::prune_placements(
-        &mut folio.registry,
-        &fs,
-        &lock,
-        &[],
-        PruneOptions::default(),
-    )
-    .unwrap();
+    let dry = home
+        .home
+        .prune_placements(
+            &mut folio.registry,
+            &fs,
+            &lock,
+            &[],
+            PruneOptions::default(),
+        )
+        .unwrap();
     assert_eq!(dry.counts.in_scope, 6);
     assert_eq!(dry.counts.dropped, 5);
-    let error =
-        prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap_err();
+    let error = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+        .unwrap_err();
     assert!(matches!(
         error,
         PruneError::ConfirmationRequired {
@@ -278,8 +299,10 @@ fn mass_deletion_requires_confirmation_and_counts_every_scoped_row() {
     assert_eq!(folio.registry.all_placements().unwrap(), before);
     let mut options = applying();
     options.confirm_mass_deletion = true;
-    let mut result =
-        prune::prune_placements(&mut folio.registry, &fs, &lock, &[], options).unwrap();
+    let mut result = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], options)
+        .unwrap();
     result.dry_run = true;
     assert_eq!(dry, result);
     assert_eq!(folio.registry.all_placements().unwrap(), [folio.internal()]);
@@ -308,8 +331,10 @@ fn scoped_prune_includes_nested_directory_markers_but_not_similar_prefixes() {
     );
     let fs = PlacementFs::new(&home.home);
     let scope = [PlacementPath::resolve_directory(&old).unwrap()];
-    let result =
-        prune::prune_placements(&mut folio.registry, &fs, &lock, &scope, applying()).unwrap();
+    let result = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &scope, applying())
+        .unwrap();
     assert_eq!(result.counts.in_scope, 1);
     assert_eq!(result.dropped[0].path, nested.path);
     assert_eq!(
@@ -317,14 +342,16 @@ fn scoped_prune_includes_nested_directory_markers_but_not_similar_prefixes() {
         Some(sibling)
     );
     std::fs::remove_file(row.path.to_path_buf()).unwrap();
-    let result = prune::prune_placements(
-        &mut folio.registry,
-        &fs,
-        &lock,
-        std::slice::from_ref(&row.path),
-        applying(),
-    )
-    .unwrap();
+    let result = home
+        .home
+        .prune_placements(
+            &mut folio.registry,
+            &fs,
+            &lock,
+            std::slice::from_ref(&row.path),
+            applying(),
+        )
+        .unwrap();
     assert_eq!(result.dropped[0].path, row.path);
 }
 
@@ -337,7 +364,7 @@ fn file_reappearing_or_row_changing_after_gather_is_kept() {
         let mut row = folio.copy(&home, &lock);
         std::fs::remove_file(row.path.to_path_buf()).unwrap();
         let fs = PlacementFs::new(&home.home);
-        let plan = prune::gather(&folio.registry, &fs, &[]).unwrap();
+        let plan = home.home.gather_prune(&folio.registry, &fs, &[]).unwrap();
         assert_eq!(plan.report().dropped.len(), 1);
         if changed_row {
             row.head = "changed".into();
@@ -348,7 +375,10 @@ fn file_reappearing_or_row_changing_after_gather_is_kept() {
         } else {
             std::fs::write(row.path.to_path_buf(), b"reappeared").unwrap();
         }
-        let result = prune::apply(&plan, &fs, &mut folio.registry, &lock, false).unwrap();
+        let result = home
+            .home
+            .apply_prune(&plan, &fs, &mut folio.registry, &lock, false)
+            .unwrap();
         assert!(result.dropped.is_empty());
         assert_eq!(
             folio.registry.placement_at(&row.path).unwrap(),
@@ -395,8 +425,10 @@ fn interrupted_move_row_sets_prune_to_one_identical_surviving_set() {
             std::fs::rename(row.path.to_path_buf(), destination.path.to_path_buf()).unwrap();
         }
         let fs = PlacementFs::new(&home.home);
-        let result =
-            prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+        let result = home
+            .home
+            .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+            .unwrap();
         assert_eq!(result.dropped.len(), 1);
         assert!(result.unreachable_staged_blobs.is_empty());
         let (gone, live) = if renamed {
@@ -438,8 +470,10 @@ fn deleted_links_drop_and_mismatching_files_or_links_are_kept() {
             std::os::unix::fs::symlink("foreign", row.path.to_path_buf()).unwrap();
         }
         let fs = PlacementFs::new(&home.home);
-        let result =
-            prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+        let result = home
+            .home
+            .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+            .unwrap();
         assert_eq!(result.dropped.len(), usize::from(replacement == 0));
         if replacement != 0 {
             assert_eq!(
@@ -473,7 +507,10 @@ fn a_parent_replaced_by_a_file_reports_a_read_error_and_keeps_the_row() {
     std::fs::remove_dir(&parent).unwrap();
     std::fs::write(&parent, b"a file").unwrap();
     let fs = PlacementFs::new(&home.home);
-    let result = prune::prune_placements(&mut folio.registry, &fs, &lock, &[], applying()).unwrap();
+    let result = home
+        .home
+        .prune_placements(&mut folio.registry, &fs, &lock, &[], applying())
+        .unwrap();
     assert!(result.dropped.is_empty());
     let reason = &result
         .kept

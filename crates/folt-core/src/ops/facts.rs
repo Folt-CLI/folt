@@ -39,7 +39,7 @@ pub enum Behind {
 /// Collects only the supplied rows, reading each distinct Folio/branch tip once.
 /// The caller selects rows with `placement_at` for one path or its own set query.
 /// `open_refs` supplies a ref store for the requested Folio without selecting placements.
-pub fn gather<R: Borrow<RefStore>>(
+pub(crate) fn gather<R: Borrow<RefStore>>(
     placements: &[registry::Placement],
     fs: &impl PlacementOps,
     mut open_refs: impl FnMut(FolioId) -> Result<R, RefError>,
@@ -81,7 +81,7 @@ pub fn gather<R: Borrow<RefStore>>(
 
 /// Collects one move's facts, also hashing size-changed copies to compare with
 /// incoming content. Status gathering never needs that extra comparison.
-pub fn gather_move<R: Borrow<RefStore>>(
+pub(crate) fn gather_move<R: Borrow<RefStore>>(
     placement: &registry::Placement,
     fs: &impl PlacementOps,
     open_refs: impl FnMut(FolioId) -> Result<R, RefError>,
@@ -101,7 +101,7 @@ pub fn gather_move<R: Borrow<RefStore>>(
 
 /// Collects conversion facts, hashing regular files even when the row is a link
 /// so a conversion interrupted before its row write can be resumed.
-pub fn gather_convert<R: Borrow<RefStore>>(
+pub(crate) fn gather_convert<R: Borrow<RefStore>>(
     placement: &registry::Placement,
     fs: &impl PlacementOps,
     open_refs: impl FnMut(FolioId) -> Result<R, RefError>,

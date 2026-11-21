@@ -21,7 +21,7 @@ pub struct CheckoutStores<'a> {
 }
 
 /// Resolves only branch refs; tags and detached commit ids are not checkout targets.
-pub fn resolve(
+pub(crate) fn resolve(
     refs: &RefStore,
     objects: &ObjectStore,
     branch: &RefName,
@@ -41,7 +41,7 @@ pub fn resolve(
 /// Moves one copy or internal row to a branch tip using the placement move rules.
 /// The stores must belong to the row's Folio. The home lock must cover selecting
 /// the row and the entire checkout. Internal rows can only check out `main`.
-pub fn checkout_placement(
+pub(crate) fn checkout_placement(
     row: &Placement,
     branch: &RefName,
     discard: bool,

@@ -8,7 +8,7 @@ use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
 
 /// Collects one working file, hashing when it has no base or a recorded size matches.
-pub fn gather(
+pub(crate) fn gather(
     row: &Placement,
     fs: &impl PlacementOps,
     refs: &RefStore,
@@ -34,7 +34,7 @@ pub fn gather(
 }
 
 /// Links share the internal working row, provided their entry still points to it.
-pub fn resolve_working(
+pub(crate) fn resolve_working(
     row: &Placement,
     registry: &Registry,
     fs: &impl PlacementOps,

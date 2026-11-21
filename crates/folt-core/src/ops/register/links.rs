@@ -28,7 +28,7 @@ pub struct RegisterLinkOutcome {
 
 /// Registers the batch before converting each placement independently. The home
 /// lock covers probing, registration and conversion; conversion errors keep rows.
-pub fn apply_register_links(
+pub(crate) fn apply_register_links(
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,

@@ -4,7 +4,7 @@ use crate::placement::{self, Drift, Observation, PlacementKind};
 
 /// Returns None only for a missing external row with an existing parent.
 /// All decisions depend solely on supplied facts.
-pub fn judge(facts: &PruneFacts) -> Option<String> {
+pub(crate) fn judge(facts: &PruneFacts) -> Option<String> {
     if facts.row.kind == PlacementKind::Internal {
         return Some(match &facts.observation {
             Err(error) => {
@@ -47,6 +47,6 @@ pub fn judge(facts: &PruneFacts) -> Option<String> {
 
 /// Requires at least five drops AND strictly more than half the scoped rows.
 /// Division avoids overflow when comparing counts.
-pub fn needs_confirmation(dropped: usize, in_scope: usize) -> bool {
+pub(crate) fn needs_confirmation(dropped: usize, in_scope: usize) -> bool {
     dropped >= PRUNE_CONFIRM_MIN && dropped > in_scope / 2
 }

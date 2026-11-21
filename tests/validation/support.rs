@@ -7,8 +7,7 @@ use folt_core::home::HomeLock;
 use folt_core::id::ObjectId;
 use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::object::{Author, Commit, CommitTime, ObjectKind, hash_blob};
-use folt_core::ops::history::{self, CommitMetadata, HistoryStores};
-use folt_core::ops::stage;
+use folt_core::ops::history::{CommitMetadata, HistoryStores};
 use folt_core::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
@@ -150,24 +149,30 @@ impl TestFolio {
         let row = self.internal();
         std::fs::write(row.path.to_path_buf(), content).unwrap();
         let fs = PlacementFs::new(&home.home);
-        stage::stage(
-            &row,
-            &fs,
-            &self.objects,
-            &self.refs,
-            &mut self.registry,
-            lock,
-        )
-        .unwrap();
+        home.home
+            .stage(
+                &row,
+                &fs,
+                &self.objects,
+                &self.refs,
+                &mut self.registry,
+                lock,
+            )
+            .unwrap();
         let row = self.internal();
         let stores = HistoryStores {
             objects: &self.objects,
             refs: &self.refs,
             object_limit: 16 * 1024,
         };
-        let facts = history::gather_commit(&row, &fs, &stores, &self.registry).unwrap();
-        let plan = history::judge_commit(&facts).unwrap();
-        history::apply_commit(&plan, metadata(), &fs, &stores, &mut self.registry, lock).unwrap()
+        let facts = home
+            .home
+            .gather_commit(&row, &fs, &stores, &self.registry)
+            .unwrap();
+        let plan = home.home.judge_commit(&facts).unwrap();
+        home.home
+            .apply_commit(&plan, metadata(), &fs, &stores, &mut self.registry, lock)
+            .unwrap()
     }
 }
 

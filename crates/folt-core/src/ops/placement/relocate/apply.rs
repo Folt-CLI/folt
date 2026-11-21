@@ -17,7 +17,7 @@ pub(super) enum RelocateStep {
 }
 
 /// Inserts destination rows, renames without replacement, then deletes source rows.
-pub fn apply_relocate(
+pub(crate) fn apply_relocate(
     plan: &RelocatePlan,
     fs: &impl PlacementOps,
     registry: &mut Registry,

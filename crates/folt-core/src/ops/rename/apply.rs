@@ -14,7 +14,7 @@ use crate::registry::Registry;
 /// placements also keep branches live. Metadata identity/time/body/group come
 /// from the caller; rename supplies the operation's required commit message.
 /// Returns the main commit, or None for a registry-only rename/no-op.
-pub fn apply_rename(
+pub(crate) fn apply_rename(
     plan: &RenamePlan,
     mut metadata: CommitMetadata,
     fs: &PlacementFs<'_>,

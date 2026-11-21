@@ -9,6 +9,7 @@ mod apply;
 mod error;
 mod plan;
 
-pub use apply::apply_rename;
+pub(crate) use apply::apply_rename;
 pub use error::RenameError;
-pub use plan::{RenamePlan, plan_rename};
+pub use plan::RenamePlan;
+pub(crate) use plan::plan_rename;

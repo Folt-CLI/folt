@@ -11,7 +11,7 @@ pub struct RelocatePlan {
 }
 
 /// Plans a move or the cleanup of its pending rows before reporting a collision.
-pub fn judge_relocate(
+pub(crate) fn judge_relocate(
     facts: &PlacementFacts,
     target: &RelocateTarget,
 ) -> Result<RelocatePlan, PlacementRefusal> {

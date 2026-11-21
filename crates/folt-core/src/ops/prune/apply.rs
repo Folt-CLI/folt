@@ -9,7 +9,7 @@ use crate::registry::Registry;
 
 /// Rechecks selected rows and observations inside one transaction under HomeLock.
 /// Changed rows are reported and kept. A registry failure rolls back every delete.
-pub fn apply(
+pub(crate) fn apply(
     plan: &PrunePlan,
     fs: &impl PlacementOps,
     registry: &mut Registry,
@@ -62,7 +62,7 @@ pub fn apply(
 }
 
 /// Dry run by default; applying requires options.apply and the caller's home lock.
-pub fn prune_placements(
+pub(crate) fn prune_placements(
     registry: &mut Registry,
     fs: &impl PlacementOps,
     lock: &HomeLock,

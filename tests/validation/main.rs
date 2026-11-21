@@ -13,6 +13,7 @@ mod common;
 
 mod checkout;
 mod declared_references;
+mod facade;
 mod folio;
 mod front_matter;
 mod front_matter_awkward;

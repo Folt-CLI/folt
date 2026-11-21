@@ -36,7 +36,7 @@ impl ConvertPlan {
 /// The optional target is the resolved main tip; Copy-to-Link needs no tip.
 /// Link-to-copy also requires the Internal row's facts. The home lock must cover
 /// collecting these facts through apply.
-pub fn judge_convert(
+pub(crate) fn judge_convert(
     facts: &PlacementFacts,
     to_kind: PlacementKind,
     target: Option<&MoveTarget>,
@@ -118,7 +118,7 @@ pub fn judge_convert(
 
 /// Rechecks the selected rows and files, publishes the entry, then writes its row.
 /// A retry with the requested shape syncs its parent before the registry update.
-pub fn apply_convert(
+pub(crate) fn apply_convert(
     plan: &ConvertPlan,
     fs: &impl PlacementOps,
     objects: &ObjectStore,
@@ -191,7 +191,7 @@ pub fn apply_convert(
     Ok(())
 }
 
-pub fn converted_row(
+pub(crate) fn converted_row(
     plan: &ConvertPlan,
     base: Option<placement::PlacementBase>,
 ) -> registry::Placement {

@@ -11,7 +11,7 @@ use write::write_stage;
 
 /// Captures a blob, then records its stage without changing the working base.
 /// The home lock must cover selecting the row and staging it.
-pub fn stage(
+pub(crate) fn stage(
     row: &Placement,
     fs: &impl PlacementOps,
     objects: &ObjectStore,
@@ -59,7 +59,7 @@ pub fn stage(
 }
 
 /// Clears the recorded stage without reading or changing the working file.
-pub fn unstage(
+pub(crate) fn unstage(
     row: &Placement,
     fs: &impl PlacementOps,
     registry: &mut Registry,
