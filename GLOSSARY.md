@@ -8,6 +8,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 - [alias](#alias)
 - [analysis agent](#analysis-agent)
+- [ancestor](#ancestor)
 - [base](#base)
 - [behind](#behind)
 - [blob](#blob)
@@ -41,6 +42,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [issue type](#issue-type)
 - [link](#link)
 - [marker](#marker)
+- [merge base](#merge-base)
 - [milestone](#milestone)
 - [Node (syntax tree node)](#node-syntax-tree-node)
 - [object](#object)
@@ -198,6 +200,24 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Code:** `crates/folt-core/src/object/commit.rs:10` (`Commit`); `crates/folt-core/src/ops/history/commit/apply.rs:31` (`apply_commit`)
 - **Related:** [blob](#blob), [branch](#branch), [stage](#stage), [tip](#tip).
 - **Not:** A Git commit of this repository or a placement’s recorded starting commit id.
+- **Status:** decided
+
+### ancestor
+
+- **Layer:** History
+- **Definition:** A commit reachable from another commit by following zero or more ids in `Commit::parents`, through every parent. A commit is its own ancestor.
+- **Code:** `crates/folt-core/src/history/ancestry.rs:25` (`is_ancestor`)
+- **Related:** [commit](#commit), [merge base](#merge-base).
+- **Not:** A comparison of a placement’s recorded commit with its branch tip, or an issue parent.
+- **Status:** decided
+
+### merge base
+
+- **Layer:** History
+- **Definition:** A best common ancestor of two commits: a common ancestor that is not a proper ancestor of another common ancestor. There may be none, one or several; several are reported in object id byte order without merging them or creating a virtual base.
+- **Code:** `crates/folt-core/src/history/ancestry.rs:10` (`MergeBase`); `crates/folt-core/src/history/ancestry.rs:40` (`merge_base`)
+- **Related:** [ancestor](#ancestor), [commit](#commit), [base](#base).
+- **Not:** The placement base, which records a content hash and file signature, or a merge operation.
 - **Status:** decided
 
 ### ref name

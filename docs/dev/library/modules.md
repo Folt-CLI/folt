@@ -21,7 +21,7 @@ The modules are listed in reading order, from the modules with no imports to the
 | `placement_path` | The resolved placement path. |
 | `placement` | Placement kinds, observations, drift and the in-memory placement records. Still a flat file. |
 | `placement_fs` | File-system access for placements. Still a flat file. |
-| `history` | The ref store of one Folio. Still a flat file with submodules; the history operations live in `ops/history`. |
+| `history` | The ref store, commit ancestry and merge bases of one Folio. Still a flat file with submodules; the history operations live in `ops/history`. |
 | `registry` | The SQLite registry: schema, rows, lookups and transactions. |
 | `ops` | The operations, which gather facts, judge them and apply the plan. |
 | `test_support` | Shared test fixtures, enabled by the `test-support` feature and by `cfg(test)`. |
@@ -75,6 +75,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Resolving a path to a placement path | `placement_path` (`PlacementPath`) |
 | Registry schema, rows and transactions | `registry` |
 | Branch, tag and pin refs on disk | `history::RefStore` |
+| Commit ancestry and merge base computation | `history::ancestry` |
 
 ## Forbidden patterns
 
