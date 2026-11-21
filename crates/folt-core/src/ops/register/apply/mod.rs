@@ -13,7 +13,7 @@ use super::plan::{RegisterPlan, RegisterStatus, block_changed, blocked, plan_reg
 
 /// Replans under the exclusive home lock. Returns the plan actually applied,
 /// or a blocked plan without writing. Does not create an initial history commit.
-pub fn apply_register(
+pub(crate) fn apply_register(
     home: &Home,
     plan: &RegisterPlan,
     confirm_large: bool,

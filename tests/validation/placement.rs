@@ -88,9 +88,8 @@ mod conversion {
     use folt_core::home::HomeLock;
     use folt_core::id::ObjectId;
     use folt_core::object::hash_blob;
-    use folt_core::ops::checkout::{self, CheckoutStores};
-    use folt_core::ops::facts::gather_convert;
-    use folt_core::ops::placement::convert::{ConvertPlan, apply_convert, judge_convert};
+    use folt_core::ops::checkout::CheckoutStores;
+    use folt_core::ops::placement::convert::ConvertPlan;
     use folt_core::ops::refusal::RefusalReason;
     use folt_core::ops::rules_error::RulesError;
     use folt_core::placement::{PlacementError, PlacementKind, StagedBlob};
@@ -127,16 +126,26 @@ mod conversion {
         kind: PlacementKind,
     ) -> ConvertPlan {
         let fs = PlacementFs::new(&home.home);
-        let facts = gather_convert(row, &fs, |_| Ok(&folio.refs)).unwrap();
-        let internal = gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs)).unwrap();
-        let target = checkout::resolve(
-            &folio.refs,
-            &folio.objects,
-            &RefName::parse("main").unwrap(),
-            16384,
-        )
-        .unwrap();
-        judge_convert(&facts, kind, Some(&target), Some(&internal)).unwrap()
+        let facts = home
+            .home
+            .gather_convert(row, &fs, |_| Ok(&folio.refs))
+            .unwrap();
+        let internal = home
+            .home
+            .gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs))
+            .unwrap();
+        let target = home
+            .home
+            .resolve_checkout_target(
+                &folio.refs,
+                &folio.objects,
+                &RefName::parse("main").unwrap(),
+                16384,
+            )
+            .unwrap();
+        home.home
+            .judge_convert(&facts, kind, Some(&target), Some(&internal))
+            .unwrap()
     }
 
     fn apply(
@@ -147,14 +156,15 @@ mod conversion {
         kind: PlacementKind,
     ) -> Placement {
         let plan = plan(home, folio, row, kind);
-        apply_convert(
-            &plan,
-            &PlacementFs::new(&home.home),
-            &folio.objects,
-            &mut folio.registry,
-            lock,
-        )
-        .unwrap();
+        home.home
+            .apply_convert(
+                &plan,
+                &PlacementFs::new(&home.home),
+                &folio.objects,
+                &mut folio.registry,
+                lock,
+            )
+            .unwrap();
         folio.registry.placement_at(&row.path).unwrap().unwrap()
     }
 
@@ -507,17 +517,26 @@ mod conversion {
                 .unwrap();
             let fs = PlacementFs::new(&home.home);
             // Non-main copies are refused before their branch's tip matters.
-            let facts = gather_convert(&row, &fs, |_| Ok(&folio.refs)).unwrap();
-            let internal = gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs)).unwrap();
-            let target = checkout::resolve(
-                &folio.refs,
-                &folio.objects,
-                &RefName::parse("main").unwrap(),
-                16384,
-            )
-            .unwrap();
+            let facts = home
+                .home
+                .gather_convert(&row, &fs, |_| Ok(&folio.refs))
+                .unwrap();
+            let internal = home
+                .home
+                .gather_convert(&folio.internal(), &fs, |_| Ok(&folio.refs))
+                .unwrap();
+            let target = home
+                .home
+                .resolve_checkout_target(
+                    &folio.refs,
+                    &folio.objects,
+                    &RefName::parse("main").unwrap(),
+                    16384,
+                )
+                .unwrap();
             assert_eq!(
-                judge_convert(&facts, kind, Some(&target), Some(&internal))
+                home.home
+                    .judge_convert(&facts, kind, Some(&target), Some(&internal))
                     .unwrap_err()
                     .reason,
                 reason,
@@ -553,16 +572,17 @@ mod conversion {
                 refs: &folio.refs,
                 object_limit: 16384,
             };
-            checkout::checkout_placement(
-                &discard_row,
-                &RefName::parse("main").unwrap(),
-                true,
-                &PlacementFs::new(&home.home),
-                &stores,
-                &mut folio.registry,
-                &lock,
-            )
-            .unwrap();
+            home.home
+                .checkout_placement(
+                    &discard_row,
+                    &RefName::parse("main").unwrap(),
+                    true,
+                    &PlacementFs::new(&home.home),
+                    &stores,
+                    &mut folio.registry,
+                    &lock,
+                )
+                .unwrap();
             let row = folio.registry.placement_at(&row.path).unwrap().unwrap();
             let kind = if link_side {
                 PlacementKind::Copy
@@ -615,7 +635,7 @@ mod conversion {
                     RefusalReason::RegistryChanged
                 }
             };
-            let result = apply_convert(
+            let result = home.home.apply_convert(
                 &plan,
                 &PlacementFs::new(&home.home),
                 &folio.objects,

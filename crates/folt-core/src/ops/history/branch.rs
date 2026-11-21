@@ -9,7 +9,7 @@ use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
 use crate::store::{ObjectStore, StoreError};
 
-pub fn create_branch(
+pub(crate) fn create_branch(
     id: FolioId,
     name: &RefName,
     commit: ObjectId,
@@ -54,7 +54,7 @@ pub fn create_branch(
 }
 
 /// Pass `placements_of_head`, including the internal row, to this pure judge.
-pub fn judge_delete_branch(placements: &[Placement]) -> Result<(), HistoryRefusal> {
+pub(crate) fn judge_delete_branch(placements: &[Placement]) -> Result<(), HistoryRefusal> {
     if placements.is_empty() {
         Ok(())
     } else {
@@ -67,7 +67,7 @@ pub fn judge_delete_branch(placements: &[Placement]) -> Result<(), HistoryRefusa
     }
 }
 
-pub fn delete_branch(
+pub(crate) fn delete_branch(
     id: FolioId,
     name: &RefName,
     old: ObjectId,

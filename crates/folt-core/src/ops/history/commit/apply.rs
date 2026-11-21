@@ -28,7 +28,7 @@ pub struct CommitMetadata {
 }
 
 /// Publishes objects, then the ref, then files, then both registry rows together.
-pub fn apply_commit(
+pub(crate) fn apply_commit(
     plan: &CommitPlan,
     metadata: CommitMetadata,
     fs: &impl PlacementOps,

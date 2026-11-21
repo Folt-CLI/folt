@@ -25,7 +25,9 @@ pub(super) fn former_link_home(facts: &PlacementFacts) -> Option<PathBuf> {
     former_home(&target, facts.placement.id)
 }
 
-pub fn judge_repair_link(facts: &PlacementFacts) -> Result<RepairLinkPlan, PlacementRefusal> {
+pub(crate) fn judge_repair_link(
+    facts: &PlacementFacts,
+) -> Result<RepairLinkPlan, PlacementRefusal> {
     let refuse = |reason| PlacementRefusal {
         path: facts.placement.path.to_path_buf(),
         reason,
@@ -45,7 +47,7 @@ pub fn judge_repair_link(facts: &PlacementFacts) -> Result<RepairLinkPlan, Place
     })
 }
 
-pub fn apply_repair_link(
+pub(crate) fn apply_repair_link(
     plan: &RepairLinkPlan,
     fs: &impl PlacementOps,
     objects: &ObjectStore,

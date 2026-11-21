@@ -16,7 +16,7 @@ pub struct RelocateTarget {
 
 /// Directory callers supply a synthetic row whose path and destination use
 /// `PlacementPath::resolve_directory`; its kind is Copy and its base is absent.
-pub fn gather_relocate_target(
+pub(crate) fn gather_relocate_target(
     row: &registry::Placement,
     to: &placement_path::PlacementPath,
     fs: &impl PlacementOps,

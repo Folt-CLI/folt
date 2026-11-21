@@ -6,7 +6,7 @@ use crate::object::{ObjectKind, Tag};
 use crate::ref_name::{RefKind, RefName};
 
 /// `None` makes a lightweight tag; an annotation must name this ref and target.
-pub fn create_tag(
+pub(crate) fn create_tag(
     name: &RefName,
     commit: ObjectId,
     annotation: Option<&Tag>,
@@ -37,7 +37,7 @@ pub fn create_tag(
     Ok(target)
 }
 
-pub fn delete_tag(
+pub(crate) fn delete_tag(
     name: &RefName,
     old: ObjectId,
     refs: &RefStore,

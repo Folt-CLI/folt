@@ -18,7 +18,7 @@ pub struct CommitFacts {
 
 /// The home lock must cover gathering, judging and applying history operations.
 /// `object_limit` bounds commit reads independently of blob size.
-pub fn gather_commit(
+pub(crate) fn gather_commit(
     row: &Placement,
     fs: &impl PlacementOps,
     stores: &HistoryStores<'_>,

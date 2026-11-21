@@ -14,7 +14,7 @@ pub struct RemovePlan {
     delete_file: bool,
 }
 
-pub fn judge_remove(
+pub(crate) fn judge_remove(
     facts: &PlacementFacts,
     delete_file: bool,
     discard: bool,
@@ -55,7 +55,7 @@ pub fn judge_remove(
     })
 }
 
-pub fn apply_remove(
+pub(crate) fn apply_remove(
     plan: &RemovePlan,
     fs: &impl PlacementOps,
     registry: &mut Registry,

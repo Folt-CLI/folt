@@ -1,7 +1,6 @@
 use folt_core::history::Expect;
 use folt_core::object::{Commit, Tag};
 use folt_core::ops::history::{self, HistoryStores};
-use folt_core::ops::stage;
 use folt_core::placement::PlacementOps;
 use folt_core::placement_fs::PlacementFs;
 use folt_core::ref_name::{RefKind, RefName};
@@ -39,15 +38,16 @@ fn resumes_commit_published_before_registry_update() {
     let row = folio.internal();
     std::fs::write(row.path.to_path_buf(), b"staged").unwrap();
     let fs = PlacementFs::new(&home.home);
-    stage::stage(
-        &row,
-        &fs,
-        &folio.objects,
-        &folio.refs,
-        &mut folio.registry,
-        &lock,
-    )
-    .unwrap();
+    home.home
+        .stage(
+            &row,
+            &fs,
+            &folio.objects,
+            &folio.refs,
+            &mut folio.registry,
+            &lock,
+        )
+        .unwrap();
     let row = folio.internal();
     let metadata = metadata();
     let published = folio
@@ -80,19 +80,23 @@ fn resumes_commit_published_before_registry_update() {
         refs: &folio.refs,
         object_limit: 16384,
     };
-    let facts = history::gather_commit(&row, &fs, &stores, &folio.registry).unwrap();
-    let plan = history::judge_commit(&facts).unwrap();
+    let facts = home
+        .home
+        .gather_commit(&row, &fs, &stores, &folio.registry)
+        .unwrap();
+    let plan = home.home.judge_commit(&facts).unwrap();
     assert_eq!(plan.resumed_commit(), Some(published));
     assert_eq!(
-        history::apply_commit(
-            &plan,
-            metadata,
-            &fs,
-            &stores,
-            &mut folio.registry,
-            &mut lock
-        )
-        .unwrap(),
+        home.home
+            .apply_commit(
+                &plan,
+                metadata,
+                &fs,
+                &stores,
+                &mut folio.registry,
+                &mut lock
+            )
+            .unwrap(),
         published
     );
     assert_eq!(folio.internal().commit_id, Some(published));
@@ -113,17 +117,21 @@ fn reset_moves_tip_and_restores_working_content() {
         object_limit: 16384,
     };
     let main = RefName::parse("main").unwrap();
-    let facts = history::gather_reset(
-        folio.folio.id(),
-        &main,
-        first,
-        &fs,
-        &stores,
-        &folio.registry,
-    )
-    .unwrap();
-    let plan = history::judge_reset(&facts, false).unwrap();
-    history::apply_reset(&plan, &fs, &stores, &mut folio.registry, &mut lock).unwrap();
+    let facts = home
+        .home
+        .gather_reset(
+            folio.folio.id(),
+            &main,
+            first,
+            &fs,
+            &stores,
+            &folio.registry,
+        )
+        .unwrap();
+    let plan = home.home.judge_reset(&facts, false).unwrap();
+    home.home
+        .apply_reset(&plan, &fs, &stores, &mut folio.registry, &mut lock)
+        .unwrap();
     assert_eq!(
         folio.refs.read(RefKind::Branch, &main).unwrap(),
         Some(first)
@@ -144,27 +152,29 @@ fn deletes_unused_branch_but_keeps_main_with_internal_placement() {
     let mut folio = TestFolio::new(&home, &lock);
     let commit = folio.commit_internal(&home, &mut lock, b"first");
     let topic = RefName::parse("topic").unwrap();
-    history::create_branch(
-        folio.folio.id(),
-        &topic,
-        commit,
-        &folio.refs,
-        &mut folio.registry,
-        &mut lock,
-    )
-    .unwrap();
-    history::delete_branch(
-        folio.folio.id(),
-        &topic,
-        commit,
-        &folio.refs,
-        &folio.registry,
-        &mut lock,
-    )
-    .unwrap();
+    home.home
+        .create_branch(
+            folio.folio.id(),
+            &topic,
+            commit,
+            &folio.refs,
+            &mut folio.registry,
+            &mut lock,
+        )
+        .unwrap();
+    home.home
+        .delete_branch(
+            folio.folio.id(),
+            &topic,
+            commit,
+            &folio.refs,
+            &folio.registry,
+            &mut lock,
+        )
+        .unwrap();
     assert_eq!(folio.refs.read(RefKind::Branch, &topic).unwrap(), None);
     assert!(matches!(
-        history::delete_branch(
+        home.home.delete_branch(
             folio.folio.id(),
             &RefName::parse("main").unwrap(),
             commit,
@@ -186,7 +196,9 @@ fn lightweight_and_annotated_tags_round_trip() {
     let commit = folio.commit_object(&lock, b"content");
     let light = RefName::parse("v1").unwrap();
     assert_eq!(
-        history::create_tag(&light, commit, None, &folio.stores(), &mut lock).unwrap(),
+        home.home
+            .create_tag(&light, commit, None, &folio.stores(), &mut lock)
+            .unwrap(),
         commit
     );
     let name = RefName::parse("v2").unwrap();
@@ -198,11 +210,15 @@ fn lightweight_and_annotated_tags_round_trip() {
         time: meta.time,
         message: "release".into(),
     };
-    let tagged =
-        history::create_tag(&name, commit, Some(&annotation), &folio.stores(), &mut lock).unwrap();
+    let tagged = home
+        .home
+        .create_tag(&name, commit, Some(&annotation), &folio.stores(), &mut lock)
+        .unwrap();
     assert_eq!(folio.objects.get_tag(tagged, 16384).unwrap(), annotation);
     assert_eq!(folio.refs.read(RefKind::Tag, &name).unwrap(), Some(tagged));
-    history::delete_tag(&light, commit, &folio.refs, &mut lock).unwrap();
+    home.home
+        .delete_tag(&light, commit, &folio.refs, &mut lock)
+        .unwrap();
     assert_eq!(folio.refs.read(RefKind::Tag, &light).unwrap(), None);
     assert_eq!(folio.refs.read(RefKind::Tag, &name).unwrap(), Some(tagged));
 }

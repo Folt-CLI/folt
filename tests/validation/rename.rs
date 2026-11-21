@@ -8,9 +8,8 @@ use folt_core::home::HomeLock;
 use folt_core::id::FolioId;
 use folt_core::id::ObjectId;
 use folt_core::object::{Commit, hash_blob};
-use folt_core::ops::history::{self, HistoryStores};
-use folt_core::ops::rename::{self, RenameError};
-use folt_core::ops::stage;
+use folt_core::ops::history::HistoryStores;
+use folt_core::ops::rename::RenameError;
 use folt_core::placement::{PlacementKind, PlacementOps, StagedBlob};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::{PlacementPath, RegistryError};
@@ -48,8 +47,10 @@ fn run(
         object_limit: 16384,
     };
     let fs = PlacementFs::new(&home.home);
-    let plan = rename::plan_rename(&name("old"), &name("new"), &fs, &stores, &folio.registry)?;
-    rename::apply_rename(
+    let plan = home
+        .home
+        .plan_rename(&name("old"), &name("new"), &fs, &stores, &folio.registry)?;
+    home.home.apply_rename(
         &plan,
         metadata(),
         &fs,
@@ -127,15 +128,16 @@ fn renames_only_main_internal_and_creates_one_commit() {
     let before = folio.internal().commit_id.unwrap();
     let main_copy = copy(&home, &mut folio, &lock, "main");
     let feature = copy(&home, &mut folio, &lock, "feature");
-    history::create_branch(
-        folio.folio.id(),
-        &RefName::parse("feature").unwrap(),
-        before,
-        &folio.refs,
-        &mut folio.registry,
-        &mut lock,
-    )
-    .unwrap();
+    home.home
+        .create_branch(
+            folio.folio.id(),
+            &RefName::parse("feature").unwrap(),
+            before,
+            &folio.refs,
+            &mut folio.registry,
+            &mut lock,
+        )
+        .unwrap();
     let after = run(&home, &mut folio, &mut lock).unwrap().unwrap();
     assert_completed(&folio, before, after);
     for row in [main_copy, feature] {
@@ -186,15 +188,16 @@ fn internal_edits_and_stages_refuse_before_registry_change() {
         let row = folio.internal();
         fs::write(row.path.to_path_buf(), b"user edit").unwrap();
         if stage {
-            stage::stage(
-                &row,
-                &PlacementFs::new(&home.home),
-                &folio.objects,
-                &folio.refs,
-                &mut folio.registry,
-                &lock,
-            )
-            .unwrap();
+            home.home
+                .stage(
+                    &row,
+                    &PlacementFs::new(&home.home),
+                    &folio.objects,
+                    &folio.refs,
+                    &mut folio.registry,
+                    &lock,
+                )
+                .unwrap();
             // Even restoring the file leaves a stage that must block rename.
             fs::write(row.path.to_path_buf(), OLD).unwrap();
         }
@@ -217,15 +220,16 @@ fn edited_and_staged_copies_do_not_block_or_change() {
     let mut folio = setup(&home, &mut lock, OLD);
     let row = copy(&home, &mut folio, &lock, "main");
     fs::write(row.path.to_path_buf(), b"edited copy").unwrap();
-    stage::stage(
-        &row,
-        &PlacementFs::new(&home.home),
-        &folio.objects,
-        &folio.refs,
-        &mut folio.registry,
-        &lock,
-    )
-    .unwrap();
+    home.home
+        .stage(
+            &row,
+            &PlacementFs::new(&home.home),
+            &folio.objects,
+            &folio.refs,
+            &mut folio.registry,
+            &lock,
+        )
+        .unwrap();
     let staged = folio.registry.placement_at(&row.path).unwrap().unwrap();
     run(&home, &mut folio, &mut lock).unwrap();
     assert_eq!(fs::read(row.path.to_path_buf()).unwrap(), b"edited copy");
@@ -242,27 +246,29 @@ fn staging_feature_copy_ignores_its_old_folio_name() {
     let mut folio = setup(&home, &mut lock, OLD);
     let row = copy(&home, &mut folio, &lock, "feature");
     let before = row.commit_id.unwrap();
-    history::create_branch(
-        folio.folio.id(),
-        &RefName::parse("feature").unwrap(),
-        before,
-        &folio.refs,
-        &mut folio.registry,
-        &mut lock,
-    )
-    .unwrap();
+    home.home
+        .create_branch(
+            folio.folio.id(),
+            &RefName::parse("feature").unwrap(),
+            before,
+            &folio.refs,
+            &mut folio.registry,
+            &mut lock,
+        )
+        .unwrap();
     run(&home, &mut folio, &mut lock).unwrap();
     let bytes = [OLD, b"feature edit\n"].concat();
     fs::write(row.path.to_path_buf(), &bytes).unwrap();
-    stage::stage(
-        &row,
-        &PlacementFs::new(&home.home),
-        &folio.objects,
-        &folio.refs,
-        &mut folio.registry,
-        &lock,
-    )
-    .unwrap();
+    home.home
+        .stage(
+            &row,
+            &PlacementFs::new(&home.home),
+            &folio.objects,
+            &folio.refs,
+            &mut folio.registry,
+            &lock,
+        )
+        .unwrap();
     assert_eq!(
         folio
             .registry
@@ -304,7 +310,7 @@ fn refuses_taken_and_unknown_names() {
     assert_eq!(fs::read(folio.internal().path.to_path_buf()).unwrap(), OLD);
     let fs = PlacementFs::new(&home.home);
     assert!(matches!(
-        rename::plan_rename(
+        home.home.plan_rename(
             &name("unknown"),
             &name("absent"),
             &fs,
@@ -315,7 +321,7 @@ fn refuses_taken_and_unknown_names() {
     ));
     // An existing destination alone cannot impersonate an interrupted rename.
     assert!(matches!(
-        rename::plan_rename(
+        home.home.plan_rename(
             &name("unknown"),
             &name("old"),
             &fs,
@@ -345,15 +351,16 @@ fn resumes_each_partial_rename_with_exactly_one_main_commit() {
             fs::write(row.path.to_path_buf(), NEW).unwrap();
         }
         if step >= 2 {
-            stage::stage(
-                &row,
-                &PlacementFs::new(&home.home),
-                &folio.objects,
-                &folio.refs,
-                &mut folio.registry,
-                &lock,
-            )
-            .unwrap();
+            home.home
+                .stage(
+                    &row,
+                    &PlacementFs::new(&home.home),
+                    &folio.objects,
+                    &folio.refs,
+                    &mut folio.registry,
+                    &lock,
+                )
+                .unwrap();
         }
         let published = if step >= 3 {
             let mut metadata = metadata();
@@ -541,18 +548,22 @@ fn shared_guard_blocks_id_unresolved_name_and_self_references_on_live_branches()
             object_limit: 16384,
         };
         let fs = PlacementFs::new(&home.home);
-        let plan =
-            rename::plan_rename(&name("old"), &name("new"), &fs, &stores, &folio.registry).unwrap();
-        let error = rename::apply_rename(
-            &plan,
-            metadata(),
-            &fs,
-            &stores,
-            &mut folio.registry,
-            &mut lock,
-            &mut is_live,
-        )
-        .unwrap_err();
+        let plan = home
+            .home
+            .plan_rename(&name("old"), &name("new"), &fs, &stores, &folio.registry)
+            .unwrap();
+        let error = home
+            .home
+            .apply_rename(
+                &plan,
+                metadata(),
+                &fs,
+                &stores,
+                &mut folio.registry,
+                &mut lock,
+                &mut is_live,
+            )
+            .unwrap_err();
         assert!(matches!(
             error,
             RenameError::Registry(RegistryError::References(_))
@@ -689,25 +700,29 @@ fn apply_records_pending_rename_before_file_rewrite_failure() {
         object_limit: 16384,
     };
     let fs = PlacementFs::new(&home.home);
-    let plan =
-        rename::plan_rename(&name("old"), &name("new"), &fs, &stores, &folio.registry).unwrap();
+    let plan = home
+        .home
+        .plan_rename(&name("old"), &name("new"), &fs, &stores, &folio.registry)
+        .unwrap();
     let mut checked = false;
-    let error = rename::apply_rename(
-        &plan,
-        metadata(),
-        &fs,
-        &stores,
-        &mut folio.registry,
-        &mut lock,
-        &mut |_, _| {
-            // Inject a working-file change after planning but before the rewrite,
-            // leaving the successfully committed registry transaction in place.
-            checked = true;
-            std::fs::write(row.path.to_path_buf(), b"intervening edit").unwrap();
-            Ok(false)
-        },
-    )
-    .unwrap_err();
+    let error = home
+        .home
+        .apply_rename(
+            &plan,
+            metadata(),
+            &fs,
+            &stores,
+            &mut folio.registry,
+            &mut lock,
+            &mut |_, _| {
+                // Inject a working-file change after planning but before the rewrite,
+                // leaving the successfully committed registry transaction in place.
+                checked = true;
+                std::fs::write(row.path.to_path_buf(), b"intervening edit").unwrap();
+                Ok(false)
+            },
+        )
+        .unwrap_err();
     assert!(checked);
     assert!(matches!(error, RenameError::Io(_)));
     assert_eq!(folio.registry.folio_name(id).unwrap(), Some(name("new")));
@@ -827,14 +842,16 @@ fn conflicting_base_name_refuses_in_planning_without_changes() {
     let branches = folio.refs.list(RefKind::Branch).unwrap();
     let references = folio.registry.references(row.id, "main").unwrap();
     for _ in 0..2 {
-        let error = rename::plan_rename(
-            &name("old"),
-            &name("new"),
-            &fs,
-            &folio.stores(),
-            &folio.registry,
-        )
-        .unwrap_err();
+        let error = home
+            .home
+            .plan_rename(
+                &name("old"),
+                &name("new"),
+                &fs,
+                &folio.stores(),
+                &folio.registry,
+            )
+            .unwrap_err();
         assert!(matches!(
             &error,
             RenameError::InternalNameMismatch { path, name }
@@ -1054,14 +1071,16 @@ fn malformed_references_refuse_in_planning_without_changes_including_retries() {
             let references = folio.registry.references(id, "main").unwrap();
             let mut previous = None;
             for _ in 0..2 {
-                let error = rename::plan_rename(
-                    &name("old"),
-                    &name("new"),
-                    &fs,
-                    &folio.stores(),
-                    &folio.registry,
-                )
-                .unwrap_err();
+                let error = home
+                    .home
+                    .plan_rename(
+                        &name("old"),
+                        &name("new"),
+                        &fs,
+                        &folio.stores(),
+                        &folio.registry,
+                    )
+                    .unwrap_err();
                 assert!(matches!(
                     error,
                     RenameError::FrontMatter(_)

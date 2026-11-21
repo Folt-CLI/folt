@@ -18,7 +18,7 @@ pub struct ResetFacts {
     pub placements: Vec<PlacementFacts>,
 }
 
-pub fn gather_reset(
+pub(crate) fn gather_reset(
     id: FolioId,
     branch: &RefName,
     commit: ObjectId,
@@ -63,7 +63,7 @@ pub struct ResetPlan {
     moves: Vec<MovePlan>,
 }
 
-pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, HistoryRefusal> {
+pub(crate) fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, HistoryRefusal> {
     let mut moves = Vec::new();
     for placement in &facts.placements {
         if placement.placement.id != facts.id
@@ -80,7 +80,7 @@ pub fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, Histo
     })
 }
 
-pub fn apply_reset(
+pub(crate) fn apply_reset(
     plan: &ResetPlan,
     fs: &impl PlacementOps,
     stores: &HistoryStores<'_>,

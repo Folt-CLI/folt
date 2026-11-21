@@ -20,7 +20,7 @@ impl CommitPlan {
 }
 
 /// Recognises a published commit whose remaining file/registry work can be finished.
-pub fn resume_commit(facts: &CommitFacts) -> Option<ObjectId> {
+pub(crate) fn resume_commit(facts: &CommitFacts) -> Option<ObjectId> {
     let row = &facts.working.placement;
     let staged = row.staged?;
     let tip = facts.working.tip?;

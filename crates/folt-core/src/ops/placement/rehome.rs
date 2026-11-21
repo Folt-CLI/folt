@@ -12,7 +12,7 @@ use super::repair::{apply_repair_link, former_link_home, judge_repair_link};
 
 /// Rewrites every internal path in one transaction before repairing former-home links.
 /// Repeating with the same old home resumes the link pass after interruption.
-pub fn rehome(
+pub(crate) fn rehome(
     old_home: &std::path::Path,
     fs: &impl PlacementOps,
     objects: &ObjectStore,

@@ -49,7 +49,7 @@ pub(super) fn observe(row: &Placement, fs: &impl PlacementOps) -> PruneFacts {
 
 /// Reads the whole registry for stage reachability, observing only selected rows.
 /// Scope keys name a path or directory itself (use resolve_directory for directories).
-pub fn gather(
+pub(crate) fn gather(
     registry: &Registry,
     fs: &impl PlacementOps,
     scope: &[PlacementPath],

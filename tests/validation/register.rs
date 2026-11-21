@@ -7,11 +7,8 @@ use folt_core::config::names::CONTENT_FILE;
 use folt_core::config::settings::Settings;
 use folt_core::history::RefStore;
 use folt_core::object::hash_blob;
-use folt_core::ops::facts::{Behind, gather};
-use folt_core::ops::register::{
-    self, RegisterRefusalReason, RegisterStatus, apply_register, plan_register,
-};
-use folt_core::ops::status::judge_status;
+use folt_core::ops::facts::Behind;
+use folt_core::ops::register::{self, RegisterRefusalReason, RegisterStatus};
 use folt_core::placement::{Drift, Observation, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
@@ -33,7 +30,7 @@ fn files_are_captured_without_history_and_repeated_registration_is_a_noop() {
     for (path, bytes) in paths.iter().zip(contents) {
         fs::write(path, bytes).unwrap();
     }
-    let plan = plan_register(&home.home, &paths).unwrap();
+    let plan = home.home.plan_register(&paths).unwrap();
     assert_eq!(plan.summary.new, 3);
     assert!(!home.path().join("registry.db").exists());
     let contents: [&[u8]; 3] = [
@@ -46,7 +43,7 @@ fn files_are_captured_without_history_and_repeated_registration_is_a_noop() {
     expected.entries[0].size += growth;
     expected.summary.total_bytes += growth;
     expected.summary.largest[0].1 += growth;
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), expected);
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), expected);
     let registry = Registry::open_existing(&home.home).unwrap();
     assert_eq!(registry.folios().unwrap().len(), 3);
     for (path, content) in paths.iter().zip(contents) {
@@ -66,18 +63,20 @@ fn files_are_captured_without_history_and_repeated_registration_is_a_noop() {
         )
         .unwrap();
         let refs = RefStore::open(&dir, &format).unwrap();
-        let facts = gather(&[row, internal], &PlacementFs::new(&home.home), |_| {
-            Ok(&refs)
-        })
-        .unwrap();
-        for status in judge_status(&facts) {
+        let facts = home
+            .home
+            .gather_facts(&[row, internal], &PlacementFs::new(&home.home), |_| {
+                Ok(&refs)
+            })
+            .unwrap();
+        for status in home.home.judge_status(&facts) {
             assert_eq!(status.drift, Drift::InSync);
             assert_eq!(status.behind, Some(Behind::NoHistory));
         }
     }
-    let again = plan_register(&home.home, &paths).unwrap();
+    let again = home.home.plan_register(&paths).unwrap();
     assert_eq!(again.summary.already_registered, 3);
-    assert_eq!(apply_register(&home.home, &again, false).unwrap(), again);
+    assert_eq!(home.home.apply_register(&again, false).unwrap(), again);
     assert_eq!(registry.folios().unwrap().len(), 3);
 }
 
@@ -93,7 +92,7 @@ fn directories_create_real_markers_and_deduplicate_in_both_orders() {
         } else {
             vec![dir.clone(), marker.clone(), dir.join(".")]
         };
-        let plan = plan_register(&home.home, paths).unwrap();
+        let plan = home.home.plan_register(paths).unwrap();
         assert_eq!(plan.entries.len(), 1);
         assert!(plan.entries[0].creates_marker);
         assert_eq!(plan.entries[0].status, RegisterStatus::New);
@@ -105,7 +104,7 @@ fn directories_create_real_markers_and_deduplicate_in_both_orders() {
         expected.entries[0].size = size;
         expected.summary.total_bytes = size;
         expected.summary.largest = vec![(plan.entries[0].path.clone(), size)];
-        assert_eq!(apply_register(&home.home, &plan, false).unwrap(), expected);
+        assert_eq!(home.home.apply_register(&plan, false).unwrap(), expected);
         assert_eq!(
             fs::read(&marker).unwrap(),
             b"---\nfolio-name: \"notes\"\n---\n"
@@ -122,14 +121,14 @@ fn directories_create_real_markers_and_deduplicate_in_both_orders() {
                 .unwrap(),
             Observation::File { .. }
         ));
-        let again = plan_register(&home.home, [&dir]).unwrap();
+        let again = home.home.plan_register([&dir]).unwrap();
         assert_eq!(again.summary.already_registered, 1);
-        apply_register(&home.home, &again, false).unwrap();
+        home.home.apply_register(&again, false).unwrap();
         assert_eq!(registry.folios().unwrap().len(), 1);
         let child = dir.join("child.txt");
         fs::write(&child, b"child").unwrap();
         assert_eq!(
-            plan_register(&home.home, [&child]).unwrap().entries[0].status,
+            home.home.plan_register([&child]).unwrap().entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::InsideDirectoryFolio)
         );
     }
@@ -140,14 +139,14 @@ fn directory_replaced_by_file_blocks_registration() {
     let home = TempHome::new();
     let request = home.root().join("notes.md");
     fs::create_dir(&request).unwrap();
-    let plan = plan_register(&home.home, [&request]).unwrap();
+    let plan = home.home.plan_register([&request]).unwrap();
     assert_eq!(plan.summary.new, 1);
     assert!(plan.entries[0].creates_marker);
     let destination = plan.entries[0].path.parent().unwrap();
     fs::remove_dir(destination).unwrap();
     fs::write(destination, b"body").unwrap();
 
-    let blocked = apply_register(&home.home, &plan, false).unwrap();
+    let blocked = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(blocked.summary.refused, 1);
     assert_eq!(blocked.entries[0].path, destination);
     assert_eq!(
@@ -172,14 +171,14 @@ fn file_replaced_by_directory_blocks_registration() {
     let home = TempHome::new();
     let request = home.root().join("notes.md");
     fs::write(&request, b"body").unwrap();
-    let plan = plan_register(&home.home, [&request]).unwrap();
+    let plan = home.home.plan_register([&request]).unwrap();
     assert_eq!(plan.summary.new, 1);
     assert!(!plan.entries[0].creates_marker);
     let destination = &plan.entries[0].path;
     fs::remove_file(destination).unwrap();
     fs::create_dir(destination).unwrap();
 
-    let blocked = apply_register(&home.home, &plan, false).unwrap();
+    let blocked = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(blocked.summary.refused, 1);
     assert_eq!(
         blocked.entries[0].path,
@@ -221,11 +220,11 @@ fn distinct_case_variant_markers_register_in_one_unchanged_batch() {
         return;
     }
 
-    let plan = plan_register(&home.home, &paths).unwrap();
+    let plan = home.home.plan_register(&paths).unwrap();
     assert_eq!(plan.entries.len(), 2);
     assert_eq!(plan.summary.new, 2);
     assert_ne!(plan.entries[0].path, plan.entries[1].path);
-    let applied = apply_register(&home.home, &plan, false).unwrap();
+    let applied = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(applied, plan);
     let registry = Registry::open_existing(&home.home).unwrap();
     assert_eq!(registry.folios().unwrap().len(), 2);
@@ -249,14 +248,14 @@ fn directory_names_use_the_resolved_directory_for_equivalent_spellings() {
         let request = root.join(spelling);
         assert!(request.is_absolute());
 
-        let plan = plan_register(&home.home, [&request]).unwrap();
+        let plan = home.home.plan_register([&request]).unwrap();
         assert_eq!(plan.summary.new, 1, "{spelling}: {plan:?}");
         assert_eq!(
             plan.entries[0].name.as_ref().unwrap().as_str(),
             "notes",
             "{spelling}"
         );
-        let applied = apply_register(&home.home, &plan, false).unwrap();
+        let applied = home.home.apply_register(&plan, false).unwrap();
         assert_eq!(applied.summary.new, 1, "{spelling}: {applied:?}");
         assert_eq!(
             fs::read(dir.join(folt_core::config::names::MARKER_FILE)).unwrap(),
@@ -281,10 +280,10 @@ fn apply_uses_an_appearing_marker_without_clobbering_it() {
     let home = TempHome::new();
     let dir = home.root().join("notes");
     fs::create_dir(&dir).unwrap();
-    let plan = plan_register(&home.home, [&dir]).unwrap();
+    let plan = home.home.plan_register([&dir]).unwrap();
     let marker = dir.join(folt_core::config::names::MARKER_FILE);
     fs::write(&marker, b"appeared").unwrap();
-    let applied = apply_register(&home.home, &plan, false).unwrap();
+    let applied = home.home.apply_register(&plan, false).unwrap();
     assert!(!applied.entries[0].creates_marker);
     let registry = Registry::open_existing(&home.home).unwrap();
     let row = registry
@@ -315,24 +314,24 @@ fn refusals_stop_the_entire_batch_without_creating_markers_or_registry() {
     let good = home.root().join("good");
     fs::write(&good, b"ok").unwrap();
     let bad = home.root().join("missing-parent/no-file");
-    let plan = plan_register(&home.home, [&good, &dir, &bad]).unwrap();
+    let plan = home.home.plan_register([&good, &dir, &bad]).unwrap();
     assert_eq!(plan.summary.refused, 1);
     assert_eq!(
         plan.entries[2].status,
         RegisterStatus::Refused(RegisterRefusalReason::Missing)
     );
-    assert_eq!(apply_register(&home.home, &plan, true).unwrap(), plan);
+    assert_eq!(home.home.apply_register(&plan, true).unwrap(), plan);
     assert!(!dir.join(folt_core::config::names::MARKER_FILE).exists());
     assert!(!home.path().join("registry.db").exists());
     let own = home.path().join("config.toml");
     assert_eq!(
-        plan_register(&home.home, [&own]).unwrap().entries[0].status,
+        home.home.plan_register([&own]).unwrap().entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::InsideHome)
     );
     let marker = dir.join(folt_core::config::names::MARKER_FILE);
     fs::create_dir(&marker).unwrap();
     assert_eq!(
-        plan_register(&home.home, [&dir]).unwrap().entries[0].status,
+        home.home.plan_register([&dir]).unwrap().entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::NotAFile)
     );
 }
@@ -347,16 +346,19 @@ fn configuration_confirmation_and_changed_files_are_rechecked() {
     fs::write(home.path().join("config.toml"), "large_file_bytes = 4\n").unwrap();
     let path = home.root().join("file");
     fs::write(&path, b"abc").unwrap();
-    let plan = plan_register(&home.home, [&path, &home.root().join("./file")]).unwrap();
+    let plan = home
+        .home
+        .plan_register([&path, &home.root().join("./file")])
+        .unwrap();
     assert_eq!(plan.entries.len(), 1);
     fs::write(&path, b"new!").unwrap();
-    let refused = apply_register(&home.home, &plan, false).unwrap();
+    let refused = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(
         refused.entries[0].status,
         RegisterStatus::NeedsConfirmation { size: 4 }
     );
     assert!(!home.path().join("registry.db").exists());
-    apply_register(&home.home, &plan, true).unwrap();
+    home.home.apply_register(&plan, true).unwrap();
     let registry = Registry::open_existing(&home.home).unwrap();
     let row = registry
         .placement_at(&PlacementPath::resolve(&path).unwrap())
@@ -380,10 +382,10 @@ fn batch_total_requires_confirmation_even_when_individual_files_do_not() {
             .set_len(folt_core::config::limits::DEFAULT_BATCH_TOTAL_BYTES / 2 + 1)
             .unwrap();
     }
-    let plan = plan_register(&home.home, &paths).unwrap();
+    let plan = home.home.plan_register(&paths).unwrap();
     assert_eq!(plan.summary.new, 2);
     assert_eq!(plan.notes.len(), 1);
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
     assert!(!home.path().join("registry.db").exists());
     fs::File::options()
         .write(true)
@@ -391,7 +393,7 @@ fn batch_total_requires_confirmation_even_when_individual_files_do_not() {
         .unwrap()
         .set_len(folt_core::config::limits::DEFAULT_BATCH_TOTAL_BYTES / 2 - 1)
         .unwrap();
-    assert!(plan_register(&home.home, &paths).unwrap().notes.is_empty());
+    assert!(home.home.plan_register(&paths).unwrap().notes.is_empty());
 }
 
 #[cfg(unix)]
@@ -410,21 +412,21 @@ fn repointed_parent_blocks_file_registration() {
         let current = home.root().join("current");
         symlink(&a, &current).unwrap();
         let request = current.join("note.md");
-        let plan = plan_register(&home.home, [&request]).unwrap();
+        let plan = home.home.plan_register([&request]).unwrap();
         assert_eq!(plan.summary.new, 1);
         fs::remove_file(&current).unwrap();
         symlink(&b, &current).unwrap();
-        let destination = plan_register(&home.home, [&request]).unwrap().entries[0]
+        let destination = home.home.plan_register([&request]).unwrap().entries[0]
             .path
             .clone();
         assert_ne!(destination, plan.entries[0].path);
 
         let blocked = if links {
-            let outcome = register::apply_register_links(&home.home, &plan, false).unwrap();
+            let outcome = home.home.apply_register_links(&plan, false).unwrap();
             assert!(outcome.paths.is_empty());
             outcome.registration
         } else {
-            apply_register(&home.home, &plan, false).unwrap()
+            home.home.apply_register(&plan, false).unwrap()
         };
         assert_eq!(blocked.summary.refused, 1);
         assert_eq!(blocked.entries[0].path, destination);
@@ -470,24 +472,23 @@ fn assert_repointed_parent_cannot_collapse_requests(links: bool) {
     fs::write(b.join("note.md"), b"body").unwrap();
     let current = home.root().join("current");
     symlink(&a, &current).unwrap();
-    let plan = plan_register(
-        &home.home,
-        [
+    let plan = home
+        .home
+        .plan_register([
             RegisterRequest::new(current.join("note.md"), FolioName::parse("Chosen").unwrap()),
             RegisterRequest::from(b.join("note.md")),
-        ],
-    )
-    .unwrap();
+        ])
+        .unwrap();
     assert_eq!(plan.summary.new, 2);
     fs::remove_file(&current).unwrap();
     symlink(&b, &current).unwrap();
 
     let blocked = if links {
-        let outcome = register::apply_register_links(&home.home, &plan, false).unwrap();
+        let outcome = home.home.apply_register_links(&plan, false).unwrap();
         assert!(outcome.paths.is_empty());
         outcome.registration
     } else {
-        apply_register(&home.home, &plan, false).unwrap()
+        home.home.apply_register(&plan, false).unwrap()
     };
     assert_eq!(blocked.entries.len(), 1);
     assert_eq!(blocked.summary.refused, 1);
@@ -538,24 +539,23 @@ fn assert_repointed_parent_cannot_collapse_marker_requests(links: bool, director
         } else {
             (current.join(marker), b.join(marker))
         };
-        let plan = plan_register(
-            &home.home,
-            [
+        let plan = home
+            .home
+            .plan_register([
                 RegisterRequest::new(named, FolioName::parse("Chosen").unwrap()),
                 RegisterRequest::from(other),
-            ],
-        )
-        .unwrap();
+            ])
+            .unwrap();
         assert_eq!(plan.summary.new, 2);
         fs::remove_file(&current).unwrap();
         symlink(&b, &current).unwrap();
 
         let blocked = if links {
-            let outcome = register::apply_register_links(&home.home, &plan, false).unwrap();
+            let outcome = home.home.apply_register_links(&plan, false).unwrap();
             assert!(outcome.paths.is_empty());
             outcome.registration
         } else {
-            apply_register(&home.home, &plan, false).unwrap()
+            home.home.apply_register(&plan, false).unwrap()
         };
         assert_eq!(blocked.entries.len(), 1);
         assert_eq!(blocked.summary.refused, 1);
@@ -615,21 +615,21 @@ fn unchanged_parent_registers_named_marker_request() {
             fs::write(a.join(marker), b"body").unwrap();
             let current = home.root().join("current");
             symlink(&a, &current).unwrap();
-            let plan = plan_register(
-                &home.home,
-                [RegisterRequest::new(
+            let plan = home
+                .home
+                .plan_register([RegisterRequest::new(
                     current.join(marker),
                     FolioName::parse("Chosen").unwrap(),
-                )],
-            )
-            .unwrap();
+                )])
+                .unwrap();
             assert_eq!(plan.summary.new, 1);
             let applied = if links {
-                register::apply_register_links(&home.home, &plan, false)
+                home.home
+                    .apply_register_links(&plan, false)
                     .unwrap()
                     .registration
             } else {
-                apply_register(&home.home, &plan, false).unwrap()
+                home.home.apply_register(&plan, false).unwrap()
             };
             assert_eq!(applied.summary.new, 1);
             assert_eq!(applied.summary.refused, 0);
@@ -664,19 +664,18 @@ fn repointed_parent_cannot_collapse_directory_requests() {
     fs::create_dir_all(b.join("notes")).unwrap();
     let current = home.root().join("current");
     symlink(&a, &current).unwrap();
-    let plan = plan_register(
-        &home.home,
-        [
+    let plan = home
+        .home
+        .plan_register([
             RegisterRequest::new(current.join("notes"), FolioName::parse("Chosen").unwrap()),
             RegisterRequest::from(b.join("notes")),
-        ],
-    )
-    .unwrap();
+        ])
+        .unwrap();
     assert_eq!(plan.summary.new, 2);
     fs::remove_file(&current).unwrap();
     symlink(&b, &current).unwrap();
 
-    let blocked = apply_register(&home.home, &plan, false).unwrap();
+    let blocked = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(blocked.entries.len(), 1);
     assert_eq!(blocked.summary.refused, 1);
     assert_eq!(blocked.entries[0].path, plan.entries[1].path);
@@ -717,9 +716,12 @@ fn two_path_spellings_register_one_file() {
     let x = home.root().join("x");
     fs::create_dir(&x).unwrap();
     fs::write(x.join("note.md"), b"body").unwrap();
-    let plan = plan_register(&home.home, [x.join("note.md"), x.join("../x/note.md")]).unwrap();
+    let plan = home
+        .home
+        .plan_register([x.join("note.md"), x.join("../x/note.md")])
+        .unwrap();
     assert_eq!(plan.entries.len(), 1);
-    let applied = apply_register(&home.home, &plan, false).unwrap();
+    let applied = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(applied.summary.new, 1);
     assert_eq!(applied.summary.refused, 0);
     assert_eq!(applied.entries[0].path, plan.entries[0].path);
@@ -750,15 +752,14 @@ fn unchanged_parent_registers_named_file() {
     fs::write(a.join("note.md"), b"body").unwrap();
     let current = home.root().join("current");
     symlink(&a, &current).unwrap();
-    let plan = plan_register(
-        &home.home,
-        [RegisterRequest::new(
+    let plan = home
+        .home
+        .plan_register([RegisterRequest::new(
             current.join("note.md"),
             FolioName::parse("Chosen").unwrap(),
-        )],
-    )
-    .unwrap();
-    let applied = apply_register(&home.home, &plan, false).unwrap();
+        )])
+        .unwrap();
+    let applied = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(applied.summary.new, 1);
     assert_eq!(applied.summary.refused, 0);
     assert_eq!(applied.entries[0].path, plan.entries[0].path);
@@ -802,16 +803,16 @@ fn repointed_parent_blocks_directory_registration() {
         let current = home.root().join("current");
         symlink(&a, &current).unwrap();
         let request = current.join("dir");
-        let plan = plan_register(&home.home, [&request]).unwrap();
+        let plan = home.home.plan_register([&request]).unwrap();
         assert_eq!(plan.summary.new, 1);
         fs::remove_file(&current).unwrap();
         symlink(&b, &current).unwrap();
-        let destination = plan_register(&home.home, [&request]).unwrap().entries[0]
+        let destination = home.home.plan_register([&request]).unwrap().entries[0]
             .path
             .clone();
         assert_ne!(destination, plan.entries[0].path);
 
-        let blocked = apply_register(&home.home, &plan, false).unwrap();
+        let blocked = home.home.apply_register(&plan, false).unwrap();
         assert_eq!(blocked.summary.refused, 1);
         assert_eq!(blocked.entries[0].path, destination);
         let reason = RegisterRefusalReason::DestinationChanged {
@@ -868,16 +869,19 @@ fn unchanged_parent_registers_collapsed_file_and_directory_requests() {
         let current = home.root().join("current");
         symlink(&a, &current).unwrap();
         let request = current.join(target.file_name().unwrap());
-        let plan = plan_register(&home.home, [&request, &target, &request]).unwrap();
+        let plan = home
+            .home
+            .plan_register([&request, &target, &request])
+            .unwrap();
         assert_eq!(plan.entries.len(), 1);
-        let applied = apply_register(&home.home, &plan, false).unwrap();
+        let applied = home.home.apply_register(&plan, false).unwrap();
         assert_eq!(applied.summary.refused, 0);
         assert_eq!(applied.entries[0].path, plan.entries[0].path);
         let registry = Registry::open_existing(&home.home).unwrap();
         assert_eq!(registry.folios().unwrap().len(), 1);
-        let again = plan_register(&home.home, [&request, &target]).unwrap();
+        let again = home.home.plan_register([&request, &target]).unwrap();
         assert_eq!(again.summary.already_registered, 1);
-        assert_eq!(apply_register(&home.home, &again, false).unwrap(), again);
+        assert_eq!(home.home.apply_register(&again, false).unwrap(), again);
     }
 }
 
@@ -891,19 +895,19 @@ fn symlinks_and_devices_are_refused() {
     let link = home.root().join("link");
     symlink(&path, &link).unwrap();
     assert_eq!(
-        plan_register(&home.home, [&link]).unwrap().entries[0].status,
+        home.home.plan_register([&link]).unwrap().entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::Symlink)
     );
     let dir = home.root().join("notes");
     fs::create_dir(&dir).unwrap();
     symlink(&path, dir.join(folt_core::config::names::MARKER_FILE)).unwrap();
     assert_eq!(
-        plan_register(&home.home, [&dir]).unwrap().entries[0].status,
+        home.home.plan_register([&dir]).unwrap().entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::Symlink)
     );
     let socket = std::path::Path::new("/dev/null");
     assert_eq!(
-        plan_register(&home.home, [&socket]).unwrap().entries[0].status,
+        home.home.plan_register([&socket]).unwrap().entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::NotAFile)
     );
 }
@@ -916,7 +920,8 @@ fn two_case_spellings_deduplicate_when_the_filesystem_is_case_insensitive() {
     fs::write(&path, b"bytes").unwrap();
     if other.exists() {
         assert_eq!(
-            plan_register(&home.home, [&path, &other])
+            home.home
+                .plan_register([&path, &other])
                 .unwrap()
                 .entries
                 .len(),
@@ -946,15 +951,14 @@ fn assert_unix_name_registered(name: &std::ffi::OsStr) {
     let home = TempHome::new();
     let path = home.root().join(name);
     fs::write(&path, b"bytes").unwrap();
-    let plan = plan_register(
-        &home.home,
-        [register::RegisterRequest::new(
+    let plan = home
+        .home
+        .plan_register([register::RegisterRequest::new(
             &path,
             folt_core::folio::name::FolioName::parse("explicit").unwrap(),
-        )],
-    )
-    .unwrap();
-    apply_register(&home.home, &plan, false).unwrap();
+        )])
+        .unwrap();
+    home.home.apply_register(&plan, false).unwrap();
     let registry = Registry::open_existing(&home.home).unwrap();
     let row = registry
         .placement_at(&PlacementPath::resolve(&path).unwrap())
@@ -965,7 +969,8 @@ fn assert_unix_name_registered(name: &std::ffi::OsStr) {
         resolved_path(&path).as_os_str().as_bytes()
     );
     assert_eq!(
-        plan_register(&home.home, [&path])
+        home.home
+            .plan_register([&path])
             .unwrap()
             .summary
             .already_registered,
@@ -980,9 +985,9 @@ fn apply_rechecks_disappearing_sources_before_creating_any_marker() {
     fs::create_dir(&dir).unwrap();
     let path = home.root().join("file");
     fs::write(&path, b"bytes").unwrap();
-    let plan = plan_register(&home.home, [&dir, &path]).unwrap();
+    let plan = home.home.plan_register([&dir, &path]).unwrap();
     fs::remove_file(&path).unwrap();
-    let refused = apply_register(&home.home, &plan, false).unwrap();
+    let refused = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(
         refused.entries[1].status,
         RegisterStatus::Refused(RegisterRefusalReason::Missing)
@@ -1002,12 +1007,12 @@ fn unreadable_file_refuses_the_whole_call_when_access_is_denied() {
     // Privileged users can still read mode-000 files. Test the OS access check
     // when it applies, without changing process identity or permissions globally.
     if fs::File::open(&path).is_err() {
-        let plan = plan_register(&home.home, [&path]).unwrap();
+        let plan = home.home.plan_register([&path]).unwrap();
         assert_eq!(
             plan.entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::Unreadable)
         );
-        assert_eq!(apply_register(&home.home, &plan, true).unwrap(), plan);
+        assert_eq!(home.home.apply_register(&plan, true).unwrap(), plan);
         assert!(!home.path().join("registry.db").exists());
     }
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
@@ -1029,7 +1034,7 @@ fn link_dry_run_creates_no_marker_folio_registry_or_probe() {
         names
     };
     let before = names();
-    let plan = plan_register(&home.home, [&directory, &file]).unwrap();
+    let plan = home.home.plan_register([&directory, &file]).unwrap();
     assert_eq!(plan.summary.new, 2);
     assert!(plan.entries[0].creates_marker);
     assert_eq!(names(), before);
@@ -1055,13 +1060,13 @@ fn link_registration_through_a_symlinked_home_uses_the_home_spelling() {
 }
 
 fn assert_link_registration(home: &TempHome) {
-    use folt_core::ops::register::{RegisterLinkResult, apply_register_links};
+    use folt_core::ops::register::RegisterLinkResult;
     use folt_core::placement::PlacementKind;
     let path = home.root().join("file");
     fs::write(&path, b"content").unwrap();
     let expected_path = resolved_path(&path);
-    let plan = plan_register(&home.home, [&path]).unwrap();
-    let result = apply_register_links(&home.home, &plan, false).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
+    let result = home.home.apply_register_links(&plan, false).unwrap();
     assert_eq!(
         result.paths,
         vec![(expected_path, RegisterLinkResult::Linked)]
@@ -1089,7 +1094,7 @@ fn assert_link_registration(home: &TempHome) {
         fs::read(internal.path.to_path_buf()).unwrap(),
         b"shared edit"
     );
-    let result = apply_register_links(&home.home, &plan, false).unwrap();
+    let result = home.home.apply_register_links(&plan, false).unwrap();
     assert_eq!(result.paths[0].1, RegisterLinkResult::Linked);
     assert_eq!(registry.folios().unwrap(), vec![row.id]);
 }
@@ -1097,15 +1102,15 @@ fn assert_link_registration(home: &TempHome) {
 #[cfg_attr(windows, ignore = "real symlinks require privileges")]
 #[test]
 fn link_request_retries_an_already_registered_copy() {
-    use folt_core::ops::register::{RegisterLinkResult, apply_register_links};
+    use folt_core::ops::register::RegisterLinkResult;
     let home = TempHome::new();
     let path = home.root().join("file");
     fs::write(&path, b"content").unwrap();
-    let plan = plan_register(&home.home, [&path]).unwrap();
-    apply_register(&home.home, &plan, false).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
+    home.home.apply_register(&plan, false).unwrap();
     let registry = Registry::open_existing(&home.home).unwrap();
     let ids = registry.folios().unwrap();
-    let result = apply_register_links(&home.home, &plan, false).unwrap();
+    let result = home.home.apply_register_links(&plan, false).unwrap();
     assert_eq!(result.registration.summary.already_registered, 1);
     assert_eq!(result.paths[0].1, RegisterLinkResult::Linked);
     assert_eq!(registry.folios().unwrap(), ids);
@@ -1125,7 +1130,7 @@ fn hard_linked_source_remains_a_registered_copy_while_other_paths_convert() {
 }
 
 fn assert_hard_linked_source_remains_a_registered_copy() {
-    use folt_core::ops::register::{RegisterLinkResult, apply_register_links};
+    use folt_core::ops::register::RegisterLinkResult;
     use folt_core::placement::PlacementKind;
     let home = TempHome::new();
     let path = home.root().join("file");
@@ -1134,8 +1139,8 @@ fn assert_hard_linked_source_remains_a_registered_copy() {
     fs::write(&path, b"content").unwrap();
     fs::hard_link(&path, &alias).unwrap();
     fs::write(&other, b"other").unwrap();
-    let plan = plan_register(&home.home, [&path, &other]).unwrap();
-    let result = apply_register_links(&home.home, &plan, false).unwrap();
+    let plan = home.home.plan_register([&path, &other]).unwrap();
+    let result = home.home.apply_register_links(&plan, false).unwrap();
     assert!(
         matches!(&result.paths[0].1, RegisterLinkResult::LeftAsCopy { reason }
         if reason.contains("other hard links"))
@@ -1176,16 +1181,15 @@ fn name_sources_and_exact_edits_are_planned_without_writing() {
     for (path, bytes) in paths.iter().zip(contents) {
         fs::write(path, bytes).unwrap();
     }
-    let plan = plan_register(
-        &home.home,
-        [
+    let plan = home
+        .home
+        .plan_register([
             paths[0].clone().into(),
             named(&paths[1], "Chosen"),
             paths[2].clone().into(),
             paths[3].clone().into(),
-        ],
-    )
-    .unwrap();
+        ])
+        .unwrap();
     assert_eq!(plan.summary.refused, 0);
     assert_eq!(plan.summary.files_to_write, 2);
     for (i, expected, source) in [
@@ -1240,17 +1244,16 @@ fn explicit_names_then_front_matter_are_reserved_before_stems() {
     }
     fs::write(&paths[2], b"---\nfolio-name: same\n---\n").unwrap();
     fs::write(&paths[4], b"---\nfolio-name: same_2\n---\n").unwrap();
-    let plan = plan_register(
-        &home.home,
-        [
+    let plan = home
+        .home
+        .plan_register([
             paths[0].clone().into(),
             paths[1].clone().into(),
             paths[2].clone().into(),
             named(&paths[3], "same_1"),
             paths[4].clone().into(),
-        ],
-    )
-    .unwrap();
+        ])
+        .unwrap();
     assert_eq!(plan.summary.refused, 0);
     for (entry, expected) in plan
         .entries
@@ -1267,7 +1270,7 @@ fn explicit_names_then_front_matter_are_reserved_before_stems() {
         plan.entries[1].name_source,
         Some(NameSource::FileName { suffix: 4 })
     );
-    apply_register(&home.home, &plan, false).unwrap();
+    home.home.apply_register(&plan, false).unwrap();
 }
 
 #[test]
@@ -1276,15 +1279,15 @@ fn registry_collisions_suffix_only_stems_and_explicit_names_block_the_batch() {
     let home = TempHome::new();
     let held = home.root().join("held.txt");
     fs::write(&held, b"held").unwrap();
-    let plan = plan_register(&home.home, [named(&held, "same")]).unwrap();
-    apply_register(&home.home, &plan, false).unwrap();
+    let plan = home.home.plan_register([named(&held, "same")]).unwrap();
+    home.home.apply_register(&plan, false).unwrap();
     let registry = Registry::open_existing(&home.home).unwrap();
     let id = registry.find_by_name(&name("same")).unwrap().unwrap();
     let paths = ["same.txt", "same.bin", "front.md", "good.txt"].map(|p| home.root().join(p));
     for path in &paths {
         fs::write(path, b"body").unwrap();
     }
-    let suffixes = plan_register(&home.home, [&paths[0], &paths[1]]).unwrap();
+    let suffixes = home.home.plan_register([&paths[0], &paths[1]]).unwrap();
     assert_eq!(suffixes.entries[0].name, Some(name("same_1")));
     assert_eq!(suffixes.entries[1].name, Some(name("same_2")));
     for from_front in [false, true] {
@@ -1302,7 +1305,10 @@ fn registry_collisions_suffix_only_stems_and_explicit_names_block_the_batch() {
         } else {
             named(&paths[2], "same")
         };
-        let plan = plan_register(&home.home, [request, paths[3].clone().into()]).unwrap();
+        let plan = home
+            .home
+            .plan_register([request, paths[3].clone().into()])
+            .unwrap();
         assert_eq!(
             plan.entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::NameTaken {
@@ -1311,7 +1317,7 @@ fn registry_collisions_suffix_only_stems_and_explicit_names_block_the_batch() {
             })
         );
         assert_eq!(plan.entries[0].name, None);
-        assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+        assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
         assert_eq!(registry.folios().unwrap(), vec![id]);
     }
 }
@@ -1329,7 +1335,7 @@ fn explicit_collisions_between_paths_never_get_a_suffix() {
         vec![paths[2].clone().into(), named(&paths[0], "Taken")],
         vec![paths[2].clone().into(), paths[3].clone().into()],
     ] {
-        let plan = plan_register(&home.home, requests).unwrap();
+        let plan = home.home.plan_register(requests).unwrap();
         assert_eq!(plan.summary.refused, 1);
         let refused = plan
             .entries
@@ -1341,7 +1347,7 @@ fn explicit_collisions_between_paths_never_get_a_suffix() {
             name: taken, holder: NameHolder::Path(_),
         }) if taken == &name("Taken"))
         );
-        assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+        assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
         assert!(!home.path().join("registry.db").exists());
     }
 }
@@ -1359,36 +1365,32 @@ fn repeated_paths_merge_options_but_refuse_conflicting_names_even_on_replay() {
             named(home.root().join("./file.txt"), "Chosen"),
         ],
     ] {
-        let plan = plan_register(&home.home, requests).unwrap();
+        let plan = home.home.plan_register(requests).unwrap();
         assert_eq!(plan.entries.len(), 1);
         assert_eq!(plan.entries[0].name, Some(name("Chosen")));
     }
-    let plan = plan_register(
-        &home.home,
-        [
+    let plan = home
+        .home
+        .plan_register([
             named(&path, "First"),
             named(&path, "Second"),
             path.clone().into(),
-        ],
-    )
-    .unwrap();
+        ])
+        .unwrap();
     assert_eq!(
         plan.entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::ConflictingNames)
     );
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
-    let valid = plan_register(&home.home, [named(&path, "Chosen")]).unwrap();
-    apply_register(&home.home, &valid, false).unwrap();
-    let registered = plan_register(&home.home, [named(&path, "Chosen")]).unwrap();
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
+    let valid = home.home.plan_register([named(&path, "Chosen")]).unwrap();
+    home.home.apply_register(&valid, false).unwrap();
+    let registered = home.home.plan_register([named(&path, "Chosen")]).unwrap();
     assert_eq!(
         registered.entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::NameOnRegisteredPath)
     );
     assert!(registered.to_string().contains("rename (#155)"));
-    assert_eq!(
-        apply_register(&home.home, &valid, false).unwrap(),
-        registered
-    );
+    assert_eq!(home.home.apply_register(&valid, false).unwrap(), registered);
 }
 
 #[test]
@@ -1397,16 +1399,16 @@ fn front_matter_names_refuse_options_even_when_equal_and_invalid_grammar() {
     let path = home.root().join("file.md");
     fs::write(&path, b"---\nfolio-name: Existing\n---\n").unwrap();
     for option in ["Existing", "Different"] {
-        let plan = plan_register(&home.home, [named(&path, option)]).unwrap();
+        let plan = home.home.plan_register([named(&path, option)]).unwrap();
         assert_eq!(
             plan.entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::NameOptionWithFrontMatter)
         );
-        assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+        assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
     }
     for invalid in ["bad name", ".bad", "bad/", &"g".repeat(65), &"a".repeat(64)] {
         fs::write(&path, format!("---\nfolio-name: \"{invalid}\"\n---\n")).unwrap();
-        let plan = plan_register(&home.home, [&path]).unwrap();
+        let plan = home.home.plan_register([&path]).unwrap();
         assert!(matches!(
             plan.entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::InvalidFrontMatterName(_))
@@ -1439,7 +1441,7 @@ fn editor_refusals_are_reported_with_the_path() {
         (b"---\nfolio-name:\n---\n".to_vec(), E::InvalidValue),
     ] {
         fs::write(&path, &bytes).unwrap();
-        let plan = plan_register(&home.home, [&path]).unwrap();
+        let plan = home.home.plan_register([&path]).unwrap();
         assert_eq!(
             plan.entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::FrontMatter(reason))
@@ -1448,7 +1450,7 @@ fn editor_refusals_are_reported_with_the_path() {
             plan.to_string()
                 .contains(&plan.entries[0].path.display().to_string())
         );
-        assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+        assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
         assert_eq!(fs::read(&path).unwrap(), bytes);
     }
 }
@@ -1463,13 +1465,13 @@ fn stem_slugging_preserves_case_and_shortens_suffixes_to_64_bytes() {
     ] {
         let path = home.root().join(filename);
         fs::write(&path, b"body").unwrap();
-        let plan = plan_register(&home.home, [&path]).unwrap();
+        let plan = home.home.plan_register([&path]).unwrap();
         assert_eq!(plan.entries[0].name, Some(name(&expected)));
     }
     for filename in ["日本語.txt".to_owned(), format!("{}.txt", "a".repeat(64))] {
         let path = home.root().join(filename);
         fs::write(&path, b"body").unwrap();
-        let plan = plan_register(&home.home, [&path]).unwrap();
+        let plan = home.home.plan_register([&path]).unwrap();
         assert!(matches!(
             plan.entries[0].status,
             RegisterStatus::Refused(RegisterRefusalReason::NoUsableStem(_))
@@ -1481,9 +1483,9 @@ fn stem_slugging_preserves_case_and_shortens_suffixes_to_64_bytes() {
     for path in &paths {
         fs::write(path, b"body").unwrap();
     }
-    let first = plan_register(&home.home, [&paths[0]]).unwrap();
-    apply_register(&home.home, &first, false).unwrap();
-    let rest = plan_register(&home.home, [&paths[1], &paths[2]]).unwrap();
+    let first = home.home.plan_register([&paths[0]]).unwrap();
+    home.home.apply_register(&first, false).unwrap();
+    let rest = home.home.plan_register([&paths[1], &paths[2]]).unwrap();
     assert_eq!(
         rest.entries[0].name,
         Some(name(&format!("{}_1", "g".repeat(62))))
@@ -1522,7 +1524,7 @@ fn directory_names_use_marker_then_option_then_directory_name() {
             fs::write(&path, bytes).unwrap();
         }
         let request = option.map_or_else(|| dir.clone().into(), |n| named(&dir, n));
-        let plan = plan_register(&home.home, [request]).unwrap();
+        let plan = home.home.plan_register([request]).unwrap();
         assert_eq!(plan.entries[0].name, Some(name(expected)));
         assert_eq!(plan.entries[0].name_source, Some(source.clone()));
         assert_eq!(plan.entries[0].creates_marker, marker.is_none());
@@ -1542,17 +1544,16 @@ fn apply_stores_all_names_in_the_registry_without_changing_source_bytes() {
     for (path, content) in paths.iter().zip(bytes) {
         fs::write(path, content).unwrap();
     }
-    let plan = plan_register(
-        &home.home,
-        [
+    let plan = home
+        .home
+        .plan_register([
             paths[0].clone().into(),
             named(&paths[1], "Explicit"),
             paths[2].clone().into(),
-        ],
-    )
-    .unwrap();
+        ])
+        .unwrap();
     assert_eq!(plan.summary.files_to_write, 0);
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
     let registry = Registry::open_existing(&home.home).unwrap();
     for ((path, content), expected) in paths.iter().zip(bytes).zip(["Front", "Explicit", "Stem"]) {
         let id = registry
@@ -1574,10 +1575,10 @@ fn markdown_prefix_is_bounded_and_changed_markdown_blocks_apply() {
     bytes.resize(65544, b'x');
     bytes.push(0); // NUL past the prefix must not be examined.
     fs::write(&path, bytes).unwrap();
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert_eq!(plan.summary.refused, 0);
     fs::write(&path, b"---\nfolio-name: Changed\n---\nchanged content").unwrap();
-    let changed = apply_register(&home.home, &plan, false).unwrap();
+    let changed = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(
         changed.entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::FileChanged)
@@ -1595,23 +1596,20 @@ fn markdown_needing_a_write_refuses_readonly_and_multiple_hard_links() {
     let mut readonly = original.clone();
     readonly.set_readonly(true);
     fs::set_permissions(&path, readonly).unwrap();
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert!(
         matches!(&plan.entries[0].status, RegisterStatus::Refused(RegisterRefusalReason::NameNotWritable { reason }) if reason.contains("read-only"))
     );
     fs::set_permissions(&path, original).unwrap();
     let alias = home.root().join("alias");
     fs::hard_link(&path, &alias).unwrap();
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert!(
         matches!(&plan.entries[0].status, RegisterStatus::Refused(RegisterRefusalReason::NameNotWritable { reason }) if reason.contains("hard links"))
     );
     // Existing names need no write, so hard links are allowed.
     fs::write(&path, b"---\nfolio-name: Existing\n---\n").unwrap();
-    assert_eq!(
-        plan_register(&home.home, [&path]).unwrap().summary.refused,
-        0
-    );
+    assert_eq!(home.home.plan_register([&path]).unwrap().summary.refused, 0);
 }
 
 #[cfg_attr(windows, ignore = "real symlinks require privileges")]
@@ -1620,13 +1618,13 @@ fn link_apply_replays_explicit_names_and_stores_them() {
     let home = TempHome::new();
     let path = home.root().join("file.txt");
     fs::write(&path, b"body").unwrap();
-    let plan = plan_register(&home.home, [named(&path, "Chosen")]).unwrap();
-    let linked = register::apply_register_links(&home.home, &plan, false).unwrap();
+    let plan = home.home.plan_register([named(&path, "Chosen")]).unwrap();
+    let linked = home.home.apply_register_links(&plan, false).unwrap();
     assert_eq!(linked.paths[0].1, register::RegisterLinkResult::Linked);
     let registry = Registry::open_existing(&home.home).unwrap();
     assert!(registry.find_by_name(&name("Chosen")).unwrap().is_some());
     assert_eq!(registry.find_by_name(&name("file")).unwrap(), None);
-    let refused = register::apply_register_links(&home.home, &plan, false).unwrap();
+    let refused = home.home.apply_register_links(&plan, false).unwrap();
     assert!(refused.paths.is_empty());
     assert_eq!(
         refused.registration.entries[0].status,
@@ -1644,13 +1642,13 @@ fn directory_and_marker_requests_merge_names_and_refuse_override() {
         vec![named(&marker, "Chosen"), dir.clone().into()],
         vec![dir.clone().into(), named(&marker, "Chosen")],
     ] {
-        let plan = plan_register(&home.home, requests).unwrap();
+        let plan = home.home.plan_register(requests).unwrap();
         assert_eq!(plan.entries.len(), 1);
         assert!(plan.entries[0].creates_marker);
         assert_eq!(plan.entries[0].name, Some(name("Chosen")));
     }
     fs::write(&marker, b"---\nfolio-name: Chosen\n---\n").unwrap();
-    let plan = plan_register(&home.home, [named(&dir, "Chosen")]).unwrap();
+    let plan = home.home.plan_register([named(&dir, "Chosen")]).unwrap();
     assert_eq!(
         plan.entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::NameOptionWithFrontMatter)
@@ -1701,10 +1699,10 @@ fn markdown_name_writes_preserve_surrounding_bytes_and_store_the_new_content() {
         }
         let permissions = fs::metadata(&path).unwrap().permissions();
         let request = explicit.map_or_else(|| path.clone().into(), |n| named(&path, n));
-        let plan = plan_register(&home.home, [request]).unwrap();
+        let plan = home.home.plan_register([request]).unwrap();
         assert_eq!(plan.summary.files_to_write, 1);
         assert_eq!(fs::read(&path).unwrap(), original);
-        let applied = apply_register(&home.home, &plan, false).unwrap();
+        let applied = home.home.apply_register(&plan, false).unwrap();
         assert_eq!(applied.summary.refused, 0);
         assert_eq!(applied.entries[0].size, expected.len() as u64);
         assert_eq!(fs::read(&path).unwrap(), expected);
@@ -1759,14 +1757,14 @@ fn existing_name_at_scan_limit_registers_without_rewriting() {
     assert_eq!(&bytes.as_bytes()[65535..], b"---\n");
     fs::write(&path, &bytes).unwrap();
 
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert_eq!(plan.summary.refused, 0);
     assert_eq!(plan.entries[0].status, RegisterStatus::New);
     assert_eq!(plan.entries[0].name.as_ref().unwrap().as_str(), "x");
     assert_eq!(plan.entries[0].name_source, Some(NameSource::FrontMatter));
     assert_eq!(plan.entries[0].name_write, NameWrite::None);
     assert_eq!(plan.summary.files_to_write, 0);
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
     let registry = Registry::open_existing(&home.home).unwrap();
     let row = registry
         .placement_at(&PlacementPath::resolve(&path).unwrap())
@@ -1786,7 +1784,7 @@ fn needed_name_write_past_scan_limit_is_refused_with_the_path() {
     assert_eq!(&bytes.as_bytes()[65535..], b"---\n");
     fs::write(&path, &bytes).unwrap();
 
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert_eq!(plan.summary.refused, 1);
     assert_eq!(
         plan.entries[0].status,
@@ -1798,7 +1796,7 @@ fn needed_name_write_past_scan_limit_is_refused_with_the_path() {
         plan.to_string()
             .contains(&plan.entries[0].path.display().to_string())
     );
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
     assert_eq!(fs::read(&path).unwrap(), bytes.as_bytes());
 }
 
@@ -1815,11 +1813,11 @@ fn existing_name_does_not_rewrite_the_file_even_if_its_spelling_is_unquoted() {
         use std::os::unix::fs::MetadataExt;
         fs::metadata(&path).unwrap().ino()
     };
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert_eq!(plan.summary.refused, 0);
     assert_eq!(plan.entries[0].name_write, register::NameWrite::None);
     assert_eq!(plan.summary.files_to_write, 0);
-    assert_eq!(apply_register(&home.home, &plan, false).unwrap(), plan);
+    assert_eq!(home.home.apply_register(&plan, false).unwrap(), plan);
     let registry = Registry::open_existing(&home.home).unwrap();
     let row = registry
         .placement_at(&PlacementPath::resolve(&path).unwrap())
@@ -1844,10 +1842,10 @@ fn source_changed_after_planning_a_name_write_is_blocked_without_rewriting() {
     let home = TempHome::new();
     let path = home.root().join("file.md");
     fs::write(&path, b"old body").unwrap();
-    let plan = plan_register(&home.home, [&path]).unwrap();
+    let plan = home.home.plan_register([&path]).unwrap();
     assert_eq!(plan.summary.files_to_write, 1);
     fs::write(&path, b"user changed body").unwrap();
-    let result = apply_register(&home.home, &plan, false).unwrap();
+    let result = home.home.apply_register(&plan, false).unwrap();
     assert_eq!(
         result.entries[0].status,
         RegisterStatus::Refused(RegisterRefusalReason::FileChanged)
@@ -1868,7 +1866,7 @@ fn environment_override_reaches_registration() {
     let home =
         folt_core::home::Home::open_or_create(directory.path().join("override"), &environment)
             .unwrap();
-    let plan = plan_register(&home, [&path]).unwrap();
+    let plan = home.plan_register([&path]).unwrap();
     assert_eq!(
         plan.entries[0].status,
         RegisterStatus::NeedsConfirmation { size: 4 }
@@ -1878,7 +1876,7 @@ fn environment_override_reaches_registration() {
         &Environment::default(),
     )
     .unwrap();
-    let plan = plan_register(&home, [&path]).unwrap();
+    let plan = home.plan_register([&path]).unwrap();
     assert_eq!(plan.entries[0].status, RegisterStatus::New);
 }
 
@@ -1896,13 +1894,13 @@ fn environment_batch_total_overrides_the_default() {
     let home =
         folt_core::home::Home::open_or_create(directory.path().join("override"), &environment)
             .unwrap();
-    let plan = plan_register(&home, &paths).unwrap();
+    let plan = home.plan_register(&paths).unwrap();
     assert_eq!(plan.notes.len(), 1);
     let home = folt_core::home::Home::open_or_create(
         directory.path().join("default"),
         &Environment::default(),
     )
     .unwrap();
-    let plan = plan_register(&home, &paths).unwrap();
+    let plan = home.plan_register(&paths).unwrap();
     assert!(plan.notes.is_empty());
 }

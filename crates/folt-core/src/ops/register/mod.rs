@@ -22,12 +22,14 @@ mod refusal;
 mod report;
 mod request;
 
-pub use apply::apply_register;
+pub(crate) use apply::apply_register;
 pub use error::RegisterError;
-pub use links::{RegisterLinkOutcome, RegisterLinkResult, apply_register_links};
+pub(crate) use links::apply_register_links;
+pub use links::{RegisterLinkOutcome, RegisterLinkResult};
+pub(crate) use plan::plan_register;
 pub use plan::{
     NameSource, NameWrite, RegisterEntry, RegisterNote, RegisterPlan, RegisterStatus,
-    RegisterSummary, plan_register,
+    RegisterSummary,
 };
 pub use refusal::{NameHolder, RegisterRefusalReason};
 pub use request::RegisterRequest;

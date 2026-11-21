@@ -67,15 +67,16 @@ mod refusal;
 mod reset;
 mod tag;
 
-pub use branch::{create_branch, delete_branch, judge_delete_branch};
-pub use commit::{
-    CommitFacts, CommitMetadata, CommitPlan, apply_commit, gather_commit, judge_commit,
-    resume_commit,
-};
+#[cfg(test)]
+pub(crate) use branch::judge_delete_branch;
+pub(crate) use branch::{create_branch, delete_branch};
+pub use commit::{CommitFacts, CommitMetadata, CommitPlan};
+pub(crate) use commit::{apply_commit, gather_commit, judge_commit};
 pub use error::HistoryError;
 pub use refusal::HistoryRefusal;
-pub use reset::{ResetFacts, ResetPlan, apply_reset, gather_reset, judge_reset};
-pub use tag::{create_tag, delete_tag};
+pub use reset::{ResetFacts, ResetPlan};
+pub(crate) use reset::{apply_reset, gather_reset, judge_reset};
+pub(crate) use tag::{create_tag, delete_tag};
 
 #[cfg(test)]
 mod tests;

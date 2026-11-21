@@ -31,7 +31,7 @@ pub struct WorkingStatus {
 }
 
 /// Compares only the supplied observations; no commits or files are read.
-pub fn judge_working(facts: &PlacementFacts) -> WorkingStatus {
+pub(crate) fn judge_working(facts: &PlacementFacts) -> WorkingStatus {
     let row = &facts.placement;
     let matches = |hash: ObjectId, size: u64| {
         matches!(&facts.observation, Observation::File { signature } if signature.size == size)
@@ -76,7 +76,7 @@ pub struct PlacementStatus {
 }
 
 /// Include internal-row facts to report an intact link's shared edit and stage.
-pub fn judge_status(facts_set: &[PlacementFacts]) -> Vec<PlacementStatus> {
+pub(crate) fn judge_status(facts_set: &[PlacementFacts]) -> Vec<PlacementStatus> {
     facts_set
         .iter()
         .map(|facts| {
@@ -108,7 +108,7 @@ pub fn judge_status(facts_set: &[PlacementFacts]) -> Vec<PlacementStatus> {
 }
 
 /// Collects status for the selected paths, including each intact link's shared edits.
-pub fn gather_status<R: Borrow<RefStore>>(
+pub(crate) fn gather_status<R: Borrow<RefStore>>(
     placements: &[registry::Placement],
     fs: &impl PlacementOps,
     mut open_refs: impl FnMut(FolioId) -> Result<R, RefError>,

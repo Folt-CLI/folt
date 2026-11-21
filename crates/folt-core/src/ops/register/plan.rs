@@ -84,7 +84,7 @@ pub struct RegisterPlan {
     pub(super) destinations: Vec<PlacementPath>,
 }
 
-pub fn plan_register(
+pub(crate) fn plan_register(
     home: &Home,
     paths: impl IntoIterator<Item = impl Into<RegisterRequest>>,
 ) -> Result<RegisterPlan, RegisterError> {

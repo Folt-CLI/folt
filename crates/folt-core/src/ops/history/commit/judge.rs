@@ -8,7 +8,7 @@ use crate::ops::status::{Edit, judge_working};
 use crate::placement::{Observation, PlacementKind};
 use crate::ref_name::RefName;
 
-pub fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRefusal> {
+pub(crate) fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRefusal> {
     let row = &facts.working.placement;
     if row.kind == PlacementKind::Link {
         return Err(HistoryRefusal::Link(row.path.to_path_buf()));

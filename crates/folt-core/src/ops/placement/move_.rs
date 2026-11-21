@@ -35,7 +35,7 @@ impl MovePlan {
     }
 }
 
-pub fn judge_move(
+pub(crate) fn judge_move(
     facts: &PlacementFacts,
     target: &MoveTarget,
     discard: bool,
@@ -76,7 +76,7 @@ pub fn judge_move(
 
 /// Rechecks an allowed move before writing its file, then updates just its row.
 /// The home lock must cover gathering, judging and applying the move.
-pub fn apply_move(
+pub(crate) fn apply_move(
     plan: &MovePlan,
     fs: &impl PlacementOps,
     objects: &ObjectStore,
@@ -91,7 +91,7 @@ pub fn apply_move(
 
 /// Rechecks the row and observation, then refreshes only the file.
 /// The caller persists `moved_row` after all related file work succeeds.
-pub fn apply_move_file(
+pub(crate) fn apply_move_file(
     plan: &MovePlan,
     fs: &impl PlacementOps,
     objects: &ObjectStore,
@@ -131,7 +131,7 @@ pub fn apply_move_file(
     Ok(written.base)
 }
 
-pub fn moved_row(
+pub(crate) fn moved_row(
     plan: &MovePlan,
     base: Option<crate::placement::PlacementBase>,
 ) -> registry::Placement {
