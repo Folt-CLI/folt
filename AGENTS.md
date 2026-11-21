@@ -27,12 +27,20 @@ Any other prompt, including an ordinary chat, does not read it.
 - Keep each paragraph and list item on one line in Markdown; do not hard-wrap prose at a column.
 - Never name an agent tool, model or provider in an issue, comment, pull request or Git commit message.
 - Code must not add new line-level YAML parsing of front matter; new front matter behaviour must extend the front matter tree (`Block` and `Node` in `crates/folt-core/src/front_matter/tree.rs`) instead.
+- Code must not call a mutating `std::fs` function outside `fsx`; `fsx` owns file-system writes.
+- Non-test code must not use `unwrap`, `expect` or `unreachable`; return an error instead.
+- Code must not read the process environment, the OS home directory or the current directory outside `config::env::Environment`.
+- Code must not repeat a name, limit or format literal that `config` owns; import the constant.
+- Code must not give a rule listed in [modules.md](docs/dev/library/modules.md) a second owner; extend the owner.
+- Code must not add an import that violates the layer table in [layers.md](docs/dev/library/layers.md).
+- Code must not keep a `pub use` shim or alias for an old path; move the callers.
 - Do only what your role file allows.
 
 ## Where things are
 
 - Code: `crates/folt-core` (library), `crates/folt-cli` (the `folt` binary).
 - Tests: `tests/`.
+- Module map and where each rule lives: [docs/dev/library/modules.md](docs/dev/library/modules.md).
 - Process: [docs/dev/README.md](docs/dev/README.md) and the rest of `docs/dev/`.
 - Agent roles: `docs/dev/agents/`.
 - Terms: [GLOSSARY.md](GLOSSARY.md).

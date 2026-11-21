@@ -37,5 +37,6 @@ See [Dependencies and grouped work](issues/ticket-planning.md#dependencies-and-g
 | [Prune](library/prune.md) | folt-core prune behaviour |
 | [Front matter](front-matter.md) | folt-core front matter grammar: supported shapes, edits and errors |
 | [Layers](library/layers.md) | folt-core layer table and the layer check |
+| [Modules](library/modules.md) | folt-core module map, ops order, where each rule lives and forbidden patterns |
 
 [AGENTS.md](../../AGENTS.md) points each agent to its role file. [CONTRIBUTING.md](../../CONTRIBUTING.md) is the contributor entry point. The [working templates](issues/rules.md) hold the size, status and closing rules. Use the other guides for their specific procedures.
