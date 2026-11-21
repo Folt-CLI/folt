@@ -12,6 +12,7 @@ The modules are listed in reading order, from the modules with no imports to the
 | `layout` | The home format version and layout support. |
 | `id` | Folio ids and object ids. |
 | `fsx` | File-system writes, the `FileSystem` trait, `TempFile` and the file signature. |
+| `merge` | Pure three-way merge of bytes, with binary conflicts and recorded conflict marker lines. |
 | `ref_name` | Validated names of history refs and retention pin names. |
 | `front_matter` | Locating, reading and editing front matter through the syntax tree. |
 | `object` | Immutable history objects: blobs, commits and tags. |
@@ -67,6 +68,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Placement refusals | `ops::refusal` |
 | Gathered facts of a placement | `ops::facts` |
 | Whether a placement has a stage | `ops::stage::refuse` |
+| Binary test, whole-file equality rules, line merge and conflict marker rendering | `merge` |
 | History operations and their refusals | `ops::history` |
 | Registration plan, apply and refusals | `ops::register` |
 | Rename plan and apply | `ops::rename` |
