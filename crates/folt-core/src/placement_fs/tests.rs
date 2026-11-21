@@ -1,5 +1,8 @@
+#[cfg(unix)]
+use super::helpers::move_failure;
 use super::*;
 use crate::test_support::TempHome;
+use std::io;
 
 #[test]
 fn unreadable_link_count_refuses_conversion() {

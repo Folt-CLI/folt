@@ -36,6 +36,12 @@ jobs:
         run: |
           bash scripts/test-integrity-test.sh
           bash scripts/test-integrity.sh origin/${{ github.base_ref }}
+      - name: Check layers and file size
+        run: |
+          bash scripts/check-layers-test.sh
+          scripts/check-layers.sh --enforce
+          bash scripts/check-file-size-test.sh
+          bash scripts/check-file-size.sh
       - name: Decide whether to skip the build
         id: plan
         env:

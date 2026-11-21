@@ -80,12 +80,7 @@ fn existing_ancestor_resolution_reports_input_below_regular_file() {
     fs::write(&file, b"content").unwrap();
     let input = file.join("missing-parent").join("leaf");
     let expected_kind = fs::canonicalize(&input).unwrap_err().kind();
-    let PlacementError::OperationFailed { path, source } =
-        resolve_existing_ancestor(&input).unwrap_err()
-    else {
-        panic!("wrong error");
-    };
-    assert_eq!(path, input);
+    let source = resolve_existing_ancestor(&input).unwrap_err();
     assert_eq!(source.kind(), expected_kind);
 }
 

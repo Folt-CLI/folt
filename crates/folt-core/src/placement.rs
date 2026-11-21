@@ -1,9 +1,13 @@
+mod error;
+mod ops;
+
+pub use error::PlacementError;
+pub use ops::PlacementOps;
+
 use crate::fsx::Signature;
 use crate::id::ObjectId;
-use crate::store::{ObjectStore, StoreError};
-use std::error::Error;
-use std::fmt;
-use std::path::PathBuf;
+use crate::placement_path;
+use std::path::{Path, PathBuf};
 
 /// The way a Folio is presented at a placement path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -138,141 +142,14 @@ pub fn classify(
     }
 }
 
-/// PlacementKind-specific placement operations. Implementations perform filesystem work.
-pub trait PlacementOps {
-    /// Returns the canonical derived link target spelling used by create and read.
-    fn link_target(&self, id: crate::id::FolioId) -> PathBuf;
-
-    /// Creates a placement; copies read the supplied commit content blob.
-    fn create(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-        objects: &ObjectStore,
-        content: ObjectId,
-    ) -> Result<Written, PlacementError>;
-
-    /// Reads facts about a placement path.
-    fn read(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-    ) -> Result<Observation, PlacementError>;
-
-    /// Refreshes a placement; copies read the supplied commit content blob.
-    /// When supplied, copies recheck the expected observation before replacement.
-    fn refresh(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-        objects: &ObjectStore,
-        content: ObjectId,
-        expected: Option<&Observation>,
-    ) -> Result<Written, PlacementError>;
-
-    /// Syncs the parent directory before recording a previously published conversion.
-    fn sync_parent(&self, placement: &PlacementSpec) -> Result<(), PlacementError>;
-
-    /// Replaces an existing entry with the requested kind after rechecking its facts.
-    fn convert(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-        to_kind: PlacementKind,
-        objects: &ObjectStore,
-        content: ObjectId,
-        expected: &Observation,
-    ) -> Result<Written, PlacementError>;
-
-    /// Rewrites an intact relative link to its canonical absolute target.
-    /// Absolute links and entries that are not intact links are left untouched.
-    fn normalize_link(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-    ) -> Result<(), PlacementError>;
-
-    /// Moves an entry without replacing an existing destination.
-    fn relocate(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-        to: &std::path::Path,
-        expected: &Observation,
-    ) -> Result<Written, PlacementError>;
-
-    /// Removes an entry after rechecking its observation.
-    fn unlink(
-        &self,
-        id: crate::id::FolioId,
-        placement: &PlacementSpec,
-        expected: &Observation,
-    ) -> Result<(), PlacementError>;
-
-    /// Hashes a placement file without retaining its contents.
-    fn hash_placement(&self, placement: &PlacementSpec) -> Result<ObjectId, PlacementError>;
-
-    /// Uses supplied facts to detect drift, requesting hashes when needed.
-    fn detect_drift(
-        &self,
-        placement: &PlacementSpec,
-        observation: &Observation,
-        placement_hash: Option<ObjectId>,
-    ) -> Result<Drift, PlacementError> {
-        if needs_hash(placement, observation) && placement_hash.is_none() {
-            return Err(PlacementError::HashRequired);
+/// Resolves existing ancestors even when a former home has been moved or removed.
+pub(crate) fn resolve_existing_ancestor(input: &Path) -> Result<PathBuf, PlacementError> {
+    placement_path::resolve_existing_ancestor(input).map_err(|source| {
+        PlacementError::OperationFailed {
+            path: input.to_path_buf(),
+            source,
         }
-        Ok(classify(placement, observation, placement_hash))
-    }
-}
-
-/// Errors returned by placement operations.
-#[derive(Debug)]
-pub enum PlacementError {
-    HashRequired,
-    PlacementChanged,
-    Store(StoreError),
-    OperationFailed {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    LinkUnavailable {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-}
-
-impl fmt::Display for PlacementError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Store(error) => error.fmt(formatter),
-            Self::PlacementChanged => write!(formatter, "placement changed before refresh"),
-            Self::HashRequired => write!(formatter, "placement content hash is required"),
-            Self::OperationFailed { path, source } => {
-                write!(
-                    formatter,
-                    "placement operation failed for {}: {source}",
-                    path.display()
-                )
-            }
-            Self::LinkUnavailable { path, source } => write!(
-                formatter,
-                "cannot create a symbolic link at {}: {source}. On Windows, enable Developer Mode or grant the process the Create symbolic links right; otherwise use a filesystem that supports symbolic links or choose a copy placement",
-                path.display()
-            ),
-        }
-    }
-}
-
-impl Error for PlacementError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::HashRequired | Self::PlacementChanged => None,
-            Self::Store(error) => Some(error),
-            Self::OperationFailed { source, .. } => Some(source),
-            Self::LinkUnavailable { source, .. } => Some(source),
-        }
-    }
+    })
 }
 
 #[cfg(test)]

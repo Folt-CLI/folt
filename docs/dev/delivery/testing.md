@@ -32,7 +32,13 @@ cargo build --locked --workspace
 cargo test --locked --workspace
 cargo test-pr --locked
 cargo test-full --locked
+bash scripts/check-layers-test.sh
+scripts/check-layers.sh --enforce
+bash scripts/check-file-size-test.sh
+bash scripts/check-file-size.sh
 ```
+
+Three checks are enforced by these commands. The layer check fails on any violation of the layer table, `too_many_lines` is denied at 100 lines, and a production file over 200 lines fails the size check. None has an exception list. CI runs the script checks in the `plan` job and Clippy in the `verify` job.
 
 Commit and push only when all commands pass. A failure goes back to the implementation agent with the output. Never push a failing suite. The second Clippy command and the aliases also cover suites excluded from the local run. CI runs `cargo test-pr` and `cargo test-performance --test`, not `cargo test-full`. For offline work, export `CARGO_NET_OFFLINE=true` and add `--offline` to each Cargo command that resolves dependencies.
 

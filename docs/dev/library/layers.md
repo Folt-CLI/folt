@@ -21,7 +21,7 @@ A module may import from another module only when its table row lists that modul
 | L4 | folio | config, layout, id, ref_name, fsx, home |
 | L5 | store | config, layout, id, object, folio, fsx, home |
 | L5 | placement_path | config, id, folio |
-| L6 | placement, placement_fs | config, layout, id, object, folio, store, fsx, home |
+| L6 | placement, placement_fs | config, layout, id, object, folio, store, fsx, home, placement_path |
 | L6 | history | config, id, ref_name, object, folio, store, fsx, home |
 | L7 | registry | config, layout, id, object, folio, placement, placement_fs, placement_path, front_matter, fsx, home |
 | L8 | ops | config, layout, id, fsx, ref_name, front_matter, object, home, folio, store, placement_path, placement, placement_fs, history, registry |
@@ -34,7 +34,7 @@ The `ops` internal order is `refusal`, `facts`, `working`, `status`, `step_hook`
 
 `folio` now holds the Folio directory, folio-name, format, row and ref-file items. `placement_fs` is a flat file beside `placement`. The ref store lives under `history` (`history.rs` with `ref_store`, `expect` and `error` submodules); the L8 history operations live in `ops/history`. Working-file gathering and resolution live in `ops/working`, working status in `ops/status`, and stage, rename, checkout and prune operations in their own `ops` modules. Registration operations now live in `ops/register`.
 
-The file-level corrections are `id` importing `config`, the existing `folio` in the L4 unit and its import permissions in dependent rows, and the existing `placement_path` at L5 with imports from `config`, `id` and L4 `folio`. `registry` also imports `placement_path`. The current `home -> placement_path` import is upward and remains a reported violation; listing it cannot make a higher-layer import conform to the rule.
+The file-level corrections are `id` importing `config`, the existing `folio` in the L4 unit and its import permissions in dependent rows, and the existing `placement_path` at L5 with imports from `config`, `id` and L4 `folio`. `placement` and `registry` also import `placement_path`. `home` does not import `placement_path`: `HomeError::Registry` boxes the registry error, which `ops` creates.
 
 ## Allowed exceptions
 
@@ -51,9 +51,9 @@ Run these from the repository root:
 ```sh
 grep -n '^\(pub \)\?mod \|^#\[cfg' crates/folt-core/src/lib.rs
 grep -rhoE '^[[:space:]]*(pub(\([a-z]+\))? )?use crate::[a-z_]+' crates/folt-core/src | sed -E 's/.*crate:://' | sort -u
-bash -n scripts/check-layers.sh scripts/check-layers-test.sh
+bash -n scripts/check-layers.sh scripts/check-layers-test.sh scripts/check-file-size.sh scripts/check-file-size-test.sh
 # If installed:
-shellcheck scripts/check-layers.sh scripts/check-layers-test.sh
+shellcheck scripts/check-layers.sh scripts/check-layers-test.sh scripts/check-file-size.sh scripts/check-file-size-test.sh
 bash scripts/check-layers-test.sh
 scripts/check-layers.sh
 echo $?
@@ -84,7 +84,7 @@ rm -rf "$copy"
 
 The inserted import adds one upward violation in `id/folio.rs`; replacing it with a test-only item removes that violation. Existing violations in the source tree remain in both cases.
 
-The check is not part of the gate or CI yet; ticket H3 of [Folt-CLI/folt#203](https://github.com/Folt-CLI/folt/issues/203) turns it on.
+The gate and CI run `scripts/check-layers.sh --enforce`, so a violation fails both. Report-only mode (no flag) remains an option for local use.
 
 ## What the script checks
 

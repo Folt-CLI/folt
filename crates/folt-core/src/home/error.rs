@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use crate::config::settings::SettingsError;
 use crate::layout::LayoutVersion;
-use crate::placement_path::RegistryError;
 
 /// Errors that can occur while resolving or opening a Folt home.
 #[derive(Debug)]
@@ -44,7 +43,8 @@ pub enum HomeError {
         found: LayoutVersion,
         supported: LayoutVersion,
     },
-    Registry(RegistryError),
+    /// A registry failure, boxed because the registry error type lives above this layer.
+    Registry(Box<dyn Error + Send + Sync>),
     Locked {
         path: PathBuf,
     },
@@ -162,8 +162,8 @@ impl Error for HomeError {
             Self::CannotCreate { source, .. }
             | Self::WriteFailed { source, .. }
             | Self::LockIo { source, .. } => Some(source),
-            Self::Registry(source) => Some(source),
             Self::InvalidSettings(source) => Some(source),
+            Self::Registry(source) => Some(source.as_ref()),
             _ => None,
         }
     }
@@ -172,11 +172,5 @@ impl Error for HomeError {
 impl From<SettingsError> for HomeError {
     fn from(error: SettingsError) -> Self {
         Self::InvalidSettings(error)
-    }
-}
-
-impl From<RegistryError> for HomeError {
-    fn from(error: RegistryError) -> Self {
-        Self::Registry(error)
     }
 }

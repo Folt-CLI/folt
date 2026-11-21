@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::config::names::{BLOBS_DIR, CONTENT_FILE, FOLIOS_DIR, REFS_DIR, TEMP_PREFIX_COPY};
+use crate::config::names::{BLOBS_DIR, CONTENT_FILE, FOLIOS_DIR, REFS_DIR};
 use crate::folio::format::{FormatError, check_format};
 use crate::folio::refs_dir::inspect_refs;
 use crate::folio::row::FolioRow;
@@ -11,6 +11,10 @@ use crate::id::FolioId;
 use crate::layout::LayoutVersion;
 
 use super::{FolioDir, FolioDirError};
+
+mod entries;
+
+use entries::check_unexpected_entries;
 
 /// A repair that can safely recreate a missing empty directory.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -112,31 +116,6 @@ fn check_required_entries(path: &Path, problems: &mut Vec<Problem>, fixes: &mut 
     }
 }
 
-/// Records every entry that is neither required nor a copy temporary file.
-fn check_unexpected_entries(path: &Path, name: &OsStr, problems: &mut Vec<Problem>) {
-    match fs::read_dir(path) {
-        Ok(entries) => {
-            for entry in entries {
-                match entry {
-                    Ok(entry)
-                        if !REQUIRED.iter().any(|(name, _)| entry.file_name() == *name)
-                            && !(entry.file_name().to_str().is_some_and(copy_temporary_name)
-                                && entry.file_type().is_ok_and(|kind| kind.is_file())) =>
-                    {
-                        problems.push(Problem {
-                            entry: entry.file_name(),
-                            message: "unexpected entry".into(),
-                        });
-                    }
-                    Ok(_) => {}
-                    Err(error) => problems.push(problem(name, error)),
-                }
-            }
-        }
-        Err(error) => problems.push(problem(name, error)),
-    }
-}
-
 /// Returns a final inspection when the registry row's format blocks the Folio.
 fn check_row_format(row: &FolioRow) -> Option<Inspection> {
     match check_format(&row.format) {
@@ -181,19 +160,6 @@ pub fn validate(home: &Path, row: &FolioRow) -> Result<FolioDir, FolioDirError> 
             home.join(FOLIOS_DIR).join(row.id.to_string()),
         )),
     }
-}
-
-fn copy_temporary_name(name: &str) -> bool {
-    let Some(rest) = name.strip_prefix(TEMP_PREFIX_COPY) else {
-        return false;
-    };
-    let Some((pid, counter)) = rest.split_once('-') else {
-        return false;
-    };
-    !pid.is_empty()
-        && !counter.is_empty()
-        && pid.bytes().all(|byte| byte.is_ascii_digit())
-        && counter.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 fn problem(entry: &OsStr, error: io::Error) -> Problem {

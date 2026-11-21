@@ -3,8 +3,9 @@ use crate::home::HomeLock;
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
+use crate::placement::resolve_existing_ancestor;
 use crate::placement::{Observation, PlacementKind, PlacementOps};
-use crate::placement_path::{self, RegistryError, resolve_existing_ancestor};
+use crate::placement_path::{self, RegistryError};
 use crate::registry::{self, Registry};
 use crate::store::ObjectStore;
 
