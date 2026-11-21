@@ -14,9 +14,9 @@ use crate::id::FolioId;
 use crate::id::ObjectId;
 use crate::object::{ObjectHasher, ObjectKind};
 use crate::placement::{
-    Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, PlacementSpec, Written,
+    Observation, PlacementBase, PlacementError, PlacementKind, PlacementOps, PlacementSpec,
+    Written, resolve_existing_ancestor,
 };
-use crate::placement_path;
 use crate::store::ObjectStore;
 
 /// Filesystem implementation of link and copy placement operations.
@@ -243,8 +243,8 @@ impl PlacementOps for PlacementFs<'_> {
                     // Resolving a detached target can fail (for example, a file
                     // used as a directory). The link itself is still observable.
                     let intact = match (
-                        placement_path::resolve_existing_ancestor(&found_path),
-                        placement_path::resolve_existing_ancestor(&target),
+                        resolve_existing_ancestor(&found_path),
+                        resolve_existing_ancestor(&target),
                     ) {
                         (Ok(found), Ok(expected)) => found == expected,
                         _ => false,

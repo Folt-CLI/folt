@@ -1,9 +1,10 @@
 use crate::fsx::Signature;
 use crate::id::ObjectId;
+use crate::placement_path;
 use crate::store::{ObjectStore, StoreError};
 use std::error::Error;
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The way a Folio is presented at a placement path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -273,6 +274,16 @@ impl Error for PlacementError {
             Self::LinkUnavailable { source, .. } => Some(source),
         }
     }
+}
+
+/// Resolves existing ancestors even when a former home has been moved or removed.
+pub(crate) fn resolve_existing_ancestor(input: &Path) -> Result<PathBuf, PlacementError> {
+    placement_path::resolve_existing_ancestor(input).map_err(|source| {
+        PlacementError::OperationFailed {
+            path: input.to_path_buf(),
+            source,
+        }
+    })
 }
 
 #[cfg(test)]

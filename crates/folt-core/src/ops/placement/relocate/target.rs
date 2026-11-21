@@ -1,7 +1,7 @@
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
-use crate::placement::{Observation, PlacementOps};
-use crate::placement_path::{self, resolve_existing_ancestor};
+use crate::placement::{Observation, PlacementOps, resolve_existing_ancestor};
+use crate::placement_path;
 use crate::registry::{self, Registry};
 
 /// Destination and registry facts collected while the home lock is held.

@@ -3,6 +3,20 @@ use crate::object::hash_blob;
 use crate::test_support::facts;
 
 #[test]
+fn existing_ancestor_resolution_reports_input_below_regular_file() {
+    let directory = crate::test_support::TempDir::new().unwrap();
+    let file = directory.path().join("file");
+    std::fs::write(&file, b"content").unwrap();
+    let input = file.join("missing-parent").join("leaf");
+    let PlacementError::OperationFailed { path, .. } =
+        resolve_existing_ancestor(&input).unwrap_err()
+    else {
+        panic!("wrong error");
+    };
+    assert_eq!(path, input);
+}
+
+#[test]
 fn user_kind_excludes_internal() {
     for (text, expected) in [
         ("copy", Some(PlacementKind::Copy)),

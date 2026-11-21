@@ -11,7 +11,6 @@ use crate::config::env::Environment;
 use crate::config::names::MARKER_FILE;
 use crate::folio::name::FolioName;
 use crate::id::FolioId;
-use crate::placement::PlacementError;
 
 /// A path whose filesystem spelling has been resolved before registry access.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -100,15 +99,10 @@ enum ResolveMode {
 }
 
 /// Resolves existing ancestors even when a former home has been moved or removed.
-pub(crate) fn resolve_existing_ancestor(input: &Path) -> Result<PathBuf, PlacementError> {
-    resolve(input, ResolveMode::ResolveExistingAncestor).map_err(|error| {
-        PlacementError::OperationFailed {
-            path: input.to_path_buf(),
-            source: match error {
-                RegistryError::Io(source) => source,
-                error => std::io::Error::other(error),
-            },
-        }
+pub(crate) fn resolve_existing_ancestor(input: &Path) -> Result<PathBuf, std::io::Error> {
+    resolve(input, ResolveMode::ResolveExistingAncestor).map_err(|error| match error {
+        RegistryError::Io(source) => source,
+        error => std::io::Error::other(error),
     })
 }
 
