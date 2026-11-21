@@ -101,3 +101,18 @@ fn merge_dependency_terms_and_ownership_are_documented() {
     assert!(include_str!("../../docs/dev/library/layers.md").contains("| L1 | merge | config |"));
     assert!(include_str!("../../docs/dev/library/modules.md").contains("| `merge` |"));
 }
+
+#[test]
+fn merge_newline_removal_and_append_report_conflicting_line_boundary() {
+    assert_eq!(
+        merge3(b"a\nb\n", b"a\nb", b"a\nb\nc\n"),
+        MergeResult::Conflicted {
+            merged: Some(b"a\n<<<<<<<\nb\n=======\nb\nc\n>>>>>>>\n".to_vec()),
+            marker_lines: vec![
+                b"<<<<<<<\n".to_vec(),
+                b"=======\n".to_vec(),
+                b">>>>>>>\n".to_vec()
+            ],
+        }
+    );
+}

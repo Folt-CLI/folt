@@ -53,10 +53,13 @@ pub(super) fn merge(base: &[u8], ours: &[u8], theirs: &[u8]) -> MergeResult {
         output.bytes.extend(base[cursor..start].concat());
         let mut end = edits[index].range.end;
         let mut next = index + 1;
-        // Adjacent nonempty edits remain independent. Insertions at the same
-        // location or within a replaced region belong to the same region.
+        // Adjacent edits remain independent unless a boundary insertion would
+        // join its first line to an unterminated replacement on the other side.
         while next < edits.len()
-            && (edits[next].range.start < end || edits[next].range.start == start)
+            && (edits[next].range.start < end
+                || edits[next].range.start == start
+                || (edits[next].range.start == end
+                    && conflicts_at_boundary(&edits[index..next], &edits[next])))
         {
             end = end.max(edits[next].range.end);
             next += 1;
@@ -95,4 +98,13 @@ fn apply(base: &[&[u8]], range: Range<usize>, edits: &[Change<'_>], side: usize)
     }
     bytes.extend(base[cursor..range.end].concat());
     bytes
+}
+
+fn conflicts_at_boundary(region: &[Change<'_>], insertion: &Change<'_>) -> bool {
+    insertion.range.is_empty()
+        && region.iter().any(|edit| {
+            edit.side != insertion.side
+                && edit.range.end == insertion.range.start
+                && edit.lines.last().is_some_and(|line| !line.ends_with(b"\n"))
+        })
 }

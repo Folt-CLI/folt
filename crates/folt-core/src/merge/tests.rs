@@ -210,3 +210,53 @@ fn differing_insertions_at_the_same_location_conflict() {
         }
     );
 }
+
+#[test]
+fn removing_final_newline_conflicts_with_boundary_append() {
+    for (base, shortened, appended, forward, reverse) in [
+        (
+            &b"a\nb\n"[..],
+            &b"a\nb"[..],
+            &b"a\nb\nc\n"[..],
+            &b"a\n<<<<<<<\nb\n=======\nb\nc\n>>>>>>>\n"[..],
+            &b"a\n<<<<<<<\nb\nc\n=======\nb\n>>>>>>>\n"[..],
+        ),
+        (
+            &b"a\r\nb\r\n"[..],
+            &b"a\r\nb"[..],
+            &b"a\r\nb\r\nc\r\n"[..],
+            &b"a\r\n<<<<<<<\nb\n=======\nb\r\nc\r\n>>>>>>>\n"[..],
+            &b"a\r\n<<<<<<<\nb\r\nc\r\n=======\nb\n>>>>>>>\n"[..],
+        ),
+    ] {
+        for (ours, theirs, expected) in [
+            (shortened, appended, forward),
+            (appended, shortened, reverse),
+        ] {
+            assert_eq!(
+                merge3(base, ours, theirs),
+                MergeResult::Conflicted {
+                    merged: Some(expected.to_vec()),
+                    marker_lines: vec![
+                        b"<<<<<<<\n".to_vec(),
+                        b"=======\n".to_vec(),
+                        b">>>>>>>\n".to_vec()
+                    ],
+                }
+            );
+        }
+    }
+}
+
+#[test]
+fn terminated_replacement_and_boundary_append_remain_clean() {
+    for (ours, theirs) in [
+        (&b"a\nB\n"[..], &b"a\nb\nc\n"[..]),
+        (&b"a\nb\nc\n"[..], &b"a\nB\n"[..]),
+    ] {
+        assert_eq!(
+            merge3(b"a\nb\n", ours, theirs),
+            MergeResult::Clean(b"a\nB\nc\n".to_vec())
+        );
+    }
+}
