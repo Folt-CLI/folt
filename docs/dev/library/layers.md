@@ -51,9 +51,9 @@ Run these from the repository root:
 ```sh
 grep -n '^\(pub \)\?mod \|^#\[cfg' crates/folt-core/src/lib.rs
 grep -rhoE '^[[:space:]]*(pub(\([a-z]+\))? )?use crate::[a-z_]+' crates/folt-core/src | sed -E 's/.*crate:://' | sort -u
-bash -n scripts/check-layers.sh scripts/check-layers-test.sh
+bash -n scripts/check-layers.sh scripts/check-layers-test.sh scripts/check-file-size.sh scripts/check-file-size-test.sh
 # If installed:
-shellcheck scripts/check-layers.sh scripts/check-layers-test.sh
+shellcheck scripts/check-layers.sh scripts/check-layers-test.sh scripts/check-file-size.sh scripts/check-file-size-test.sh
 bash scripts/check-layers-test.sh
 scripts/check-layers.sh
 echo $?
@@ -84,7 +84,7 @@ rm -rf "$copy"
 
 The inserted import adds one upward violation in `id/folio.rs`; replacing it with a test-only item removes that violation. Existing violations in the source tree remain in both cases.
 
-The check is not part of the gate or CI yet; ticket H3 of [Folt-CLI/folt#203](https://github.com/Folt-CLI/folt/issues/203) turns it on.
+The gate and CI run `scripts/check-layers.sh --enforce`, so a violation fails both. Report-only mode (no flag) remains an option for local use.
 
 ## What the script checks
 
