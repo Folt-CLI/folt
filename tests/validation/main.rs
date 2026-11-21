@@ -23,6 +23,7 @@ mod front_matter_properties;
 mod history;
 mod home;
 mod link_commit;
+mod merge;
 #[cfg(unix)]
 mod non_regular;
 mod placement;

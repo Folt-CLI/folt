@@ -14,6 +14,7 @@ A module may import from another module only when its table row lists that modul
 | L0 | layout | none |
 | L0 | id | config |
 | L1 | fsx | config |
+| L1 | merge | config |
 | L1 | ref_name | config, id |
 | L1 | front_matter | config, id |
 | L2 | object | config, id, ref_name |

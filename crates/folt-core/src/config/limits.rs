@@ -68,3 +68,9 @@ pub(crate) const PRUNE_CONFIRM_MIN: usize = 5;
 
 /// Default SQLite busy timeout in seconds.
 pub(crate) const DEFAULT_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Prefix inspected for NUL bytes by the three-way merge, in bytes (#158).
+pub(crate) const MERGE_BINARY_PROBE_BYTES: usize = 8_000;
+
+/// Per-side diff search budget; #158 uses 100 ms before a valid coarse fallback.
+pub(crate) const MERGE_DIFF_COST_LIMIT: std::time::Duration = std::time::Duration::from_millis(100);

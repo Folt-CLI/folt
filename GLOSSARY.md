@@ -16,6 +16,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [checkout](#checkout)
 - [child](#child)
 - [commit](#commit)
+- [conflict marker](#conflict-marker)
 - [copy](#copy)
 - [directory Folio](#directory-folio)
 - [Disposition](#disposition)
@@ -82,6 +83,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [tag](#tag)
 - [TempFile](#tempfile)
 - [test_support](#test_support)
+- [three-way merge](#three-way-merge)
 - [tip](#tip)
 - [tree](#tree)
 - [trigger](#trigger)
@@ -263,6 +265,24 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Code:** `crates/folt-core/src/ops/working.rs:11` (`gather`); `crates/folt-core/src/ops/facts.rs:28` (`Behind`)
 - **Related:** [branch](#branch), [commit](#commit), [behind](#behind).
 - **Not:** The branch name stored in `head`, a content blob id or an ancestry comparison.
+- **Status:** decided
+
+### three-way merge
+
+- **Layer:** History
+- **Definition:** A pure combination of supplied merge base, ours and theirs content bytes. Whole-file equality rules run first, then a NUL in the first 8,000 bytes of any input causes a binary conflict with no merged bytes; otherwise line changes combine or produce text containing recorded conflict marker lines.
+- **Code:** `crates/folt-core/src/merge/mod.rs` (`merge3`, `MergeResult`)
+- **Related:** [conflict marker](#conflict-marker), [blob](#blob).
+- **Not:** History traversal, merge base search, a placement base, validation for stage or a commit operation.
+- **Status:** decided
+
+### conflict marker
+
+- **Layer:** History
+- **Definition:** One of the exact `<<<<<<<`, `=======` and `>>>>>>>` lines written around conflicting text by a three-way merge, with an LF terminator. The result records these lines as bytes in file order; binary conflicts have none.
+- **Code:** `crates/folt-core/src/merge/render.rs` (`Render`); `crates/folt-core/src/merge/mod.rs` (`MergeResult`)
+- **Related:** [three-way merge](#three-way-merge), [marker](#marker).
+- **Not:** A directory Folio marker, object codec byte or registry conflict state.
 - **Status:** decided
 
 ## Placements and working state
@@ -873,7 +893,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | placement and same-named types | Registry Placement and PlacementSpec; working-state and front-matter Edit; `HistoryRefusal` and `PlacementRefusal` and RefusalReason and registration RegisterRefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; the in-memory record is `PlacementSpec`. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types use `HistoryRefusal` and `PlacementRefusal`; kind enums require module or domain qualification and their renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
 | ref, refs, reference, edge, pin | History pointers; registry reference rows; declared relationships; informal edge; retention pin; reference pin field | Reference is the declared relationship, with edge an informal synonym. Distinguish the refs table from history refs and retention pins from opaque reference pin fields; [#152](https://github.com/Folt-CLI/folt/issues/152) implements commit-hash pins. |
 | unresolved | Unknown reference target; undecodable front matter key | Use unresolved reference for the cached unknown target, and unresolved key for parser ambiguity. |
-| marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; planned conflict markers; build-skip marker | Marker means `__folio__.md`; qualify codec, conflict and build-skip markers. Workspace and home format markers are retired below. |
+| marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; [conflict markers](#conflict-marker); build-skip marker | Marker means `__folio__.md`; qualify codec and build-skip markers and use [conflict marker](#conflict-marker) for three-way merge output. Workspace and home format markers are retired below. |
 | plan and apply | Judged operation plan; dry-run report; CI plan job; forbidden Implementation plan issue section | Plan and apply means the operation pattern; qualify a CI plan. Registration and prune expose dry-run reports; do not add an Implementation plan section to work items. |
 | commit | Folt history object or operation; placement’s starting commit id; repository Git commit | Commit means Folt history in domain text; qualify Git commits and a placement’s recorded commit. |
 | head, tip, branch | Placement branch name; branch’s current commit; removed Folio HEAD file; Git HEAD | Head is the placement’s branch name, tip is the ref’s commit id, branch is the named history ref. Qualify Git HEAD. |
