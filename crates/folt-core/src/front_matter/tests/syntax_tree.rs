@@ -274,7 +274,7 @@ fn reference_entry_spans_belong_to_each_entry_in_every_spelling() {
                 }));
             }
             assert!(entries[0].range.end <= entries[1].range.start);
-            let source = tree::entries(bytes, node)
+            let source = super::super::entries::entries(bytes, node)
                 .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();

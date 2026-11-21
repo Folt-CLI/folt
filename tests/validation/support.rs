@@ -1,19 +1,18 @@
 use folt_core::config::formats::OBJECT_ALGORITHM;
+use folt_core::folio::dir::{Durability, FolioDir, FolioSpec, create_folio};
 use folt_core::folio::format::FolioFormat;
 use folt_core::folio::row::NewFolio;
-use folt_core::folio_dir::{Durability, FolioDir, FolioSpec, create_folio};
-use folt_core::history::{self, CommitMetadata, HistoryStores};
+use folt_core::history::RefStore;
 use folt_core::home::HomeLock;
 use folt_core::id::ObjectId;
 use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::object::{Author, Commit, CommitTime, ObjectKind, hash_blob};
+use folt_core::ops::history::{CommitMetadata, HistoryStores};
 use folt_core::placement::{Observation, PlacementBase, PlacementKind, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
-use folt_core::refs::RefStore;
 use folt_core::registry::{self, NewPlacement, Placement, Registry};
 use folt_core::store::ObjectStore;
-use folt_core::working_state;
 
 use crate::common::TempHome;
 
@@ -150,24 +149,30 @@ impl TestFolio {
         let row = self.internal();
         std::fs::write(row.path.to_path_buf(), content).unwrap();
         let fs = PlacementFs::new(&home.home);
-        working_state::stage(
-            &row,
-            &fs,
-            &self.objects,
-            &self.refs,
-            &mut self.registry,
-            lock,
-        )
-        .unwrap();
+        home.home
+            .stage(
+                &row,
+                &fs,
+                &self.objects,
+                &self.refs,
+                &mut self.registry,
+                lock,
+            )
+            .unwrap();
         let row = self.internal();
         let stores = HistoryStores {
             objects: &self.objects,
             refs: &self.refs,
             object_limit: 16 * 1024,
         };
-        let facts = history::gather_commit(&row, &fs, &stores, &self.registry).unwrap();
-        let plan = history::judge_commit(&facts).unwrap();
-        history::apply_commit(&plan, metadata(), &fs, &stores, &mut self.registry, lock).unwrap()
+        let facts = home
+            .home
+            .gather_commit(&row, &fs, &stores, &self.registry)
+            .unwrap();
+        let plan = home.home.judge_commit(&facts).unwrap();
+        home.home
+            .apply_commit(&plan, metadata(), &fs, &stores, &mut self.registry, lock)
+            .unwrap()
     }
 }
 

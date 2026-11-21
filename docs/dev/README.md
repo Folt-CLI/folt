@@ -2,7 +2,7 @@
 
 Staged issue workflow shared by the Folt repositories. Keep process docs under docs/dev and issue forms under .github/ISSUE_TEMPLATE. GitHub issues are the durable work record.
 
-See [Issue format](issues/issue-format.md#work-items) for the work-item body sections. The orchestrator investigates and attaches findings and separate proposals; the developer selects the solution before implementation where analysis applies; see the working templates. Details contains the findings attachment and two to four key points. Do not add Acceptance criteria, Implementation plan or Closeout sections. Record delivery and performed verification in the PR.
+See [Issue format](issues/issue-format.md#work-items) for the work-item body sections. The orchestrator investigates and attaches the findings; options stay inline and only the selected option's scope is attached. The developer selects the solution when a trigger fires, otherwise the policy selects it; see the working templates. Details contains the findings attachment and two to four key points. Do not add Acceptance criteria, Implementation plan or Closeout sections. Record delivery and performed verification in the PR.
 
 See [Dependencies and grouped work](issues/ticket-planning.md#dependencies-and-grouped-work) for parents and prerequisites. See [Issue format](issues/issue-format.md#epics) for release Epics.
 
@@ -11,6 +11,8 @@ See [Dependencies and grouped work](issues/ticket-planning.md#dependencies-and-g
 | [Glossary](../../GLOSSARY.md) | The terms of Folt and of the process, defined once |
 | [Process](README.md) | This index, with the rules for body sections and parents |
 | [Stack](stack.md) | Confirmed technical choices and pending decisions |
+| [Standards](guides/standards.md) | Language-independent engineering rules with ids, read by the analysis, implementation and review agents |
+| [Rust guidelines](guides/rust.md) | Rust rules with ids that the lints do not enforce |
 | [Repository settings](repository.md) | Recorded GitHub settings, drift checks and application |
 | [Verification](verification.md) | Checks actually performed and their status |
 | [Orchestrator rules](agents/orchestrator.md) | What the orchestrator does that agents do not |
@@ -35,5 +37,6 @@ See [Dependencies and grouped work](issues/ticket-planning.md#dependencies-and-g
 | [Prune](library/prune.md) | folt-core prune behaviour |
 | [Front matter](front-matter.md) | folt-core front matter grammar: supported shapes, edits and errors |
 | [Layers](library/layers.md) | folt-core layer table and the layer check |
+| [Modules](library/modules.md) | folt-core module map, ops order, where each rule lives and forbidden patterns |
 
 [AGENTS.md](../../AGENTS.md) points each agent to its role file. [CONTRIBUTING.md](../../CONTRIBUTING.md) is the contributor entry point. The [working templates](issues/rules.md) hold the size, status and closing rules. Use the other guides for their specific procedures.

@@ -4,7 +4,7 @@ Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 `front_matter` implements a bounded YAML subset. Foreign `Node` values stay opaque; edits are byte-span replacements valid only for the bytes they were planned on. Reading is more permissive than editing.
 
-Scenario numbers below follow the implementation scope: scenario 1 introduces the numbered rules; scenarios 2 to 36 describe the grammar and edits. Function names refer to [front_matter.rs](../../crates/folt-core/src/front_matter.rs); test names are qualified by their module under [unit tests](../../crates/folt-core/src/front_matter/tests/) or [validation tests](../../tests/validation/). This guide covers the parser, not [stage](../../GLOSSARY.md#stage) or [register](../../GLOSSARY.md#register).
+Scenario numbers below follow the implementation scope: scenario 1 introduces the numbered rules; scenarios 2 to 36 describe the grammar and edits. Function names refer to [front_matter/](../../crates/folt-core/src/front_matter/); test names are qualified by their module under [unit tests](../../crates/folt-core/src/front_matter/tests/) or [validation tests](../../tests/validation/). This guide covers the parser, not [stage](../../GLOSSARY.md#stage) or [register](../../GLOSSARY.md#register).
 
 ## Block location
 

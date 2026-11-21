@@ -1,4 +1,8 @@
+use std::fs;
+use std::io;
+
 use super::*;
+use crate::config::names::HOME_DIR_NAME;
 
 #[test]
 fn override_that_is_absolute_wins() {
@@ -80,4 +84,69 @@ fn invalid_tuning_value_refuses_to_open() {
         Err(HomeError::InvalidSettings(_))
     ));
     assert!(!path.parent().unwrap().exists());
+}
+
+#[test]
+fn write_temp_file_publishes_bytes_and_cleans_tmp() {
+    use crate::test_support::TempDir;
+    use std::io::Write;
+
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    let target = directory.path().join("written");
+    lock.write_temp_file(&target, |file| {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(file.metadata()?.permissions().mode() & 0o777, 0o600);
+        }
+        file.write_all(b"written")
+    })
+    .unwrap();
+    assert_eq!(fs::read(target).unwrap(), b"written");
+    assert_eq!(fs::read_dir(&lock.temporary_directory).unwrap().count(), 0);
+}
+
+#[test]
+fn write_temp_file_closure_error_cleans_tmp_and_names_target() {
+    use crate::test_support::TempDir;
+    use std::io::Write;
+
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    let target = directory.path().join("unwritten");
+    let error = lock
+        .write_temp_file(&target, |file| {
+            file.write_all(b"partial")?;
+            Err(io::Error::other("closure failed"))
+        })
+        .unwrap_err();
+    assert!(matches!(error, HomeError::WriteFailed { path, source }
+        if path == target && source.to_string() == "closure failed"));
+    assert!(!target.exists());
+    assert_eq!(fs::read_dir(&lock.temporary_directory).unwrap().count(), 0);
+}
+
+#[test]
+fn write_temp_file_rename_error_cleans_tmp_and_names_target() {
+    use crate::test_support::TempDir;
+    use std::io::Write;
+
+    let directory = TempDir::new().unwrap();
+    let home =
+        Home::open_or_create(directory.path().join("home"), &Environment::default()).unwrap();
+    let lock = home.try_lock().unwrap();
+    let target = directory.path().join("directory");
+    fs::create_dir(&target).unwrap();
+    fs::write(target.join("child"), b"existing").unwrap();
+    let error = lock
+        .write_temp_file(&target, |file| file.write_all(b"written"))
+        .unwrap_err();
+    assert!(matches!(error, HomeError::WriteFailed { path, .. } if path == target));
+    assert_eq!(fs::read_dir(&lock.temporary_directory).unwrap().count(), 0);
+    assert_eq!(fs::read(target.join("child")).unwrap(), b"existing");
 }

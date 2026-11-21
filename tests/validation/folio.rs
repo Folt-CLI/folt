@@ -1,4 +1,4 @@
-use folt_core::folio_dir::{self, Inspection};
+use folt_core::folio::dir::{self, Inspection};
 use folt_core::object::{ObjectError, ObjectKind, hash_blob};
 use folt_core::store::StoreError;
 use proptest::prelude::*;
@@ -14,7 +14,7 @@ fn created_folio_inspects_and_validates() {
     let row = folio.registry.folio_row(folio.folio.id()).unwrap().unwrap();
     assert_eq!(row.format, folio.format);
     assert!(matches!(
-        folio_dir::inspect(
+        dir::inspect(
             home.path(),
             folio.folio.path().file_name().unwrap(),
             Some(&row)
@@ -22,7 +22,7 @@ fn created_folio_inspects_and_validates() {
         Inspection::Valid(_)
     ));
     assert_eq!(
-        folio_dir::validate(home.path(), &row).unwrap().id(),
+        dir::validate(home.path(), &row).unwrap().id(),
         folio.folio.id()
     );
 }
@@ -47,6 +47,56 @@ fn store_round_trip_deduplicates() {
             .count(),
         1
     );
+}
+
+fn blob_names(folio: &TestFolio) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(folio.folio.path().join("blobs"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn put_reader_stores_the_object_and_leaves_no_temporary_file() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let id = folio
+        .objects
+        .put_reader(&lock, ObjectKind::Blob, 4, &b"data"[..])
+        .unwrap();
+    assert_eq!(id, hash_blob(b"data"));
+    assert_eq!(blob_names(&folio), vec![format!("{id}.blob")]);
+}
+
+#[test]
+fn put_reader_removes_its_spool_when_the_source_is_shorter_or_longer() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    for length in [3, 5] {
+        let result = folio
+            .objects
+            .put_reader(&lock, ObjectKind::Blob, length, &b"data"[..]);
+        assert!(matches!(result, Err(StoreError::SourceChanged)));
+        assert!(blob_names(&folio).is_empty());
+    }
+}
+
+#[test]
+fn put_reader_of_an_existing_object_leaves_no_temporary_file() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let first = folio.objects.put(&lock, ObjectKind::Blob, b"data").unwrap();
+    let second = folio
+        .objects
+        .put_reader(&lock, ObjectKind::Blob, 4, &b"data"[..])
+        .unwrap();
+    assert_eq!(second, first);
+    assert_eq!(blob_names(&folio), vec![format!("{first}.blob")]);
 }
 
 #[test]

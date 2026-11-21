@@ -13,8 +13,12 @@ impl Home {
     /// Concurrent first runs are not serialised until the home lock exists.
     pub fn open_or_create(path: PathBuf, environment: &Environment) -> Result<Self, HomeError> {
         let home = Self::create_and_recognize(path.clone(), environment)?;
-        let registry = Registry::open_existing(&home)?;
-        if let Some(text) = registry.format_version()? {
+        let registry =
+            Registry::open_existing(&home).map_err(|error| HomeError::Registry(Box::new(error)))?;
+        if let Some(text) = registry
+            .format_version()
+            .map_err(|error| HomeError::Registry(Box::new(error)))?
+        {
             let version =
                 LayoutVersion::from_str(&text).map_err(|_| HomeError::InvalidFormatVersion {
                     path: path.join(REGISTRY_FILE),

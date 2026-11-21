@@ -15,6 +15,16 @@ use folt_core::store::StoreError;
 use crate::common::TempHome;
 use crate::support::TestFolio;
 
+fn is_not_regular_file(result: Result<Home, HomeError>) -> bool {
+    match result {
+        Err(HomeError::Registry(source)) => matches!(
+            source.downcast_ref::<RegistryError>(),
+            Some(RegistryError::NotRegularFile(_))
+        ),
+        _ => false,
+    }
+}
+
 fn mkfifo(path: &Path) {
     assert!(Command::new("mkfifo").arg(path).status().unwrap().success());
 }
@@ -55,10 +65,10 @@ fn fifo_registry_with_only_allowed_names_is_refused() {
     assert_completes("FIFO registry with only allowed names", || {
         let directory = private_home();
         mkfifo(&directory.path().join("registry.db"));
-        assert!(matches!(
-            Home::open_or_create(directory.path().to_path_buf(), &Environment::default()),
-            Err(HomeError::Registry(RegistryError::NotRegularFile(_)))
-        ));
+        assert!(is_not_regular_file(Home::open_or_create(
+            directory.path().to_path_buf(),
+            &Environment::default()
+        )));
     });
 }
 
@@ -86,10 +96,10 @@ fn symlink_to_fifo_registry_with_only_allowed_names_is_refused() {
         mkfifo(&fifo);
         let directory = private_home();
         symlink(&fifo, directory.path().join("registry.db")).unwrap();
-        assert!(matches!(
-            Home::open_or_create(directory.path().to_path_buf(), &Environment::default()),
-            Err(HomeError::Registry(RegistryError::NotRegularFile(_)))
-        ));
+        assert!(is_not_regular_file(Home::open_or_create(
+            directory.path().to_path_buf(),
+            &Environment::default()
+        )));
     });
 }
 

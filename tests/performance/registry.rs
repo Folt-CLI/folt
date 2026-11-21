@@ -3,8 +3,8 @@ use std::hint::black_box;
 use criterion::Criterion;
 use folt_core::config::formats::OBJECT_ALGORITHM;
 use folt_core::folio::format::FolioFormat;
+use folt_core::folio::name::FolioName;
 use folt_core::folio::row::NewFolio;
-use folt_core::folio_name::FolioName;
 use folt_core::id::FolioId;
 use folt_core::layout::FOLIO_LAYOUT_VERSION;
 use folt_core::placement::PlacementKind;
@@ -45,7 +45,7 @@ pub fn bench(c: &mut Criterion) {
         })
         .unwrap();
     drop(registry);
-    let prefix = PlacementPrefix::resolve(home.root()).unwrap();
+    let prefix = PlacementPrefix::from(&PlacementPath::resolve_directory(home.root()).unwrap());
     let registry = Registry::open_existing(&home.home).unwrap();
     assert_eq!(registry.placements_under(&prefix).unwrap().len(), 10_000);
     let mut group = c.benchmark_group("registry");

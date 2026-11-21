@@ -10,21 +10,15 @@ Use the five-section [work-item body](../issue-format.md) with Summary and Scope
 
 XS needs no analysis and no review.
 
-## Solution
+## Outcome
 
-Write Solution at creation, short and readable for the developer, in the style of Analysis. It comes from the enabling Question, with no solution selection; the Question's answer does not replace a missing Solution or scope.
+Write the outcome in Summary and two or three numbered scenarios in Scope, with **Agreed in #N** when a parent Question decided something the work must respect. XS has no Solution section and no scope attachment; the implementation agent reads the code itself, within the ticket's Scope.
 
-Use a `> [!IMPORTANT]` decision line, **Agreed in #N** (what the parent Question decided), **You get**, **Changes**, **Not changed** and **Watch out**, then **Implementation scope** linking the complete `<N>-solution-1.md` scope attachment.
-
-Attach with gh-attach and verify at creation by downloading and comparing.
-
-XS may skip the scope file when the ticket is self-descriptive. Follow the [S and XS Solution layout](../issue-format.md#s-and-xs-solution-layout) and the applicable [type row](../rules.md#by-issue-type).
+If implementation needs more than the ticket says, stop and re-size to S. See [Re-sizing](../rules.md#analysis-triggers-and-re-sizing).
 
 ## Statuses
 
-The ticket is ready when its Solution and scope exist at creation. Only self-descriptive XS may skip the scope. Do not start the implementation agent or move the ticket to S3 or S4 before these requirements are met.
-
-See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
+The ticket is ready when its outcome and scenarios exist. See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
 
 ## Who does what
 

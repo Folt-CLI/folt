@@ -1,4 +1,5 @@
 #![allow(
+    clippy::disallowed_methods,
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
@@ -12,6 +13,7 @@ mod common;
 
 mod checkout;
 mod declared_references;
+mod facade;
 mod folio;
 mod front_matter;
 mod front_matter_awkward;

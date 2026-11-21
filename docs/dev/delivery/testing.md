@@ -6,7 +6,9 @@ Every ticket adds or updates the tests for what it changes, in the same pull req
 
 Non-test code denies Clippy’s `unwrap_used`, `expect_used`, `panic` and `unreachable` lints. Exceptions require `#[expect(clippy::<lint>, reason = "...")]` on the smallest item, explaining why the type system cannot express the invariant.
 
-Reading the process environment, the OS home directory or the current directory is denied outside `crates/folt-core/src/config/env.rs` by Clippy `disallowed_methods` (configured in `clippy.toml`). Code and tests get these values from `Environment`, and tests build an `Environment` value instead of changing the process environment.
+In non-test code, reading the process environment, the OS home directory or the current directory is denied outside `crates/folt-core/src/config/env.rs` by Clippy `disallowed_methods` (configured in `clippy.toml`). Test code allows this lint. Code and tests get these values from `Environment`, and tests build an `Environment` value instead of changing the process environment.
+
+Raw mutating `std::fs` calls are denied outside fsx by Clippy `disallowed_methods`; test code allows this lint.
 
 On pull requests, `scripts/test-integrity.sh <base-ref> [<head-ref>]` checks the diff from the merge base for removed or edited assertions and test declarations in Rust files, including deleted test files, multi-line assertions and all lines of `#[should_panic(...)]` attributes. Multi-line attributes between `#[test]` and its function preserve the test declaration context. Pure additions, new files and non-Rust changes pass. Identical lines moved to another Rust file pass only when the added line is in test context: a path containing `/tests/` or ending in `tests.rs` or `_test.rs`, or after the first `#[cfg(test)]` line in the head file. Each added line excuses only one removed line. Intentional changes require a Git commit trailer `Test-change: <non-empty reason>` in at least one Git commit in the PR; the script prints the affected lines and the reason. This is a text heuristic: reworded assertions can slip past, and a string containing parentheses or brackets can confuse the multi-line counts. Run its offline tests with `bash scripts/test-integrity-test.sh`.
 
@@ -16,7 +18,7 @@ The Test issue type is for a ticket whose whole outcome is adding test cases, su
 
 ## Roles
 
-Implementation agents run headless in the ticket's worktree and implement and fix. They do not analyse code, reviews or CI. The orchestrator analyses: it runs the gate, reads CI, and hands findings and failing excerpts to the agent. The headless review agent reviews the diff, the tests in it and the CI result; it does not run anything.
+Implementation agents run headless in the ticket's worktree and implement and fix. They do not analyse code, reviews or CI. The orchestrator analyses: it runs the gate, reads CI, and hands findings and failing excerpts to the agent. With no review on XS and S, the gate and CI are the checks of those tickets. The headless review agent reviews the diff, the tests in it and the CI result; it does not run anything.
 
 ## Gate before push
 
@@ -30,7 +32,13 @@ cargo build --locked --workspace
 cargo test --locked --workspace
 cargo test-pr --locked
 cargo test-full --locked
+bash scripts/check-layers-test.sh
+scripts/check-layers.sh --enforce
+bash scripts/check-file-size-test.sh
+bash scripts/check-file-size.sh
 ```
+
+Three checks are enforced by these commands. The layer check fails on any violation of the layer table, `too_many_lines` is denied at 100 lines, and a production file over 200 lines fails the size check. None has an exception list. CI runs the script checks in the `plan` job and Clippy in the `verify` job.
 
 Commit and push only when all commands pass. A failure goes back to the implementation agent with the output. Never push a failing suite. The second Clippy command and the aliases also cover suites excluded from the local run. CI runs `cargo test-pr` and `cargo test-performance --test`, not `cargo test-full`. For offline work, export `CARGO_NET_OFFLINE=true` and add `--offline` to each Cargo command that resolves dependencies.
 
@@ -106,7 +114,7 @@ To add a regression test, declare a module in `regression/main.rs`, record the b
 
 Tests must not change process environment, working directory or umask. Start CLI commands as child processes; set any command-specific environment on the child. Do not use sleeps, clocks or metadata timing to detect edits. Keep property tests bounded and reproducible. Platform-specific tests carry `#[cfg(unix)]` or `#[cfg(windows)]`.
 
-Portability limit found while adding this suite: existing history operations sync directories through `File::open(...).sync_all()` in `store.rs` and `refs.rs`. Opening directories this way fails on Windows, so the history validation tests expose an existing Windows blocker. Fixing directory durability needs a separate implementation decision; these tests do not skip the failure. The suite was run on Linux with Rust 1.98.1; Windows, macOS and Rust 1.89 have not been verified.
+Portability limit found while adding this suite: existing history operations sync directories through `File::open(...).sync_all()` in `store/` and `history/ref_store.rs`. Opening directories this way fails on Windows, so the history validation tests expose an existing Windows blocker. Fixing directory durability needs a separate implementation decision; these tests do not skip the failure. The suite was run on Linux with Rust 1.98.1; Windows, macOS and Rust 1.89 have not been verified.
 
 ## Performance
 

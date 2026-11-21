@@ -1,8 +1,8 @@
 # M ticket
 
-Use M when a ticket is still loose and can be read several ways. It needs analysis and review, and the developer selects a solution. If there is one straightforward solution, use S or XS, not M.
+Use M when a ticket is still loose and can be read several ways. It needs full analysis and review. The developer is asked only when a [trigger](../rules.md#analysis-triggers-and-re-sizing) fires. If the decision is already made, use S or XS, not M.
 
-Split it into M/S items when warranted.
+An M may be a Question; see [M Question](l-question.md#m-question). An M sits under an L or an XL. Split it into M/S items when warranted.
 
 ## The ticket must contain
 
@@ -10,23 +10,19 @@ Use the five-section [work-item body](../issue-format.md) with Summary and Scope
 
 ## Analysis and review
 
-For a Question, follow [Working a Question](l-question.md#working-a-question).
+The analysis agent is read-only and produces drafts as files: findings, the options with their trade-offs, a recommendation with the trigger check, and the scope of the selected option. The orchestrator publishes them to the ticket.
 
-M needs analysis AND review. Analysis agents are read-only and produce drafts as files: findings, solution scopes and Analysis text. The orchestrator publishes them to the ticket and attaches them.
-
-The orchestrator writes Analysis inline, links the findings attachment from Details and attaches each solution as a complete implementation scope.
-
-Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../../delivery/review.md).
+The orchestrator writes Analysis inline, links the findings attachment from Details and attaches the selected option's implementation scope. Options stay inline and have no files. Follow [Analysis and solution selection](../issue-format.md#analysis-and-solution-selection) for the layouts, uploads and selection. Use a read-only [review](../../delivery/review.md) of the pull request.
 
 ## Solution
 
-The developer selects the solution before implementation. Mark its implementation scope attachment **[Selected Solution]**. Summarize changes, Affected areas and Why this one in Solution; link findings and two to four key points in Details.
+When no trigger fires, the recommendation is selected by policy and recorded as such with its reason. When one fires, the ticket parks and the developer selects. Mark the scope attachment **[Selected Solution]**. Summarize changes, Affected areas and Why this one in Solution; link findings and two to four key points in Details.
 
 ## Statuses
 
 See the Status values in the [shared steps](../rules.md#shared-steps) for the suggested path.
 
-S3 requires a recorded selected solution: mark the attachment **[Selected Solution]** and fill Solution. Do not start the implementation agent or move the ticket to S3 or S4 before this is recorded.
+S3 requires a recorded selection: mark the attachment **[Selected Solution]** and fill Solution. Do not start the implementation agent or move the ticket to S3 or S4 before this is recorded.
 
 ## Who does what
 

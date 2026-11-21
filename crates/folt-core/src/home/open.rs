@@ -1,11 +1,14 @@
-use std::fs;
 use std::io;
 use std::path::PathBuf;
 
 use crate::config::env::Environment;
 use crate::config::settings::{FileSettings, Settings};
 
-use super::{Home, HomeError, home_warnings, private_directory_builder, recognize_home};
+use crate::fsx::private_directory_builder;
+
+use super::recognize::recognize_home;
+use super::warnings::home_warnings;
+use super::{Home, HomeError};
 
 impl Home {
     pub(crate) fn create_and_recognize(
@@ -14,7 +17,7 @@ impl Home {
     ) -> Result<Self, HomeError> {
         let settings = Settings::resolve(environment, FileSettings::default())?;
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|source| HomeError::CannotCreate {
+            crate::fsx::create_dir_all(parent).map_err(|source| HomeError::CannotCreate {
                 path: parent.to_path_buf(),
                 source,
             })?;

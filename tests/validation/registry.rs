@@ -35,7 +35,9 @@ fn internal_rows_are_hidden_from_user_lists() {
     assert!(
         folio
             .registry
-            .placements_under(&PlacementPrefix::resolve(home.root()).unwrap())
+            .placements_under(&PlacementPrefix::from(
+                &PlacementPath::resolve_directory(home.root()).unwrap()
+            ))
             .unwrap()
             .is_empty()
     );
@@ -91,8 +93,8 @@ fn moving_prefix_preserves_row_data() {
         .registry
         .write(&lock, |tx| tx.move_placement(&row.path, &old_path))
         .unwrap();
-    let old = PlacementPrefix::resolve(&old_dir).unwrap();
-    let new = PlacementPrefix::resolve(&new_dir).unwrap();
+    let old = PlacementPrefix::from(&PlacementPath::resolve_directory(&old_dir).unwrap());
+    let new = PlacementPrefix::from(&PlacementPath::resolve_directory(&new_dir).unwrap());
     folio
         .registry
         .write(&lock, |tx| tx.move_prefix(&old, &new))
@@ -104,8 +106,8 @@ fn moving_prefix_preserves_row_data() {
 
 #[test]
 fn names_are_unique_case_sensitive_and_released_by_removal() {
+    use folt_core::folio::name::FolioName;
     use folt_core::folio::row::NewFolio;
-    use folt_core::folio_name::FolioName;
     use folt_core::id::FolioId;
     use folt_core::registry::Registry;
 
@@ -165,8 +167,8 @@ fn names_are_unique_case_sensitive_and_released_by_removal() {
 
 #[test]
 fn replace_all_preserves_only_surviving_names() {
+    use folt_core::folio::name::FolioName;
     use folt_core::folio::row::{FolioRow, NewFolio};
-    use folt_core::folio_name::FolioName;
     use folt_core::id::FolioId;
 
     let home = TempHome::new();

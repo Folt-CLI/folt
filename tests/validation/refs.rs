@@ -1,6 +1,6 @@
+use folt_core::history::{Expect, RefError};
 use folt_core::object::ObjectKind;
 use folt_core::ref_name::{RefKind, RefName};
-use folt_core::refs::{Expect, RefError};
 
 use crate::common::TempHome;
 use crate::support::TestFolio;
