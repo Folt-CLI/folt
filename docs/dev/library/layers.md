@@ -28,11 +28,11 @@ A module may import from another module only when its table row lists that modul
 
 `none` means std and external crates only.
 
-The target `ops` internal order is `refusal`, `facts`, `working`, `status`, `step_hook`, `placement`, `stage`, `history`, `register`, `rename`, `checkout`, `prune`.
+The `ops` internal order is `refusal`, `facts`, `working`, `status`, `step_hook`, `stage`, `placement`, `history`, `register`, `rename`, `checkout`, `prune`, then `facade`. `placement` imports `stage::refuse`, so `stage` comes first. `rollback` imports only `fsx`. The order is also stated in `crates/folt-core/src/ops/mod.rs`.
 
 `test_support` and all `cfg(test)` code are outside the table.
 
-`folio` now holds the Folio directory, folio-name, format, row and ref-file items. `placement_fs` will become `placement/fs`. The ref store now lives under `history` (`history.rs` with `ref_store`, `expect` and `error` submodules) until #291 turns `history` into a full module; the L8 history operations live in `ops/history`. Working-file gathering and resolution live in `ops/working`, working status in `ops/status`, and stage, rename, checkout and prune operations in their own `ops` modules. Registration operations now live in `ops/register`.
+`folio` now holds the Folio directory, folio-name, format, row and ref-file items. `placement_fs` is a flat file beside `placement`. The ref store lives under `history` (`history.rs` with `ref_store`, `expect` and `error` submodules); the L8 history operations live in `ops/history`. Working-file gathering and resolution live in `ops/working`, working status in `ops/status`, and stage, rename, checkout and prune operations in their own `ops` modules. Registration operations now live in `ops/register`.
 
 The file-level corrections are `id` importing `config`, the existing `folio` in the L4 unit and its import permissions in dependent rows, and the existing `placement_path` at L5 with imports from `config`, `id` and L4 `folio`. `registry` also imports `placement_path`. The current `home -> placement_path` import is upward and remains a reported violation; listing it cannot make a higher-layer import conform to the rule.
 
