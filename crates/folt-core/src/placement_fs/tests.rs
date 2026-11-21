@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use super::helpers::move_failure;
 use super::*;
 use crate::test_support::TempHome;
