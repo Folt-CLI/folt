@@ -38,6 +38,8 @@ The order is `refusal`, `facts`, `working`, `status`, `step_hook`, `stage`, `pla
 | `ops::status` | Judging working status. |
 | `ops::step_hook` | The `StepHook` trait that observes operation steps. |
 | `ops::rollback` | The `Rollback` guard. |
+| `ops::rules_error` | `RulesError`, the error shared by the operations. |
+| `ops::open` | Opening or creating a home, as a `Home` method. |
 | `ops::stage` | Stage and unstage, with the stage refusal checks in `ops::stage::refuse`. |
 | `ops::placement` | Placement convert, move, rehome, relocate, remove and repair. |
 | `ops::history` | History operations: commit, branch, tag and reset. |
@@ -79,7 +81,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 These are the same rules as in [AGENTS.md](../../../AGENTS.md).
 
 - A mutating `std::fs` call outside `fsx`: `fsx` owns file-system writes, so atomicity, syncing and fault injection stay in one place.
-- `unwrap`, `expect` and `unreachable` in non-test code: the lints deny them, and a failure must reach the caller as an error.
+- `unwrap`, `expect` and `unreachable` in non-test code: the clippy lints `unwrap_used`, `expect_used` and `unreachable` are set to deny in `Cargo.toml`, and a failure must reach the caller as an error.
 - Reading the process environment, the OS home directory or the current directory outside `config::env::Environment`: tests and callers must be able to supply those values.
 - Repeating a name, limit or format literal that `config` owns: a repeated literal drifts from its owner.
 - A second owner for a rule listed in the table above: two owners disagree over time.
