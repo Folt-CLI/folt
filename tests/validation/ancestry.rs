@@ -188,8 +188,11 @@ fn missing_reachable_commits_return_store_errors_without_writes() {
             Expect::Absent,
         )
         .unwrap();
-    let before = snapshot(home.path());
     let limit = folio.stores().object_limit;
+    // Close SQLite (including WAL locks) and release the home lock before raw reads on Windows.
+    drop(folio.registry);
+    drop(lock);
+    let before = snapshot(home.path());
     assert!(is_ancestor(&folio.objects, root, root, limit).unwrap());
     assert_eq!(
         merge_base(&folio.objects, root, root, limit).unwrap(),
@@ -234,6 +237,10 @@ fn corrupt_commits_and_object_read_limits_are_propagated() {
         ));
     }
     assert!(is_ancestor(&folio.objects, root, root, root_size).unwrap());
+    let limit = folio.stores().object_limit;
+    // The remaining work needs no registry or home lock; both lock files against raw reads on Windows.
+    drop(folio.registry);
+    drop(lock);
     let path = snapshot(home.path())
         .into_keys()
         .find(|path| {
@@ -243,7 +250,6 @@ fn corrupt_commits_and_object_read_limits_are_propagated() {
         .unwrap();
     std::fs::write(path, b"corrupt").unwrap();
     let before = snapshot(home.path());
-    let limit = folio.stores().object_limit;
     assert!(is_ancestor(&folio.objects, root, tip, limit).is_err());
     assert!(merge_base(&folio.objects, root, tip, limit).is_err());
     assert_eq!(snapshot(home.path()), before);
