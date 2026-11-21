@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Usage: scripts/check-file-size.sh [--root <dir>] [--limit <n>]
+# Usage: bash scripts/check-file-size.sh [--root <dir>] [--limit <n>]
 # Fail when a production Rust file has more lines than the limit. Skips
 # tests.rs, files under a tests directory and files under test_support.
 # There is no exception list.
 set -euo pipefail
 
 usage() {
-  printf 'Usage: scripts/check-file-size.sh [--root <dir>] [--limit <n>]\n' >&2
+  printf 'Usage: bash scripts/check-file-size.sh [--root <dir>] [--limit <n>]\n' >&2
   exit 2
 }
 
