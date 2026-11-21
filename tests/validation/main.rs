@@ -11,6 +11,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod ancestry;
 mod checkout;
 mod declared_references;
 mod facade;
