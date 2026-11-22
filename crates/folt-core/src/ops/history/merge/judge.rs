@@ -34,10 +34,11 @@ pub(crate) fn judge_merge(facts: &MergeFacts) -> Result<MergePlan, HistoryRefusa
     if working.tip == Some(other) || facts.base == MergeBase::One(other) {
         return Err(HistoryRefusal::MergeAlreadyMerged);
     }
-    match facts.base {
-        MergeBase::None => return Err(HistoryRefusal::MergeNoBase),
-        MergeBase::Several(_) => return Err(HistoryRefusal::MergeCrissCross),
-        MergeBase::One(_) => {}
+    if facts.base == MergeBase::None {
+        return Err(HistoryRefusal::MergeNoBase);
+    }
+    if facts.ancestors_binary_conflict {
+        return Err(HistoryRefusal::MergeBaseBinaryConflict);
     }
     let MergeResult::Clean(bytes) = &facts.merged else {
         return Err(HistoryRefusal::MergeConflict);

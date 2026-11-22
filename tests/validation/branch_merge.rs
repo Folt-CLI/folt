@@ -213,13 +213,13 @@ fn scenario_2_fast_forward_writes_merge_commit_and_contained_branch_writes_nothi
 }
 
 #[test]
-fn scenario_3_conflict_no_base_and_criss_cross_write_nothing() {
+fn scenario_3_conflict_and_no_base_write_nothing() {
     let home = TempHome::new();
     let mut lock = home.lock();
     let mut folio = TestFolio::new(&home, &lock);
     let base = folio.commit_internal(&home, &mut lock, b"base\n");
     folio.second_branch(&home, &mut lock, "topic", base, b"theirs\n");
-    let ours = folio.commit_internal(&home, &mut lock, b"ours\n");
+    folio.commit_internal(&home, &mut lock, b"ours\n");
     let row = folio.internal();
     assert_eq!(
         refused(&home, &mut folio, &mut lock, &row),
@@ -241,39 +241,6 @@ fn scenario_3_conflict_no_base_and_criss_cross_write_nothing() {
     assert_eq!(
         refused(&home, &mut folio, &mut lock, &row),
         HistoryRefusal::MergeNoBase
-    );
-    let sibling = folio.commit_with_parents(&lock, b"sibling", &[base]);
-    let left = folio.commit_with_parents(&lock, b"left", &[ours, sibling]);
-    let right = folio.commit_with_parents(&lock, b"right", &[sibling, ours]);
-    folio
-        .refs
-        .update(
-            &mut lock,
-            RefKind::Branch,
-            &topic,
-            right,
-            Expect::Is(unrelated),
-        )
-        .unwrap();
-    let mut row = row;
-    row.commit_id = Some(left);
-    folio
-        .registry
-        .write(&lock, |tx| tx.update_placement(&row))
-        .unwrap();
-    folio
-        .refs
-        .update(
-            &mut lock,
-            RefKind::Branch,
-            &RefName::parse("main").unwrap(),
-            left,
-            Expect::Is(ours),
-        )
-        .unwrap();
-    assert_eq!(
-        refused(&home, &mut folio, &mut lock, &row),
-        HistoryRefusal::MergeCrissCross
     );
 }
 
@@ -504,4 +471,178 @@ fn scenario_7_name_collision_and_markdown_gating() {
         })
         .unwrap();
     assert!(merge(&home, &mut folio, &mut lock, &internal).is_ok());
+}
+
+// Install a clean target tip while preserving the two-parent history built by
+// the fixture. This avoids making a staged commit that would add another tip.
+fn install_tip(
+    home: &TempHome,
+    folio: &mut TestFolio,
+    lock: &mut HomeLock,
+    branch: &str,
+    tip: ObjectId,
+) {
+    let name = RefName::parse(branch).unwrap();
+    let old = folio.refs.read(RefKind::Branch, &name).unwrap().unwrap();
+    folio
+        .refs
+        .update(lock, RefKind::Branch, &name, tip, Expect::Is(old))
+        .unwrap();
+    if branch == "main" {
+        let mut row = folio.internal();
+        let content = folio.objects.get_commit(tip, 16384).unwrap().content;
+        row.base = PlacementFs::new(&home.home)
+            .refresh(row.id, &row.to_placement().1, &folio.objects, content, None)
+            .unwrap()
+            .base;
+        row.commit_id = Some(tip);
+        folio
+            .registry
+            .write(lock, |tx| tx.update_placement(&row))
+            .unwrap();
+    }
+}
+
+#[test]
+fn criss_cross_clean_virtual_base_stores_only_merged_blob_and_commit() {
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let base = folio.commit_internal(&home, &mut lock, b"a\nb\nc\nd\ne\n");
+    let a = folio.second_branch(&home, &mut lock, "topic", base, b"A\nb\nc\nd\ne\n");
+    let b = folio.commit_internal(&home, &mut lock, b"a\nb\nC\nd\ne\n");
+    let ours = folio.commit_with_parents(&lock, b"A\nB\nC\nd\ne\n", &[a, b]);
+    let theirs = folio.commit_with_parents(&lock, b"A\nb\nC\nd\nE\n", &[b, a]);
+    install_tip(&home, &mut folio, &mut lock, "main", ours);
+    install_tip(&home, &mut folio, &mut lock, "topic", theirs);
+    let objects = folio.folio.path().to_path_buf();
+    let before = snapshot(&objects, &home.path().join("lock"));
+    let row = copy(&home, &mut folio, &lock, "main", "copy.md");
+    let id = merge(&home, &mut folio, &mut lock, &row).unwrap();
+    let commit = folio.objects.get_commit(id, 16384).unwrap();
+    assert_eq!(commit.parents, vec![ours, theirs]);
+    let expected = b"A\nB\nC\nd\nE\n";
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), expected);
+    assert_eq!(
+        std::fs::read(folio.internal().path.to_path_buf()).unwrap(),
+        expected
+    );
+    assert_eq!(folio.internal().commit_id, Some(id));
+    let after = snapshot(&objects, &home.path().join("lock"));
+    let added: Vec<_> = after
+        .iter()
+        .filter(|(path, _)| !before.iter().any(|(old, _)| old == path))
+        .collect();
+    assert_eq!(
+        added.len(),
+        2,
+        "only the merged blob and merge commit are stored"
+    );
+    assert_eq!(
+        folio
+            .objects
+            .get(
+                commit.content,
+                folt_core::object::ObjectKind::Blob,
+                u64::MAX
+            )
+            .unwrap(),
+        expected
+    );
+    assert!(
+        folio
+            .objects
+            .get(
+                folt_core::object::hash_blob(b"A\nb\nC\nd\ne\n"),
+                folt_core::object::ObjectKind::Blob,
+                u64::MAX
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn criss_cross_text_conflicts_in_virtual_base_still_merge() {
+    use folt_core::merge::{MergeResult, merge3};
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let original = b"start\nspacer\nmiddle\nspacer\nend\n";
+    let left: &[u8] = b"start\nspacer\nleft\nspacer\nend\n";
+    let right: &[u8] = b"start\nspacer\nright\nspacer\nend\n";
+    let base = folio.commit_internal(&home, &mut lock, original);
+    let a = folio.second_branch(&home, &mut lock, "topic", base, left);
+    let b = folio.commit_internal(&home, &mut lock, right);
+    let (first, second) = if a.as_bytes() < b.as_bytes() {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    let MergeResult::Conflicted {
+        merged: Some(virtual_bytes),
+        marker_lines,
+    } = merge3(original, first, second)
+    else {
+        panic!("ancestors must produce text conflicts");
+    };
+    assert_eq!(
+        marker_lines,
+        vec![
+            b"<<<<<<<\n".to_vec(),
+            b"=======\n".to_vec(),
+            b">>>>>>>\n".to_vec()
+        ]
+    );
+    let our_bytes = b"START\nspacer\nresolved\nspacer\nend\n";
+    let their_bytes = b"start\nspacer\nresolved\nspacer\nEND\n";
+    let expected = b"START\nspacer\nresolved\nspacer\nEND\n";
+    assert_eq!(
+        merge3(&virtual_bytes, our_bytes, their_bytes),
+        MergeResult::Clean(expected.to_vec())
+    );
+    let ours = folio.commit_with_parents(&lock, our_bytes, &[a, b]);
+    let theirs = folio.commit_with_parents(&lock, their_bytes, &[b, a]);
+    install_tip(&home, &mut folio, &mut lock, "main", ours);
+    install_tip(&home, &mut folio, &mut lock, "topic", theirs);
+    let row = copy(&home, &mut folio, &lock, "main", "copy.md");
+    let id = merge(&home, &mut folio, &mut lock, &row).unwrap();
+    assert_eq!(
+        folio.objects.get_commit(id, 16384).unwrap().parents,
+        vec![ours, theirs]
+    );
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), expected);
+    let internal = folio.internal();
+    assert_eq!(
+        std::fs::read(internal.path.to_path_buf()).unwrap(),
+        expected
+    );
+    assert_eq!(internal.commit_id, Some(id));
+    let updated = folio.registry.placement_at(&row.path).unwrap().unwrap();
+    assert_eq!(updated.commit_id, Some(id));
+    assert_eq!(
+        updated.base.as_ref().unwrap().hash,
+        folt_core::object::hash_blob(expected)
+    );
+    assert!(updated.staged.is_none());
+}
+
+#[test]
+fn criss_cross_binary_conflict_between_ancestors_writes_nothing() {
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let base = folio.commit_internal(&home, &mut lock, b"base");
+    let a = folio.second_branch(&home, &mut lock, "topic", base, b"left\0");
+    let b = folio.commit_internal(&home, &mut lock, b"right");
+    // Equal final tips would merge cleanly with a missing base. The ancestor
+    // refusal must take precedence even when their content agrees.
+    let ours = folio.commit_with_parents(&lock, b"resolved", &[a, b]);
+    let theirs = folio.commit_with_parents(&lock, b"resolved", &[b, a]);
+    install_tip(&home, &mut folio, &mut lock, "main", ours);
+    install_tip(&home, &mut folio, &mut lock, "topic", theirs);
+    let row = folio.internal();
+    assert_eq!(
+        refused(&home, &mut folio, &mut lock, &row),
+        HistoryRefusal::MergeBaseBinaryConflict
+    );
 }

@@ -22,7 +22,7 @@ pub enum HistoryRefusal {
     RebaseConflict(ObjectId),
     RebaseRoot(ObjectId),
     MergeConflict,
-    MergeCrissCross,
+    MergeBaseBinaryConflict,
     MergeAlreadyMerged,
     MergeNoBase,
     MergeEdited(PathBuf),
@@ -68,7 +68,9 @@ impl fmt::Display for HistoryRefusal {
             Self::RebaseConflict(id) => write!(f, "replay conflicted at commit {id}"),
             Self::RebaseRoot(id) => write!(f, "cannot replay parentless commit {id}"),
             Self::MergeConflict => write!(f, "merge content conflicts"),
-            Self::MergeCrissCross => write!(f, "merge has several merge bases"),
+            Self::MergeBaseBinaryConflict => {
+                write!(f, "merge base ancestors have a binary conflict")
+            }
             Self::MergeAlreadyMerged => write!(f, "branch is already merged"),
             Self::MergeNoBase => write!(f, "branches have no merge base"),
             Self::MergeEdited(path) => write!(

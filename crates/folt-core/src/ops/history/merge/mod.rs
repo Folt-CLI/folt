@@ -12,6 +12,7 @@ use crate::registry::{Placement, Registry};
 
 mod apply;
 mod judge;
+mod virtual_base;
 
 pub(crate) use apply::merge_branch;
 #[cfg(test)]
@@ -23,6 +24,7 @@ pub(crate) struct MergeFacts {
     pub history: CommitFacts,
     pub other: Option<ObjectId>,
     pub base: MergeBase,
+    pub ancestors_binary_conflict: bool,
     pub merged: MergeResult,
     pub validation: Result<(), String>,
 }
@@ -78,14 +80,21 @@ pub(super) fn gather_merge(
             .objects
             .get(commit.content, ObjectKind::Blob, u64::MAX)?)
     };
-    let base_bytes = content(if let MergeBase::One(id) = base {
-        Some(id)
-    } else {
-        None
-    })?;
+    let base_bytes = match &base {
+        MergeBase::None => Some(Vec::new()),
+        MergeBase::One(id) => Some(content(Some(*id))?),
+        MergeBase::Several(ids) => virtual_base::fold(stores.objects, ids, stores.object_limit)?,
+    };
+    let ancestors_binary_conflict = base_bytes.is_none();
     let ours = content(working.tip)?;
     let theirs = content(other)?;
-    let merged = merge3(&base_bytes, &ours, &theirs);
+    let merged = match base_bytes {
+        Some(bytes) => merge3(&bytes, &ours, &theirs),
+        None => MergeResult::Conflicted {
+            merged: None,
+            marker_lines: Vec::new(),
+        },
+    };
     let validation = match &merged {
         MergeResult::Clean(bytes) => validate_merged(&row, bytes, registry),
         MergeResult::Conflicted { .. } => Ok(()),
@@ -100,6 +109,7 @@ pub(super) fn gather_merge(
         },
         other,
         base,
+        ancestors_binary_conflict,
         merged,
         validation,
     })
