@@ -59,7 +59,7 @@ pub(crate) fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRef
     })
 }
 
-pub(super) fn branch_moved(facts: &CommitFacts) -> HistoryRefusal {
+pub(crate) fn branch_moved(facts: &CommitFacts) -> HistoryRefusal {
     HistoryRefusal::BranchMoved {
         tip: facts.working.tip,
         ahead: facts

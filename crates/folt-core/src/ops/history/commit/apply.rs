@@ -2,13 +2,14 @@ use super::super::{
     HistoryError, HistoryRefusal, HistoryStores, gather_commit, judge_commit, require_blob,
     require_observation, require_row,
 };
-use super::finish::{advance_branch, move_internal, write_rows};
+use super::finish::{Recovery, advance_branch, move_internal, write_rows};
 use super::gather::CommitFacts;
 use super::judge::branch_moved;
 use super::plan::{CommitPlan, matches_requested_commit};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::{Author, Commit, CommitTime, ObjectKind, hash_blob};
+use crate::ops::placement::move_::MoveTarget;
 use crate::ops::working::resolve_working;
 use crate::placement::PlacementOps;
 use crate::registry::Registry;
@@ -33,11 +34,32 @@ pub(crate) fn apply_commit(
     lock: &mut HomeLock,
 ) -> Result<ObjectId, HistoryError> {
     let (mut facts, checked) = check_plan(plan, fs, stores, registry)?;
-    let commit = build_commit(plan, metadata, &facts, &checked)?;
+    let staged = plan
+        .placement()
+        .staged
+        .ok_or(HistoryRefusal::InvalidFacts)?;
+    let commit = build_commit(
+        staged.hash,
+        plan.placement().commit_id.into_iter().collect(),
+        metadata,
+    )?;
+    if checked.resume.is_some()
+        && !facts
+            .tip_commit
+            .as_ref()
+            .is_some_and(|tip| matches_requested_commit(tip, &commit))
+    {
+        return Err(branch_moved(&facts).into());
+    }
     let id = publish_objects(&commit, &checked, stores.objects, lock, plan)?;
-    let (id, name) = advance_branch(id, &commit, &mut facts, stores, lock)?;
-    let internal = move_internal(&facts, id, name, fs, stores.objects, registry, lock)?;
-    write_rows(plan, &facts, id, internal, registry, lock)?;
+    let (id, name) = advance_branch(id, &commit, &mut facts, Recovery::Resume, stores, lock)?;
+    let target = MoveTarget {
+        branch: name,
+        commit: id,
+        content: staged.hash,
+    };
+    let internal = move_internal(&facts, target, fs, stores.objects, registry, lock)?;
+    write_rows(&facts, id, staged, internal, None, registry, lock)?;
     Ok(id)
 }
 
@@ -67,17 +89,14 @@ fn check_plan(
     Ok((facts, checked))
 }
 
-fn build_commit(
-    plan: &CommitPlan,
+pub(crate) fn build_commit(
+    content: ObjectId,
+    parents: Vec<ObjectId>,
     metadata: CommitMetadata,
-    facts: &CommitFacts,
-    checked: &CommitPlan,
 ) -> Result<Commit, HistoryError> {
-    let row = plan.placement();
-    let staged = row.staged.ok_or(HistoryRefusal::InvalidFacts)?;
     let commit = Commit {
-        content: staged.hash,
-        parents: row.commit_id.into_iter().collect(),
+        content,
+        parents,
         author: metadata.author,
         time: metadata.time,
         message: metadata.message,
@@ -86,14 +105,6 @@ fn build_commit(
     };
     // Validate all metadata before any writes, even when finishing a prior commit.
     commit.encode_body()?;
-    if checked.resume.is_some()
-        && !facts
-            .tip_commit
-            .as_ref()
-            .is_some_and(|tip| matches_requested_commit(tip, &commit))
-    {
-        return Err(branch_moved(facts).into());
-    }
     Ok(commit)
 }
 

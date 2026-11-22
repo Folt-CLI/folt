@@ -365,3 +365,119 @@ fn rebase_empty_range_still_judges_placements_against_final_content() {
         HistoryRefusal::InvalidFacts
     );
 }
+
+fn merge_facts() -> merge::MergeFacts {
+    let mut history = commit_facts();
+    history.working.placement.staged = None;
+    merge::MergeFacts {
+        history,
+        other: Some(hash_blob(b"other tip")),
+        base: crate::history::MergeBase::One(hash_blob(b"merge base")),
+        merged: crate::merge::merge3(b"a\nb\nc\n", b"A\nb\nc\n", b"a\nb\nC\n"),
+        validation: Ok(()),
+    }
+}
+
+#[test]
+fn merge_refuses_link_unusable_stage_edits_and_moved_branch_in_order() {
+    let mut facts = merge_facts();
+    facts.history.working.placement.kind = PlacementKind::Link;
+    facts.history.working.observation = Observation::Missing;
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Err(HistoryRefusal::Link(_))
+    ));
+    facts.history.working.placement.kind = PlacementKind::Copy;
+    facts.history.working.placement.staged = Some(StagedBlob {
+        hash: hash_blob(b"stage"),
+        size: 5,
+    });
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Err(HistoryRefusal::Unusable(_))
+    ));
+    facts.history.working.observation = crate::test_support::facts().observation;
+    facts.history.working.tip = Some(hash_blob(b"moved"));
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Err(HistoryRefusal::MergeEdited(_))
+    ));
+    facts.history.working.placement.staged = None;
+    facts.history.working.placement_hash = Some(hash_blob(b"edits"));
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Err(HistoryRefusal::MergeEdited(_))
+    ));
+    facts.history.working.placement_hash = crate::test_support::facts().placement_hash;
+    facts.other = None;
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Err(HistoryRefusal::BranchMoved { .. })
+    ));
+    facts.history.working.tip = facts.history.working.placement.commit_id;
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MissingBranch
+    );
+}
+
+#[test]
+fn merge_refuses_already_merged_no_base_criss_cross_conflict_then_validation() {
+    use crate::history::MergeBase;
+    let mut facts = merge_facts();
+    facts.other = facts.history.working.tip;
+    facts.base = MergeBase::None;
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeAlreadyMerged
+    );
+    facts = merge_facts();
+    facts.base = MergeBase::One(facts.other.unwrap());
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeAlreadyMerged
+    );
+    facts.base = MergeBase::None;
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeNoBase
+    );
+    facts.base = MergeBase::Several(vec![hash_blob(b"a"), hash_blob(b"b")]);
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeCrissCross
+    );
+    facts.base = merge_facts().base;
+    facts.merged = crate::merge::merge3(b"a\nb\nc\n", b"A\nb\nc\n", b"different\nb\nc\n");
+    facts.validation = Err("invalid".into());
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeConflict
+    );
+    facts.merged = merge_facts().merged;
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeInvalid("invalid".into())
+    );
+}
+
+#[test]
+fn merge_accepts_fast_forward_and_refuses_edited_internal() {
+    let mut facts = merge_facts();
+    facts.base = crate::history::MergeBase::One(facts.history.working.tip.unwrap());
+    facts.merged = crate::merge::merge3(b"ours", b"ours", b"theirs");
+    assert!(merge::judge_merge(&facts).is_ok());
+    facts.history.working.placement.head = "main".into();
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MissingInternal
+    );
+    let mut internal = facts.history.working.clone();
+    internal.placement.kind = PlacementKind::Internal;
+    internal.placement_hash = Some(hash_blob(b"internal edit"));
+    facts.history.internal = Some(internal);
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Err(HistoryRefusal::InternalEdited(_))
+    ));
+}

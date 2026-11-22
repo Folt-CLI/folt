@@ -133,6 +133,28 @@ impl TestFolio {
             .unwrap()
     }
 
+    pub fn second_branch(
+        &mut self,
+        home: &TempHome,
+        lock: &mut HomeLock,
+        name: &str,
+        parent: ObjectId,
+        content: &[u8],
+    ) -> ObjectId {
+        let tip = self.commit_with_parents(lock, content, &[parent]);
+        home.home
+            .create_branch(
+                self.folio.id(),
+                &folt_core::ref_name::RefName::parse(name).unwrap(),
+                tip,
+                &self.refs,
+                &mut self.registry,
+                lock,
+            )
+            .unwrap();
+        tip
+    }
+
     pub fn copy(&mut self, home: &TempHome, lock: &HomeLock) -> Placement {
         let path = home.root().join("copy.txt");
         let blob = self

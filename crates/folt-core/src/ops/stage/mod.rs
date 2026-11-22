@@ -74,3 +74,6 @@ pub(crate) mod refuse;
 mod write;
 
 pub(crate) use references::stage_references;
+
+mod validate;
+pub(crate) use validate::validate_merged;
