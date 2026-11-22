@@ -430,3 +430,5 @@ fn continue_accepts_resolution_equal_to_pre_rebase_bytes() {
     assert_eq!(std::fs::read(copy.path.to_path_buf()).unwrap(), b"ours\n");
     assert!(folio.registry.stopped_rebase(copy.id).unwrap().is_none());
 }
+
+mod abort;

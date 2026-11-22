@@ -3,6 +3,7 @@ use crate::home::HomeLock;
 use crate::object::{ObjectKind, hash_blob};
 use crate::ops::history::{HistoryError, HistoryRefusal, HistoryStores, gather_file, require_row};
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
+use crate::ops::stage::stage_references;
 use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement::{ConflictOperation, ConflictState, PlacementOps};
 use crate::placement_path::RegistryError;
@@ -163,6 +164,14 @@ pub(crate) fn abort_rebase(
         }
         .into());
     }
+    let bytes = stores
+        .objects
+        .get(state.pre_merge, ObjectKind::Blob, u64::MAX)?;
+    let references = row
+        .staged
+        .map(|_| stage_references(row, &bytes))
+        .transpose()
+        .map_err(|error| HistoryRefusal::MergeInvalid(error.to_string()))?;
     let written = fs.refresh(
         row.id,
         &row.to_placement().1,
@@ -172,9 +181,13 @@ pub(crate) fn abort_rebase(
     )?;
     let mut restored = row.clone();
     restored.base = written.base;
+    restored.staged = None;
     restored.conflict = None;
     registry.write(lock, |tx| {
         tx.update_placement(&restored)?;
+        if let Some(references) = &references {
+            tx.rebuild_references(row.id, &row.head, references)?;
+        }
         tx.remove_stopped_rebase(row.id)
     })?;
     Ok(())
