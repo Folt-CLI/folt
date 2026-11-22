@@ -2,11 +2,28 @@ use std::collections::{HashMap, HashSet};
 
 use super::{HistoryRefusal, ResetFacts, ResetPlan, judge_reset};
 use crate::id::ObjectId;
-use crate::merge::{MergeResult, merge3};
 use crate::object::{Commit, ObjectKind, hash_blob, hash_object};
+use crate::placement::ConflictState;
+use crate::placement_path::PlacementPath;
 use crate::ref_name::{RefKind, RefName};
+use crate::registry::StoppedRebase;
 
+mod finish;
 mod io;
+mod replay;
+mod resume;
+mod stopped;
+pub(crate) use stopped::{abort_rebase, continue_rebase};
+
+#[cfg(test)]
+mod tests;
+
+/// Result of applying or continuing a rebase.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RebaseOutcome {
+    Finished(ObjectId),
+    Stopped(ConflictState),
+}
 pub(crate) use io::{apply_rebase, gather_rebase};
 
 /// A tag or retention pin that stays on a commit in the original range.
@@ -21,6 +38,8 @@ pub struct LeftBehind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebaseFacts {
     pub reset: ResetFacts,
+    pub copy: Option<PlacementPath>,
+    pub stopped: Option<StoppedRebase>,
     pub range: HashSet<ObjectId>,
     /// Range commits, their original parents and the destination commit.
     pub commits: HashMap<ObjectId, Commit>,
@@ -37,6 +56,7 @@ pub struct RebasePlan {
     replayed: Vec<(ObjectId, Commit, Vec<u8>)>,
     tip: ObjectId,
     discard: bool,
+    stop: Option<replay::StopPoint>,
 }
 
 impl RebasePlan {
@@ -77,59 +97,43 @@ pub(crate) fn judge_rebase(
     if onto.content != reset.target.content {
         return Err(HistoryRefusal::InvalidFacts);
     }
-    let mut content = bytes(facts, onto.content)?.to_vec();
-    let mut remaining = facts.range.clone();
-    let mut replayed = Vec::new();
-    while !remaining.is_empty() {
-        // Include merges in the ordering, so descendants wait for every original parent.
-        let id = remaining
-            .iter()
-            .filter(|id| {
-                facts.commits.get(id).is_some_and(|commit| {
-                    commit
-                        .parents
-                        .iter()
-                        .all(|parent| !remaining.contains(parent))
-                })
-            })
-            .min_by_key(|id| *id.as_bytes())
-            .copied()
-            .ok_or(HistoryRefusal::InvalidFacts)?;
-        remaining.remove(&id);
-        let original = facts.commits.get(&id).ok_or(HistoryRefusal::InvalidFacts)?;
-        let parent = match original.parents.as_slice() {
-            [] => return Err(HistoryRefusal::RebaseRoot(id)),
-            [parent] => parent,
-            _ => continue,
-        };
-        let base = facts
-            .commits
-            .get(parent)
-            .ok_or(HistoryRefusal::InvalidFacts)?;
-        content = match merge3(
-            bytes(facts, base.content)?,
-            &content,
-            bytes(facts, original.content)?,
-        ) {
-            MergeResult::Clean(bytes) => bytes,
-            MergeResult::Conflicted { .. } => return Err(HistoryRefusal::RebaseConflict(id)),
-        };
-        let mut commit = original.clone();
-        commit.parents = vec![reset.target.commit];
-        commit.content = hash_blob(&content);
-        let body = commit
-            .encode_body()
-            .map_err(|_| HistoryRefusal::InvalidFacts)?;
-        reset.target.commit = hash_object(ObjectKind::Commit, &body);
-        reset.target.content = commit.content;
-        replayed.push((reset.target.commit, commit, content.clone()));
+    if facts.stopped.is_some() {
+        return Err(HistoryRefusal::RebaseStopped);
     }
+    let ids = replay::ordered(facts)?;
+    let result = replay::replay(
+        facts,
+        reset.target.commit,
+        bytes(facts, onto.content)?.to_vec(),
+        &ids,
+    )?;
+    if let Some(stop) = &result.stop {
+        if facts.copy.is_none() || stop.marker_lines.is_empty() {
+            return Err(HistoryRefusal::RebaseConflict(stop.current));
+        }
+        let copy = facts
+            .reset
+            .placements
+            .iter()
+            .find(|p| Some(&p.placement.path) == facts.copy.as_ref())
+            .ok_or(HistoryRefusal::InvalidFacts)?;
+        if copy.placement.kind != crate::placement::PlacementKind::Copy
+            || copy.placement.conflict.is_some()
+            || copy.placement.staged.is_some()
+        {
+            return Err(HistoryRefusal::InvalidFacts);
+        }
+        let _ = crate::ops::placement::move_::judge_move(copy, &facts.reset.target, discard)?;
+    }
+    reset.target.commit = result.tip;
+    reset.target.content = hash_blob(&result.content);
     Ok(RebasePlan {
         facts: facts.clone(),
         reset: judge_reset(&reset, discard)?,
-        replayed,
+        replayed: result.replayed,
         tip: reset.target.commit,
         discard,
+        stop: result.stop,
     })
 }
 

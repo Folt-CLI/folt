@@ -134,6 +134,7 @@ pub(super) fn encode_conflict(
     Ok(EncodedConflict {
         operation: Some(match state.operation {
             crate::placement::ConflictOperation::Merge => "merge",
+            crate::placement::ConflictOperation::Rebase => "rebase",
         }),
         other: Some(state.other.as_bytes().to_vec()),
         markers: Some(markers),
@@ -158,6 +159,7 @@ pub(super) fn decode_conflict(
     };
     let operation = match operation.as_str() {
         "merge" => ConflictOperation::Merge,
+        "rebase" => ConflictOperation::Rebase,
         _ => return Err(invalid()),
     };
     let mut remaining = markers.as_slice();
@@ -176,4 +178,16 @@ pub(super) fn decode_conflict(
         marker_lines,
         pre_merge: ObjectId::from_bytes(pre_merge.try_into().map_err(|_| invalid())?),
     }))
+}
+
+pub(super) fn encode_commits(ids: &[ObjectId]) -> Vec<u8> {
+    ids.iter().flat_map(|id| *id.as_bytes()).collect()
+}
+
+pub(super) fn decode_commits(bytes: &[u8]) -> Result<Vec<ObjectId>, RegistryError> {
+    let (chunks, rest) = bytes.as_chunks::<32>();
+    if !rest.is_empty() {
+        return Err(RegistryError::InvalidConflictState);
+    }
+    Ok(chunks.iter().map(|id| ObjectId::from_bytes(*id)).collect())
 }

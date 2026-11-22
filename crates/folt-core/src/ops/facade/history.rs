@@ -4,9 +4,8 @@ use crate::id::{FolioId, ObjectId};
 use crate::object::Tag;
 use crate::ops::history::{
     CommitFacts, CommitMetadata, CommitPlan, HistoryError, HistoryRefusal, HistoryStores,
-    RebaseFacts, RebasePlan, ResetFacts, ResetPlan, apply_commit, apply_rebase, apply_reset,
-    create_branch, create_tag, delete_branch, delete_tag, gather_commit, gather_rebase,
-    gather_reset, judge_commit, judge_rebase, judge_reset,
+    ResetFacts, ResetPlan, apply_commit, apply_reset, create_branch, create_tag, delete_branch,
+    delete_tag, gather_commit, gather_reset, judge_commit, judge_reset,
 };
 use crate::placement::PlacementOps;
 use crate::ref_name::RefName;
@@ -123,41 +122,5 @@ impl Home {
         lock: &mut HomeLock,
     ) -> Result<(), HistoryError> {
         apply_reset(plan, fs, stores, registry, lock)
-    }
-}
-
-impl Home {
-    /// Gathers history and placements for replay onto `onto`.
-    pub fn gather_rebase(
-        &self,
-        id: FolioId,
-        branch: &RefName,
-        onto: ObjectId,
-        fs: &impl PlacementOps,
-        stores: &HistoryStores<'_>,
-        registry: &Registry,
-    ) -> Result<RebaseFacts, HistoryError> {
-        gather_rebase(id, branch, onto, fs, stores, registry)
-    }
-
-    /// Judges replay and delegates placement decisions to reset.
-    pub fn judge_rebase(
-        &self,
-        facts: &RebaseFacts,
-        discard: bool,
-    ) -> Result<RebasePlan, HistoryRefusal> {
-        judge_rebase(facts, discard)
-    }
-
-    /// Publishes replay objects and applies the judged reset.
-    pub fn apply_rebase(
-        &self,
-        plan: &RebasePlan,
-        fs: &impl PlacementOps,
-        stores: &HistoryStores<'_>,
-        registry: &mut Registry,
-        lock: &mut HomeLock,
-    ) -> Result<ObjectId, HistoryError> {
-        apply_rebase(plan, fs, stores, registry, lock)
     }
 }

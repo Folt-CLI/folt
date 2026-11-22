@@ -6,6 +6,7 @@ mod history;
 mod merge;
 mod placement;
 mod prune;
+mod rebase;
 mod register;
 mod rename;
 mod stage;

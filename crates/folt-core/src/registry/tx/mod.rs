@@ -4,6 +4,7 @@ mod folios;
 mod moves;
 mod names;
 mod placements;
+mod rebases;
 mod references;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

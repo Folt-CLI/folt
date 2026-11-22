@@ -237,6 +237,8 @@ fn replay_commit(
 fn rebase_facts() -> (RebaseFacts, ObjectId, ObjectId) {
     let placement = facts();
     let mut facts = RebaseFacts {
+        copy: None,
+        stopped: None,
         reset: ResetFacts {
             id: placement.placement.id,
             target: target(),
@@ -511,7 +513,7 @@ fn merge_refuses_binary_ancestors_before_content_conflict_and_validation() {
     );
 }
 
-fn conflict_fixture(
+pub(super) fn conflict_fixture(
     home: &crate::home::Home,
     lock: &mut crate::home::HomeLock,
 ) -> (Registry, crate::store::ObjectStore, RefStore, Placement) {

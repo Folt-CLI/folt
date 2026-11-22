@@ -87,6 +87,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [size](#size)
 - [stage](#stage)
 - [StepHook](#stephook)
+- [stopped rebase](#stopped-rebase)
 - [tag](#tag)
 - [TempFile](#tempfile)
 - [test_support](#test_support)
@@ -114,7 +115,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### registry
 
 - **Layer:** Storage and identity
-- **Definition:** The SQLite database `registry.db` in the home records Folio existence, names, placements and cached references. Its tables are `folios`, `placements`, `refs` and `folt_metadata`.
+- **Definition:** The SQLite database `registry.db` in the home records Folio existence, names, placements, cached references and stopped rebase progress. Its tables are `folios`, `placements`, `refs`, `stopped_rebases` and `folt_metadata`.
 - **Code:** `crates/folt-core/src/registry/mod.rs:27` (`Registry`)
 - **Related:** [home](#home), [Folio](#folio), [placement](#placement), [refs table](#refs-table).
 - **Not:** Just the placements table, a tracked-roots list or the on-disk history refs.
@@ -341,7 +342,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### conflict state
 
 - **Layer:** Placements and working state
-- **Definition:** A nullable state on a copy's placement row holding the operation, the other commit, the exact conflict marker lines and the pre-merge file blob id. The state ends by abort or continue.
+- **Definition:** A nullable state on a copy's placement row holding the operation (merge or rebase), the other commit (the other branch tip for a merge or the commit being replayed for a rebase), the exact conflict marker lines and the file blob id before the merge or rebase. Merge conflict state ends by abort or continue; rebase conflict state ends when the stopped rebase finishes or is aborted.
 - **Code:** `crates/folt-core/src/placement.rs` (`ConflictState`)
 - **Related:** [copy](#copy), [placement](#placement), [conflict marker](#conflict-marker), [merge](#merge).
 - **Not:** A conflict marker, a link row field, or recoverable by registry rebuild.
@@ -642,7 +643,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### rebase
 
 - **Layer:** Operations
-- **Definition:** A plan and apply operation for one Folio and branch that replays commits reachable from its tip but not from a chosen destination commit, drops merge commits and uses reset to advance the branch and move its placements once. Tags and retention pins stay on the original commits and are reported. A parentless commit in the range is refused.
+- **Definition:** A plan and apply operation for one Folio and branch that replays commits reachable from its tip but not from a chosen destination commit, drops merge commits and uses reset to advance the branch and move its placements once. Tags and retention pins stay on the original commits and are reported. A parentless commit in the range is refused. A text conflict stops a rebase run from a copy; a conflict without a copy or a binary conflict is refused.
 - **Code:** `crates/folt-core/src/ops/history/rebase.rs` (`RebaseFacts`, `RebasePlan`, `LeftBehind`, `judge_rebase`)
 - **Related:** [replay](#replay), [branch](#branch), [plan and apply](#plan-and-apply).
 - **Status:** decided
@@ -650,9 +651,17 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### replay
 
 - **Layer:** Operations
-- **Definition:** Applying an ordinary commit's content change to the accumulated destination content with a three-way merge using the original parent's content. Rebase orders commits parent-first with object id byte order as the tie-break, preserves author, time, message, body and group, and chains each new commit to the previous result. A conflict refuses the operation with the original commit id.
-- **Code:** `crates/folt-core/src/ops/history/rebase.rs` (`judge_rebase`)
+- **Definition:** Applying an ordinary commit's content change to the accumulated destination content with a three-way merge using the original parent's content. Rebase orders commits parent-first with object id byte order as the tie-break, preserves author, time, message, body and group, and chains each new commit to the previous result. A text conflict stops a rebase run from a copy at the original commit id; without a copy, or for a binary conflict, it refuses the operation with that id.
+- **Code:** `crates/folt-core/src/ops/history/rebase/replay.rs` (`replay`)
 - **Related:** [rebase](#rebase), [three-way merge](#three-way-merge), [commit](#commit).
+- **Status:** decided
+
+### stopped rebase
+
+- **Layer:** Operations
+- **Definition:** Durable progress for one Folio whose rebase has stopped at a replay conflict from a copy. The registry table holds the branch, copy path, original tip, destination, remaining commits, current replay and new tip so far. Its copy has a rebase conflict state. Continue uses the resolved working bytes for the current replay, then replays the remaining commits and either stops again or advances the branch once and moves its placements. Abort restores the pre-rebase file blob and removes the progress and conflict state; edited conflict content requires discard. Durable progress also recovers interrupted conflict-file publication and final placement movement.
+- **Code:** `crates/folt-core/src/ops/history/rebase/stopped.rs`
+- **Related:** [rebase](#rebase), [replay](#replay), [conflict state](#conflict-state), [registry](#registry).
 - **Status:** decided
 
 ### publish
