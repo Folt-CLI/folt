@@ -15,6 +15,8 @@ pub enum RefusalReason {
     CopyBranch,
     ConvertGone,
     OtherLink,
+    Conflicted,
+    ConflictMarkers,
     Staged,
     InternalEdited,
     Link,
@@ -54,6 +56,12 @@ impl fmt::Display for PlacementRefusal {
             }
             RefusalReason::OtherLink => {
                 "placement points elsewhere; use the kind-change command (#33) to retarget on purpose"
+            }
+            RefusalReason::Conflicted => {
+                "copy has a conflict state; resolve and stage, or remove the placement"
+            }
+            RefusalReason::ConflictMarkers => {
+                "copy still contains the recorded conflict marker lines"
             }
             RefusalReason::Staged => {
                 "copy has a recorded stage; commit or checkout main with discard first"

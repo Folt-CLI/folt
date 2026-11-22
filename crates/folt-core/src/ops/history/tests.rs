@@ -681,3 +681,125 @@ fn conflict_failure_after_file_write_leaves_no_state_and_discard_checkout_restor
         hash_blob(b"ours\n")
     );
 }
+
+#[test]
+fn commit_conflict_refusal_precedes_stage_and_branch_checks() {
+    let mut facts = commit_facts();
+    facts.working = crate::test_support::conflicted_facts();
+    facts.working.tip = Some(hash_blob(b"advanced"));
+    let refusal = judge_commit(&facts).unwrap_err();
+    assert!(
+        matches!(&refusal, HistoryRefusal::Move(error) if error.reason == crate::ops::refusal::RefusalReason::Conflicted)
+    );
+    assert!(
+        refusal.to_string().contains(
+            &facts
+                .working
+                .placement
+                .path
+                .to_path_buf()
+                .display()
+                .to_string()
+        )
+    );
+}
+
+#[test]
+fn reset_skips_conflicted_copy_and_plans_ordinary_copy() {
+    let conflicted = crate::test_support::conflicted_facts();
+    let mut ordinary = facts();
+    ordinary.placement.path = crate::placement_path::PlacementPath::resolve(
+        std::env::temp_dir().join("folt-reset-ordinary"),
+    )
+    .unwrap();
+    let reset = ResetFacts {
+        id: conflicted.placement.id,
+        target: target(),
+        old: conflicted.tip.unwrap(),
+        placements: vec![conflicted.clone(), ordinary],
+    };
+    let plan = judge_reset(&reset, false).unwrap();
+    assert_eq!(plan.skipped(), &[conflicted.placement.path.to_path_buf()]);
+}
+
+#[test]
+fn apply_reset_preserves_conflicted_row_and_file_and_rechecks_skipped_rows() {
+    use crate::placement::PlacementOps;
+    let home = crate::test_support::TempHome::new().unwrap();
+    let mut lock = home.home.try_lock().unwrap();
+    let (mut registry, objects, refs, mut flagged) = conflict_fixture(&home.home, &mut lock);
+    let fs = crate::placement_fs::PlacementFs::new(&home.home);
+    flagged.conflict = crate::test_support::conflicted_facts().placement.conflict;
+    let mut ordinary = flagged.clone();
+    ordinary.path =
+        crate::placement_path::PlacementPath::resolve(home.root.join("ordinary.txt")).unwrap();
+    ordinary.conflict = None;
+    ordinary.base = fs
+        .create(
+            ordinary.id,
+            &ordinary.to_placement().1,
+            &objects,
+            hash_blob(b"ours\n"),
+        )
+        .unwrap()
+        .base;
+    registry
+        .write(&lock, |tx| {
+            tx.update_placement(&flagged)?;
+            tx.insert_placement(&ordinary)
+        })
+        .unwrap();
+    let stores = HistoryStores {
+        objects: &objects,
+        refs: &refs,
+        object_limit: 16384,
+    };
+    let target = refs
+        .read(RefKind::Branch, &RefName::parse("topic").unwrap())
+        .unwrap()
+        .unwrap();
+    let facts = gather_reset(
+        flagged.id,
+        &RefName::parse("main").unwrap(),
+        target,
+        &fs,
+        &stores,
+        &registry,
+    )
+    .unwrap();
+    let plan = judge_reset(&facts, false).unwrap();
+    assert_eq!(plan.skipped(), &[flagged.path.to_path_buf()]);
+    let mut changed = flagged.clone();
+    changed.conflict.as_mut().unwrap().other = hash_blob(b"changed conflict");
+    registry
+        .write(&lock, |tx| tx.update_placement(&changed))
+        .unwrap();
+    assert!(matches!(
+        apply_reset(&plan, &fs, &stores, &mut registry, &mut lock),
+        Err(HistoryError::Refused(HistoryRefusal::PlacementsChanged))
+    ));
+    registry
+        .write(&lock, |tx| tx.update_placement(&flagged))
+        .unwrap();
+    apply_reset(&plan, &fs, &stores, &mut registry, &mut lock).unwrap();
+    assert_eq!(
+        registry.placement_at(&flagged.path).unwrap(),
+        Some(flagged.clone())
+    );
+    assert_eq!(
+        std::fs::read(flagged.path.to_path_buf()).unwrap(),
+        b"ours\n"
+    );
+    assert_eq!(
+        registry
+            .placement_at(&ordinary.path)
+            .unwrap()
+            .unwrap()
+            .commit_id,
+        Some(target)
+    );
+    assert_eq!(
+        std::fs::read(ordinary.path.to_path_buf()).unwrap(),
+        b"theirs\n"
+    );
+}

@@ -4,7 +4,7 @@ use crate::config::names::DEFAULT_BRANCH;
 use crate::id::ObjectId;
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
-use crate::ops::stage::refuse::is_staged;
+use crate::ops::stage::refuse::{is_conflicted, is_staged};
 use crate::placement::{self, Drift, Observation, PlacementKind};
 use crate::registry;
 
@@ -58,6 +58,9 @@ pub(crate) fn judge_convert(
         || (placement.kind == PlacementKind::Copy && placement.head != DEFAULT_BRANCH)
     {
         return Err(refuse(RefusalReason::CopyBranch));
+    }
+    if is_conflicted(&facts.placement) {
+        return Err(refuse(RefusalReason::Conflicted));
     }
     if is_staged(&facts.placement) {
         return Err(refuse(RefusalReason::Staged));

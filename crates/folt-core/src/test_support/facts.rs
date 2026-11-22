@@ -38,6 +38,21 @@ pub(crate) fn facts() -> PlacementFacts {
     }
 }
 
+pub(crate) fn conflicted_facts() -> PlacementFacts {
+    let mut facts = facts();
+    facts.placement.conflict = Some(crate::placement::ConflictState {
+        operation: crate::placement::ConflictOperation::Merge,
+        other: hash_blob(b"other"),
+        marker_lines: vec![
+            b"<<<<<<<\n".to_vec(),
+            b"=======\n".to_vec(),
+            b">>>>>>>\n".to_vec(),
+        ],
+        pre_merge: hash_blob(b"pre-merge"),
+    });
+    facts
+}
+
 pub(crate) fn target() -> MoveTarget {
     MoveTarget {
         branch: RefName::parse("topic").unwrap(),

@@ -68,6 +68,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Restoring files and removing created files when an operation fails | `ops::rollback` (`Rollback`) |
 | Placement refusals | `ops::refusal` |
 | Gathered facts of a placement | `ops::facts` |
+| Checks of a copy's conflict state in existing operations and whether recorded conflict marker lines remain | `ops::stage::refuse` (checks), `ops::refusal` (refusal reasons) |
 | Whether a placement has a stage | `ops::stage::refuse` |
 | Binary test, whole-file equality rules, line merge and conflict marker rendering | `merge` |
 | History operations and their refusals | `ops::history` |

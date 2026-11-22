@@ -22,6 +22,20 @@ pub(crate) fn stage(
     let selected = row;
     let row = &resolve_working(selected, registry, fs)?;
     let before = read_working(row, fs)?;
+    if let Some(state) = &row.conflict {
+        let path = row.path.to_path_buf();
+        let bytes = std::fs::read(&path).map_err(|source| PlacementError::OperationFailed {
+            path: path.clone(),
+            source,
+        })?;
+        if refuse::markers_remain(state, &bytes) {
+            return Err(PlacementRefusal {
+                path,
+                reason: RefusalReason::ConflictMarkers,
+            }
+            .into());
+        }
+    }
     let hash = objects
         .put_file(lock, ObjectKind::Blob, &row.path.to_path_buf())
         .map_err(PlacementError::Store)?;
