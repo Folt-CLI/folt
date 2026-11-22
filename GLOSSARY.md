@@ -6,6 +6,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 ## A-Z index
 
+- [abort](#abort)
 - [alias](#alias)
 - [analysis agent](#analysis-agent)
 - [ancestor](#ancestor)
@@ -18,6 +19,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [commit](#commit)
 - [conflict marker](#conflict-marker)
 - [conflict state](#conflict-state)
+- [continue](#continue)
 - [copy](#copy)
 - [directory Folio](#directory-folio)
 - [Disposition](#disposition)
@@ -222,9 +224,27 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### merge
 
 - **Layer:** History
-- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. Several merge bases are folded into a virtual base first. A text conflict on a copy writes conflict markers and a conflict state instead of a merge commit. Binary conflicts and non-copy conflicts are refused; a binary conflict between merge base ancestors, no merge base or an already merged branch writes nothing.
+- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. Several merge bases are folded into a virtual base first. A text conflict on a copy writes conflict markers and a conflict state instead of a merge commit; that state ends by abort or continue. Binary conflicts and non-copy conflicts are refused; a binary conflict between merge base ancestors, no merge base or an already merged branch writes nothing.
 - **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
 - **Related:** [merge base](#merge-base), [three-way merge](#three-way-merge), [merge commit](#merge-commit).
+- **Status:** decided
+
+### abort
+
+- **Layer:** History
+- **Definition:** To end the merge of a copy with conflict state by restoring its pre-merge bytes and clearing its stage and conflict state, without moving the branch ref or removing the pre-merge blob.
+- **Code:** `crates/folt-core/src/ops/history/merge/abort.rs` (`abort_merge`)
+- **Related:** [merge](#merge), [conflict state](#conflict-state), [continue](#continue).
+- **Not:** Rebase continue or abort.
+- **Status:** decided
+
+### continue
+
+- **Layer:** History
+- **Definition:** To end the merge of a copy with conflict state by committing its staged resolution with the recorded target commit first and the other commit second as parents, clearing its stage and conflict state together with recording the merge commit.
+- **Code:** `crates/folt-core/src/ops/history/merge/continue_merge.rs` (`continue_merge`)
+- **Related:** [merge](#merge), [conflict state](#conflict-state), [abort](#abort).
+- **Not:** Rebase continue or abort.
 - **Status:** decided
 
 ### merge commit
@@ -321,7 +341,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### conflict state
 
 - **Layer:** Placements and working state
-- **Definition:** A nullable state on a copy's placement row holding the operation, the other commit, the exact conflict marker lines and the pre-merge file blob id.
+- **Definition:** A nullable state on a copy's placement row holding the operation, the other commit, the exact conflict marker lines and the pre-merge file blob id. The state ends by abort or continue.
 - **Code:** `crates/folt-core/src/placement.rs` (`ConflictState`)
 - **Related:** [copy](#copy), [placement](#placement), [conflict marker](#conflict-marker), [merge](#merge).
 - **Not:** A conflict marker, a link row field, or recoverable by registry rebuild.

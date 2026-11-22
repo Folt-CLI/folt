@@ -5,6 +5,7 @@ use std::{error::Error, fmt, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HistoryRefusal {
     NothingStaged,
+    NotConflicted(PathBuf),
     BranchMoved {
         tip: Option<ObjectId>,
         ahead: Vec<PathBuf>,
@@ -41,6 +42,11 @@ impl From<placement_refusal::PlacementRefusal> for HistoryRefusal {
 impl fmt::Display for HistoryRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NotConflicted(path) => write!(
+                f,
+                "copy has no merge to abort or continue: {}",
+                path.display()
+            ),
             Self::NothingStaged => write!(f, "nothing staged"),
             Self::BranchMoved { tip, ahead } => {
                 write!(f, "branch moved to {tip:?}")?;

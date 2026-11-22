@@ -10,14 +10,18 @@ use crate::placement::{ConflictState, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
 
+mod abort;
 mod apply;
 pub(crate) mod conflict;
+mod continue_merge;
 mod judge;
 mod virtual_base;
 
+pub(crate) use abort::abort_merge;
 pub(crate) use apply::merge_branch;
 #[cfg(test)]
 pub(super) use apply::merge_branch_steps;
+pub(crate) use continue_merge::continue_merge;
 #[cfg(test)]
 pub(super) use judge::judge_merge;
 

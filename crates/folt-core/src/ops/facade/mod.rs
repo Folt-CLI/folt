@@ -3,6 +3,7 @@
 
 mod checkout;
 mod history;
+mod merge;
 mod placement;
 mod prune;
 mod register;
