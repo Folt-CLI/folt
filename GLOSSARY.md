@@ -93,6 +93,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [trigger](#trigger)
 - [unresolved reference](#unresolved-reference)
 - [unstage](#unstage)
+- [virtual base](#virtual-base)
 - [work item](#work-item)
 - [worktree](#worktree)
 
@@ -220,7 +221,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### merge
 
 - **Layer:** History
-- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. A conflict, a criss-cross history, no merge base or an already merged branch writes nothing.
+- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. Several merge bases are folded into a virtual base first. A conflict in the final result, a binary conflict between merge base ancestors, no merge base or an already merged branch writes nothing.
 - **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
 - **Related:** [merge base](#merge-base), [three-way merge](#three-way-merge), [merge commit](#merge-commit).
 - **Status:** decided
@@ -236,10 +237,19 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### merge base
 
 - **Layer:** History
-- **Definition:** A best common ancestor of two commits: a common ancestor that is not a proper ancestor of another common ancestor. There may be none, one or several; several are reported in object id byte order without merging them or creating a virtual base.
+- **Definition:** A best common ancestor of two commits: a common ancestor that is not a proper ancestor of another common ancestor. There may be none, one or several; several are returned in object id byte order and folded into a virtual base by the merge.
 - **Code:** `crates/folt-core/src/history/ancestry.rs:10` (`MergeBase`); `crates/folt-core/src/history/ancestry.rs:40` (`merge_base`)
 - **Related:** [ancestor](#ancestor), [commit](#commit), [base](#base).
 - **Not:** The placement base, which records a content hash and file signature, or a merge operation.
+- **Status:** decided
+
+### virtual base
+
+- **Layer:** History
+- **Definition:** In-memory content produced by folding several best common ancestors from left to right in object id byte order for a merge. Each pair uses its merge base content, recursively folding several merge bases and using empty bytes when there is none. Text conflicts remain as conflict marker lines in these bytes; a binary conflict between the ancestors refuses the merge. No object is stored for the virtual base.
+- **Code:** `crates/folt-core/src/ops/history/merge/virtual_base.rs` (`fold`)
+- **Related:** [merge](#merge), [merge base](#merge-base), [three-way merge](#three-way-merge), [conflict marker](#conflict-marker).
+- **Not:** A stored commit or blob, a placement base, or conflict markers written into a working file.
 - **Status:** decided
 
 ### ref name

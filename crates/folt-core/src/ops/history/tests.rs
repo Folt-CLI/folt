@@ -373,6 +373,7 @@ fn merge_facts() -> merge::MergeFacts {
         history,
         other: Some(hash_blob(b"other tip")),
         base: crate::history::MergeBase::One(hash_blob(b"merge base")),
+        ancestors_binary_conflict: false,
         merged: crate::merge::merge3(b"a\nb\nc\n", b"A\nb\nc\n", b"a\nb\nC\n"),
         validation: Ok(()),
     }
@@ -422,7 +423,7 @@ fn merge_refuses_link_unusable_stage_edits_and_moved_branch_in_order() {
 }
 
 #[test]
-fn merge_refuses_already_merged_no_base_criss_cross_conflict_then_validation() {
+fn merge_refuses_already_merged_no_base_conflict_then_validation() {
     use crate::history::MergeBase;
     let mut facts = merge_facts();
     facts.other = facts.history.working.tip;
@@ -443,10 +444,7 @@ fn merge_refuses_already_merged_no_base_criss_cross_conflict_then_validation() {
         HistoryRefusal::MergeNoBase
     );
     facts.base = MergeBase::Several(vec![hash_blob(b"a"), hash_blob(b"b")]);
-    assert_eq!(
-        merge::judge_merge(&facts).unwrap_err(),
-        HistoryRefusal::MergeCrissCross
-    );
+    assert!(merge::judge_merge(&facts).is_ok());
     facts.base = merge_facts().base;
     facts.merged = crate::merge::merge3(b"a\nb\nc\n", b"A\nb\nc\n", b"different\nb\nc\n");
     facts.validation = Err("invalid".into());
@@ -480,4 +478,24 @@ fn merge_accepts_fast_forward_and_refuses_edited_internal() {
         merge::judge_merge(&facts),
         Err(HistoryRefusal::InternalEdited(_))
     ));
+}
+
+#[test]
+fn merge_refuses_binary_ancestors_before_content_conflict_and_validation() {
+    let mut facts = merge_facts();
+    facts.base = crate::history::MergeBase::Several(vec![hash_blob(b"a"), hash_blob(b"b")]);
+    facts.ancestors_binary_conflict = true;
+    facts.merged = crate::merge::merge3(b"base", b"ours", b"theirs");
+    facts.validation = Err("invalid".into());
+    let refusal = merge::judge_merge(&facts).unwrap_err();
+    assert_eq!(refusal, HistoryRefusal::MergeBaseBinaryConflict);
+    assert_eq!(
+        refusal.to_string(),
+        "merge base ancestors have a binary conflict"
+    );
+    facts.base = crate::history::MergeBase::None;
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeNoBase
+    );
 }
