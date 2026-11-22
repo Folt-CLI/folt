@@ -21,6 +21,8 @@ pub enum HistoryRefusal {
     InvalidFacts,
     RebaseConflict(ObjectId),
     RebaseRoot(ObjectId),
+    RebaseStopped,
+    NoStoppedRebase,
     MergeConflict,
     MergeBaseBinaryConflict,
     MergeAlreadyMerged,
@@ -66,6 +68,8 @@ impl fmt::Display for HistoryRefusal {
             Self::BranchInUse(paths) => write!(f, "branch is used by {} placement(s)", paths.len()),
             Self::InvalidFacts => write!(f, "inconsistent history facts"),
             Self::RebaseConflict(id) => write!(f, "replay conflicted at commit {id}"),
+            Self::RebaseStopped => write!(f, "a rebase of this Folio is already stopped"),
+            Self::NoStoppedRebase => write!(f, "no stopped rebase for this Folio"),
             Self::RebaseRoot(id) => write!(f, "cannot replay parentless commit {id}"),
             Self::MergeConflict => write!(f, "merge content conflicts"),
             Self::MergeBaseBinaryConflict => {

@@ -55,7 +55,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 
 | Rule | Owner |
 | --- | --- |
-| Conflict state of a copy: type and columns | `placement` and `registry`; writing it: `ops::history` merge |
+| Conflict state of a copy: type and columns | `placement` and `registry`; writing it: `ops::history` |
 | Fixed names, file names and the marker name | `config::names` |
 | Scan limit and the window that reads past it | `config::limits` (`SCAN_LIMIT`, `SCAN_WINDOW`) |
 | Registry application id | `config::formats` (`APPLICATION_ID`) |
@@ -79,6 +79,8 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Prune judge and apply | `ops::prune` |
 | Exclusive access to one home | `home::lock` (`HomeLock`) |
 | Resolving a path to a placement path | `placement_path` (`PlacementPath`) |
+| Stopped rebase table, row codec and transactions | `registry` |
+| Starting, stopping, continuing and aborting a rebase, including replay ordering and metadata | `ops::history` |
 | Registry schema, rows and transactions | `registry` |
 | Branch, tag and pin refs on disk | `history::RefStore` |
 | Commit ancestry and merge base computation | `history::ancestry` |

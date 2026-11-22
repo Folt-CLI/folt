@@ -267,7 +267,15 @@ fn rebase_publishes_once_moves_placements_and_retains_original_refs() {
     };
     let facts = home
         .home
-        .gather_rebase(folio.folio.id(), &main, onto, &fs, &stores, &folio.registry)
+        .gather_rebase(
+            folio.folio.id(),
+            &main,
+            onto,
+            None,
+            &fs,
+            &stores,
+            &folio.registry,
+        )
         .unwrap();
     let plan = home.home.judge_rebase(&facts, false).unwrap();
     assert_eq!(folio.refs.read(RefKind::Branch, &main).unwrap(), Some(old));
@@ -295,6 +303,9 @@ fn rebase_publishes_once_moves_placements_and_retains_original_refs() {
         .home
         .apply_rebase(&plan, &fs, &stores, &mut folio.registry, &mut lock)
         .unwrap();
+    let history::RebaseOutcome::Finished(tip) = tip else {
+        panic!("expected finished rebase")
+    };
     assert_eq!(tip, plan.tip());
     assert_eq!(folio.refs.read(RefKind::Branch, &main).unwrap(), Some(tip));
     let replayed = folio.objects.get_commit(tip, stores.object_limit).unwrap();
@@ -349,7 +360,15 @@ fn rebase_rechecks_edits_and_ref_movement_before_publishing() {
     };
     let facts = home
         .home
-        .gather_rebase(folio.folio.id(), &main, onto, &fs, &stores, &folio.registry)
+        .gather_rebase(
+            folio.folio.id(),
+            &main,
+            onto,
+            None,
+            &fs,
+            &stores,
+            &folio.registry,
+        )
         .unwrap();
     let plan = home.home.judge_rebase(&facts, false).unwrap();
     std::fs::write(folio.internal().path.to_path_buf(), b"new edits").unwrap();
@@ -407,13 +426,24 @@ fn rebase_reads_large_content_independently_of_commit_limit() {
     };
     let facts = home
         .home
-        .gather_rebase(folio.folio.id(), &main, onto, &fs, &stores, &folio.registry)
+        .gather_rebase(
+            folio.folio.id(),
+            &main,
+            onto,
+            None,
+            &fs,
+            &stores,
+            &folio.registry,
+        )
         .unwrap();
     let plan = home.home.judge_rebase(&facts, false).unwrap();
     let tip = home
         .home
         .apply_rebase(&plan, &fs, &stores, &mut folio.registry, &mut lock)
         .unwrap();
+    let history::RebaseOutcome::Finished(tip) = tip else {
+        panic!("expected finished rebase")
+    };
     branch_content[end - 2] = b'Z';
     assert_eq!(
         std::fs::read(folio.internal().path.to_path_buf()).unwrap(),
@@ -429,6 +459,7 @@ fn rebase_reads_large_content_independently_of_commit_limit() {
             folio.folio.id(),
             &main,
             onto,
+            None,
             &fs,
             &limited,
             &folio.registry
@@ -458,13 +489,24 @@ fn rebase_accepts_working_content_equal_to_final_replay_without_discard() {
     };
     let facts = home
         .home
-        .gather_rebase(folio.folio.id(), &main, onto, &fs, &stores, &folio.registry)
+        .gather_rebase(
+            folio.folio.id(),
+            &main,
+            onto,
+            None,
+            &fs,
+            &stores,
+            &folio.registry,
+        )
         .unwrap();
     let plan = home.home.judge_rebase(&facts, false).unwrap();
     let tip = home
         .home
         .apply_rebase(&plan, &fs, &stores, &mut folio.registry, &mut lock)
         .unwrap();
+    let history::RebaseOutcome::Finished(tip) = tip else {
+        panic!("expected finished rebase")
+    };
     assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), b"A\nb\nC\n");
     let updated = folio.internal();
     assert_eq!(updated.commit_id, Some(tip));
@@ -474,3 +516,5 @@ fn rebase_accepts_working_content_equal_to_final_replay_without_discard() {
     );
     assert_eq!(folio.refs.read(RefKind::Branch, &main).unwrap(), Some(tip));
 }
+
+mod stopped;

@@ -13,12 +13,14 @@ mod query;
 mod references;
 mod rows;
 mod schema;
+mod stopped;
 mod tx;
 
 pub use crate::placement::PlacementBase;
 pub use references::ReferenceRow;
 pub(crate) use references::reference_name;
 pub use rows::{NewPlacement, Placement, internal_placement};
+pub use stopped::StoppedRebase;
 pub use tx::{MoveResult, RegistryTransaction, RemoveResult};
 
 /// SQLite registry for Folios and their placements.

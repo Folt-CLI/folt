@@ -5,6 +5,7 @@ mod checkout;
 mod history;
 mod placement;
 mod prune;
+mod rebase;
 mod register;
 mod rename;
 mod stage;

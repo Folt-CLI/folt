@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConflictOperation {
     Merge,
+    Rebase,
 }
 
 /// Conflict state belongs to one copy, independently of other placements of its Folio.

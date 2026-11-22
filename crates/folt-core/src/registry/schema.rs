@@ -2,7 +2,7 @@ use std::path::Path;
 
 use rusqlite::Transaction;
 
-use crate::config::formats::{APPLICATION_ID, OUTDATED_SCHEMA, SCHEMA_VERSION};
+use crate::config::formats::{APPLICATION_ID, SCHEMA_VERSION};
 use crate::layout::HOME_FORMAT_VERSION;
 use crate::placement_path::RegistryError;
 
@@ -29,7 +29,7 @@ pub(super) fn classify_schema(
     if app != i64::from(APPLICATION_ID) || version == 0 {
         return Err(RegistryError::ForeignDatabase(path.to_path_buf()));
     }
-    if version == OUTDATED_SCHEMA {
+    if (1..SCHEMA_VERSION).contains(&version) {
         // This refusal must be removed before the first release, when migrations are required.
         return Err(RegistryError::OutdatedSchema {
             found: version,
@@ -51,6 +51,7 @@ pub(super) fn create_schema(tx: &Transaction<'_>) -> Result<(), RegistryError> {
         CREATE INDEX placements_id ON placements(id);\
         CREATE TABLE refs(parent BLOB NOT NULL, branch TEXT NOT NULL, key TEXT NOT NULL, child TEXT NOT NULL, child_label TEXT NOT NULL, pin TEXT, PRIMARY KEY(parent,branch,key)) WITHOUT ROWID;\
         CREATE INDEX refs_child ON refs(child);")?;
+    tx.execute_batch("CREATE TABLE stopped_rebases(id BLOB PRIMARY KEY REFERENCES folios(id), branch TEXT NOT NULL, copy_path BLOB NOT NULL, original_tip BLOB NOT NULL, destination BLOB NOT NULL, remaining BLOB NOT NULL, current_replay BLOB, new_tip BLOB NOT NULL, file_before BLOB NOT NULL, marker_blob BLOB, discard INTEGER NOT NULL) WITHOUT ROWID;")?;
     tx.execute_batch(
         "CREATE TABLE folt_metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;",
     )?;
