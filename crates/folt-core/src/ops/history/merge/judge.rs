@@ -1,4 +1,4 @@
-use super::{MergeFacts, MergePlan};
+use super::{MergeFacts, MergePlan, MergePlanData};
 use crate::config::names::DEFAULT_BRANCH;
 use crate::history::MergeBase;
 use crate::merge::MergeResult;
@@ -40,8 +40,21 @@ pub(crate) fn judge_merge(facts: &MergeFacts) -> Result<MergePlan, HistoryRefusa
     if facts.ancestors_binary_conflict {
         return Err(HistoryRefusal::MergeBaseBinaryConflict);
     }
-    let MergeResult::Clean(bytes) = &facts.merged else {
-        return Err(HistoryRefusal::MergeConflict);
+    let bytes = match &facts.merged {
+        MergeResult::Clean(bytes) => bytes,
+        MergeResult::Conflicted {
+            merged: Some(bytes),
+            marker_lines,
+        } if row.kind == PlacementKind::Copy => {
+            return Ok(MergePlan::Conflicted {
+                plan: MergePlanData {
+                    facts: facts.clone(),
+                    bytes: bytes.clone(),
+                },
+                marker_lines: marker_lines.clone(),
+            });
+        }
+        MergeResult::Conflicted { .. } => return Err(HistoryRefusal::MergeConflict),
     };
     facts
         .validation
@@ -79,8 +92,8 @@ pub(crate) fn judge_merge(facts: &MergeFacts) -> Result<MergePlan, HistoryRefusa
             )?;
         }
     }
-    Ok(MergePlan {
+    Ok(MergePlan::Clean(MergePlanData {
         facts: facts.clone(),
         bytes: bytes.clone(),
-    })
+    }))
 }

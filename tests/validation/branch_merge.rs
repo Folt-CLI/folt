@@ -5,7 +5,9 @@ use folt_core::front_matter::Reference;
 use folt_core::history::Expect;
 use folt_core::home::HomeLock;
 use folt_core::id::ObjectId;
-use folt_core::ops::history::{HistoryError, HistoryRefusal, HistoryStores, MergeRequest};
+use folt_core::ops::history::{
+    HistoryError, HistoryRefusal, HistoryStores, MergeOutcome, MergeRequest,
+};
 use folt_core::placement::{PlacementKind, PlacementOps};
 use folt_core::placement_fs::PlacementFs;
 use folt_core::placement_path::PlacementPath;
@@ -21,24 +23,29 @@ fn merge(
     lock: &mut HomeLock,
     row: &Placement,
 ) -> Result<ObjectId, HistoryError> {
-    home.home.merge_branch(
-        row,
-        MergeRequest {
-            other: &RefName::parse("topic").unwrap(),
-            metadata: metadata(),
-        },
-        &PlacementFs::new(&home.home),
-        &HistoryStores {
-            objects: &folio.objects,
-            refs: &folio.refs,
-            object_limit: 16384,
-        },
-        &mut folio.registry,
-        lock,
-    )
+    home.home
+        .merge_branch(
+            row,
+            MergeRequest {
+                other: &RefName::parse("topic").unwrap(),
+                metadata: metadata(),
+            },
+            &PlacementFs::new(&home.home),
+            &HistoryStores {
+                objects: &folio.objects,
+                refs: &folio.refs,
+                object_limit: 16384,
+            },
+            &mut folio.registry,
+            lock,
+        )
+        .map(|outcome| match outcome {
+            MergeOutcome::Merged(id) => id,
+            MergeOutcome::Conflicted(_) => panic!("expected a clean merge"),
+        })
 }
 
-fn snapshot(path: &Path, home_lock: &Path) -> Vec<(PathBuf, ObjectId)> {
+pub(super) fn snapshot(path: &Path, home_lock: &Path) -> Vec<(PathBuf, ObjectId)> {
     let mut files = Vec::new();
     for entry in std::fs::read_dir(path).unwrap() {
         let path = entry.unwrap().path();
@@ -94,7 +101,7 @@ fn snapshot_skips_held_home_lock_but_keeps_working_file_named_lock() {
     assert_ne!(snapshot(home.root(), &home_lock), files);
 }
 
-fn copy(
+pub(super) fn copy(
     home: &TempHome,
     folio: &mut TestFolio,
     lock: &HomeLock,
@@ -213,12 +220,12 @@ fn scenario_2_fast_forward_writes_merge_commit_and_contained_branch_writes_nothi
 }
 
 #[test]
-fn scenario_3_conflict_and_no_base_write_nothing() {
+fn scenario_3_binary_conflict_and_no_base_write_nothing() {
     let home = TempHome::new();
     let mut lock = home.lock();
     let mut folio = TestFolio::new(&home, &lock);
     let base = folio.commit_internal(&home, &mut lock, b"base\n");
-    folio.second_branch(&home, &mut lock, "topic", base, b"theirs\n");
+    folio.second_branch(&home, &mut lock, "topic", base, b"theirs\0\n");
     folio.commit_internal(&home, &mut lock, b"ours\n");
     let row = folio.internal();
     assert_eq!(

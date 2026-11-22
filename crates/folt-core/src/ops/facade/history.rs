@@ -4,8 +4,8 @@ use crate::id::{FolioId, ObjectId};
 use crate::object::Tag;
 use crate::ops::history::{
     CommitFacts, CommitMetadata, CommitPlan, HistoryError, HistoryRefusal, HistoryStores,
-    MergeRequest, RebaseFacts, RebasePlan, ResetFacts, ResetPlan, apply_commit, apply_rebase,
-    apply_reset, create_branch, create_tag, delete_branch, delete_tag, gather_commit,
+    MergeOutcome, MergeRequest, RebaseFacts, RebasePlan, ResetFacts, ResetPlan, apply_commit,
+    apply_rebase, apply_reset, create_branch, create_tag, delete_branch, delete_tag, gather_commit,
     gather_rebase, gather_reset, judge_commit, judge_rebase, judge_reset, merge_branch,
 };
 use crate::placement::PlacementOps;
@@ -172,7 +172,18 @@ impl Home {
         stores: &HistoryStores<'_>,
         registry: &mut Registry,
         lock: &mut HomeLock,
-    ) -> Result<ObjectId, HistoryError> {
+    ) -> Result<MergeOutcome, HistoryError> {
         merge_branch(row, request, fs, stores, registry, lock)
+    }
+}
+
+impl Home {
+    /// Reads the conflict state of this placement only.
+    pub fn conflict_state(
+        &self,
+        path: &crate::placement_path::PlacementPath,
+        registry: &Registry,
+    ) -> Result<Option<crate::placement::ConflictState>, crate::placement_path::RegistryError> {
+        crate::ops::history::conflict_state(path, registry)
     }
 }

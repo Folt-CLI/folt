@@ -4,7 +4,7 @@
 pub(crate) const APPLICATION_ID: u32 = 0x464f_4c54;
 
 /// Current SQLite user_version (schema revision number).
-pub(crate) const SCHEMA_VERSION: i64 = 3;
+pub(crate) const SCHEMA_VERSION: i64 = 4;
 
 /// Retired SQLite schema revision number requiring migration.
 pub(crate) const OUTDATED_SCHEMA: i64 = 1;

@@ -30,6 +30,7 @@ pub(crate) fn facts() -> PlacementFacts {
                 signature: signature.clone(),
             }),
             staged: None,
+            conflict: None,
         },
         observation: Observation::File { signature },
         placement_hash: Some(hash),

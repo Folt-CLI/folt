@@ -17,6 +17,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [child](#child)
 - [commit](#commit)
 - [conflict marker](#conflict-marker)
+- [conflict state](#conflict-state)
 - [copy](#copy)
 - [directory Folio](#directory-folio)
 - [Disposition](#disposition)
@@ -221,7 +222,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### merge
 
 - **Layer:** History
-- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. Several merge bases are folded into a virtual base first. A conflict in the final result, a binary conflict between merge base ancestors, no merge base or an already merged branch writes nothing.
+- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. Several merge bases are folded into a virtual base first. A text conflict on a copy writes conflict markers and a conflict state instead of a merge commit. Binary conflicts and non-copy conflicts are refused; a binary conflict between merge base ancestors, no merge base or an already merged branch writes nothing.
 - **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
 - **Related:** [merge base](#merge-base), [three-way merge](#three-way-merge), [merge commit](#merge-commit).
 - **Status:** decided
@@ -317,10 +318,19 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 ## Placements and working state
 
+### conflict state
+
+- **Layer:** Placements and working state
+- **Definition:** A nullable state on a copy's placement row holding the operation, the other commit, the exact conflict marker lines and the pre-merge file blob id.
+- **Code:** `crates/folt-core/src/placement.rs` (`ConflictState`)
+- **Related:** [copy](#copy), [placement](#placement), [conflict marker](#conflict-marker), [merge](#merge).
+- **Not:** A conflict marker, a link row field, or recoverable by registry rebuild.
+- **Status:** decided
+
 ### placement
 
 - **Layer:** Placements and working state
-- **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base and optional stage. The path is the key, and the kind is link, copy or internal.
+- **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base, optional stage and optional conflict state. The path is the key, and the kind is link, copy or internal.
 - **Code:** `crates/folt-core/src/registry/rows.rs:13` (`Placement`); `crates/folt-core/src/placement.rs:9` (`PlacementKind`); `crates/folt-core/src/placement.rs:57` (`PlacementSpec`)
 - **Related:** [link](#link), [copy](#copy), [internal row](#internal-row), [base](#base), [stage](#stage).
 - **Not:** The file itself or `PlacementSpec`, the in-memory record the file-system layer reads, which has no Folio id or stage.

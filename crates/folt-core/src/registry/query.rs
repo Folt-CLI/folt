@@ -11,7 +11,7 @@ pub(super) fn query_all_placements(
     connection: &Connection,
 ) -> Result<Vec<Placement>, RegistryError> {
     let mut statement = connection.prepare(
-        "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements ORDER BY path",
+        "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements ORDER BY path",
     )?;
     collect_placements(&mut statement.query([])?)
 }
@@ -23,7 +23,7 @@ impl Registry {
         };
         query_placement(
             connection,
-            "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements WHERE path=?1",
+            "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements WHERE path=?1",
             &[&path.0],
         )
     }
@@ -35,7 +35,7 @@ impl Registry {
         };
         query_placement(
             connection,
-            "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements WHERE id=?1 AND kind='internal'",
+            "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements WHERE id=?1 AND kind='internal'",
             &[&id.as_bytes().as_slice()],
         )
     }
@@ -58,8 +58,8 @@ impl Registry {
         let lower = prefix_boundary(&prefix.0);
         let upper = prefix_successor(&lower);
         let mut statement = match upper {
-            Some(_) => connection.prepare("SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements WHERE kind != 'internal' AND path >= ?1 AND path < ?2 ORDER BY path")?,
-            None => connection.prepare("SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements WHERE kind != 'internal' AND path >= ?1 ORDER BY path")?,
+            Some(_) => connection.prepare("SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements WHERE kind != 'internal' AND path >= ?1 AND path < ?2 ORDER BY path")?,
+            None => connection.prepare("SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements WHERE kind != 'internal' AND path >= ?1 ORDER BY path")?,
         };
         let mut rows = if let Some(upper) = upper {
             statement.query(rusqlite::params![lower, upper])?
@@ -74,7 +74,7 @@ impl Registry {
             return Ok(Vec::new());
         };
         let mut statement = connection
-            .prepare("SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements WHERE id = ?1 AND kind != 'internal' ORDER BY path")?;
+            .prepare("SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements WHERE id = ?1 AND kind != 'internal' ORDER BY path")?;
         let mut rows = statement.query([id.as_bytes().as_slice()])?;
         collect_placements(&mut rows)
     }
@@ -89,7 +89,7 @@ impl Registry {
             return Ok(Vec::new());
         };
         let mut statement = connection.prepare(
-            "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size FROM placements WHERE id=?1 AND head=?2 ORDER BY path",
+            "SELECT path,id,kind,head,commit_id,base,size,mtime,ctime,inode,staged,staged_size,conflict_operation,conflict_other,conflict_markers,conflict_pre_merge FROM placements WHERE id=?1 AND head=?2 ORDER BY path",
         )?;
         let mut rows = statement.query(rusqlite::params![id.as_bytes().as_slice(), head])?;
         collect_placements(&mut rows)
