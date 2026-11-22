@@ -62,6 +62,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [prune](#prune)
 - [publish](#publish)
 - [Question](#question)
+- [rebase](#rebase)
 - [ref name](#ref-name)
 - [reference](#reference)
 - [refs table](#refs-table)
@@ -69,6 +70,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [register](#register)
 - [registry](#registry)
 - [rename](#rename)
+- [replay](#replay)
 - [review agent](#review-agent)
 - [role file](#role-file)
 - [Rollback](#rollback)
@@ -577,6 +579,22 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Code:** `crates/folt-core/src/ops/prune/judge.rs:7` (`judge`); `crates/folt-core/src/ops/prune/apply.rs:65` (`prune_placements`)
 - **Related:** [placement](#placement), [internal row](#internal-row), [stage](#stage), [home lock](#home-lock).
 - **Not:** Object garbage collection or Folio deletion; a missing path alone does not settle the lifecycle rules in [#15](https://github.com/Folt-CLI/folt/issues/15).
+- **Status:** decided
+
+### rebase
+
+- **Layer:** Operations
+- **Definition:** A plan and apply operation for one Folio and branch that replays commits reachable from its tip but not from a chosen destination commit, drops merge commits and uses reset to advance the branch and move its placements once. Tags and retention pins stay on the original commits and are reported. A parentless commit in the range is refused.
+- **Code:** `crates/folt-core/src/ops/history/rebase.rs` (`RebaseFacts`, `RebasePlan`, `LeftBehind`, `judge_rebase`)
+- **Related:** [replay](#replay), [branch](#branch), [plan and apply](#plan-and-apply).
+- **Status:** decided
+
+### replay
+
+- **Layer:** Operations
+- **Definition:** Applying an ordinary commit's content change to the accumulated destination content with a three-way merge using the original parent's content. Rebase orders commits parent-first with object id byte order as the tie-break, preserves author, time, message, body and group, and chains each new commit to the previous result. A conflict refuses the operation with the original commit id.
+- **Code:** `crates/folt-core/src/ops/history/rebase.rs` (`judge_rebase`)
+- **Related:** [rebase](#rebase), [three-way merge](#three-way-merge), [commit](#commit).
 - **Status:** decided
 
 ### publish

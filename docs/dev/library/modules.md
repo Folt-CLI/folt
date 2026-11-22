@@ -43,7 +43,7 @@ The order is `refusal`, `facts`, `working`, `status`, `step_hook`, `stage`, `pla
 | `ops::open` | Opening or creating a home, as a `Home` method. |
 | `ops::stage` | Stage and unstage, with the stage refusal checks in `ops::stage::refuse`. |
 | `ops::placement` | Placement convert, move, rehome, relocate, remove and repair. |
-| `ops::history` | History operations: commit, branch, tag and reset. |
+| `ops::history` | History operations: commit, branch, tag, reset and rebase. |
 | `ops::register` | Registration. |
 | `ops::rename` | Rename. |
 | `ops::checkout` | Checkout. |
