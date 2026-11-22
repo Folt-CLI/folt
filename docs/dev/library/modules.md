@@ -43,7 +43,7 @@ The order is `refusal`, `facts`, `working`, `status`, `step_hook`, `stage`, `pla
 | `ops::open` | Opening or creating a home, as a `Home` method. |
 | `ops::stage` | Stage and unstage, with the stage refusal checks in `ops::stage::refuse`. |
 | `ops::placement` | Placement convert, move, rehome, relocate, remove and repair. |
-| `ops::history` | History operations: commit, branch, tag, reset and rebase. |
+| `ops::history` | History operations: commit, merge, branch, tag, reset and rebase. |
 | `ops::register` | Registration. |
 | `ops::rename` | Rename. |
 | `ops::checkout` | Checkout. |
@@ -70,6 +70,8 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Whether a placement has a stage | `ops::stage::refuse` |
 | Binary test, whole-file equality rules, line merge and conflict marker rendering | `merge` |
 | History operations and their refusals | `ops::history` |
+| Merge entry, two-parent merge commit and merge refusals | `ops::history` |
+| Validation of merged content: reference keys, reference cycles and folio-name collisions | `ops::stage::validate` |
 | Registration plan, apply and refusals | `ops::register` |
 | Rename plan and apply | `ops::rename` |
 | Prune judge and apply | `ops::prune` |

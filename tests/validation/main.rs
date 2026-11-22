@@ -12,6 +12,7 @@
 mod common;
 
 mod ancestry;
+mod branch_merge;
 mod checkout;
 mod declared_references;
 mod facade;

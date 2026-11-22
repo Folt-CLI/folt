@@ -43,7 +43,9 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [issue type](#issue-type)
 - [link](#link)
 - [marker](#marker)
+- [merge](#merge)
 - [merge base](#merge-base)
+- [merge commit](#merge-commit)
 - [milestone](#milestone)
 - [Node (syntax tree node)](#node-syntax-tree-node)
 - [object](#object)
@@ -213,6 +215,22 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Code:** `crates/folt-core/src/history/ancestry.rs:25` (`is_ancestor`)
 - **Related:** [commit](#commit), [merge base](#merge-base).
 - **Not:** A comparison of a placement’s recorded commit with its branch tip, or an issue parent.
+- **Status:** decided
+
+### merge
+
+- **Layer:** History
+- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. A conflict, a criss-cross history, no merge base or an already merged branch writes nothing.
+- **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
+- **Related:** [merge base](#merge-base), [three-way merge](#three-way-merge), [merge commit](#merge-commit).
+- **Status:** decided
+
+### merge commit
+
+- **Layer:** History
+- **Definition:** A commit with two parents, the target tip first and the other branch tip second, written by a merge.
+- **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
+- **Related:** [merge](#merge), [commit](#commit), [parent](#parent).
 - **Status:** decided
 
 ### merge base
@@ -899,7 +917,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | explicit | YAML `? key` syntax; user-given name; registration confirmation | [Explicit key](#explicit-key) means the YAML syntax; explicit name means a user-given name; explicit confirmation means registration confirmation. |
 | rollback | Test wording for undoing writes; restore in registration code | Say restore, the word used in the code. |
 | internal row | Registry row; internal placement; internal file; internal main file; `folio.main` | Internal row means the registry row; `folio.main` means the file. Say the internal row on `main`. |
-| stale | Failed ref compare-and-swap; differing branch tip; old child label; reference cache older than edits; obsolete path | Say failed ref update, behind, cached child label or references from the last stage. Merge and rebase have a selected solution in [#74](https://github.com/Folt-CLI/folt/issues/74), but are not implemented here; local path resolution is open: [#28](https://github.com/Folt-CLI/folt/issues/28). |
+| stale | Failed ref compare-and-swap; differing branch tip; old child label; reference cache older than edits; obsolete path | Say failed ref update, behind, cached child label or references from the last stage. Merge is implemented here. Rebase has a selected solution in [#74](https://github.com/Folt-CLI/folt/issues/74), but is not implemented here; local path resolution is open: [#28](https://github.com/Folt-CLI/folt/issues/28). |
 | name | Folio label; path-derived label; reference target name; child_label; ref name; object hash; path holding a reserved label | Use folio-name for the Folio label, ref name for history refs, and object id for the hash. Upper case works today; lowercase-only policy is open: [#47](https://github.com/Folt-CLI/folt/issues/47). |
 | link | Symbolic-link placement; link row; Markdown link; hard link | Link means the symbolic-link placement; qualify Markdown links and hard links. The row records the expected kind even if the filesystem entry changes. |
 | copy | Regular-file placement; duplicated Folio or directory; ordinary copying action | Copy means the regular-file placement. Identity after duplication is open: [#16](https://github.com/Folt-CLI/folt/issues/16). |

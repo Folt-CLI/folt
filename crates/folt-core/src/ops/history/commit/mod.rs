@@ -10,3 +10,7 @@ pub use gather::CommitFacts;
 pub(crate) use gather::gather_commit;
 pub(crate) use judge::judge_commit;
 pub use plan::CommitPlan;
+
+pub(crate) use apply::build_commit;
+pub(crate) use finish::{Recovery, advance_branch, move_internal, write_rows};
+pub(crate) use judge::branch_moved;
