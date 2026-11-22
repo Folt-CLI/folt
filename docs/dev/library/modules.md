@@ -72,7 +72,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Whether a placement has a stage | `ops::stage::refuse` |
 | Binary test, whole-file equality rules, line merge and conflict marker rendering | `merge` |
 | History operations and their refusals | `ops::history` |
-| Merge entry, two-parent merge commit and merge refusals | `ops::history` |
+| Merge entry, two-parent merge commit, merge refusals, and abort and continue of a copy with conflict state | `ops::history` |
 | Validation of merged content: reference keys, reference cycles and folio-name collisions | `ops::stage::validate` |
 | Registration plan, apply and refusals | `ops::register` |
 | Rename plan and apply | `ops::rename` |

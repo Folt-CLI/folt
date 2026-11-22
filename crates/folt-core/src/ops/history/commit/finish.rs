@@ -93,6 +93,7 @@ pub(crate) fn write_rows(
     let mut updated = row.clone();
     updated.commit_id = Some(id);
     updated.staged = None;
+    updated.conflict = None;
     let Observation::File { signature } = &facts.working.observation else {
         return Err(HistoryRefusal::InvalidFacts.into());
     };
