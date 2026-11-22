@@ -53,8 +53,6 @@ pub(crate) fn judge_rebase(
     facts: &RebaseFacts,
     discard: bool,
 ) -> Result<RebasePlan, HistoryRefusal> {
-    // Validate placement facts even when there is nothing to replay.
-    judge_reset(&facts.reset, discard)?;
     for (id, commit) in &facts.commits {
         if hash_object(
             ObjectKind::Commit,

@@ -30,12 +30,12 @@ pub(crate) fn gather_rebase(
             continue;
         }
         let commit = stores.objects.get_commit(id, stores.object_limit)?;
-        contents.insert(
-            commit.content,
-            stores
-                .objects
-                .get(commit.content, ObjectKind::Blob, stores.object_limit)?,
-        );
+        // Replay needs full content; the caller's limit bounds commit reads only.
+        let mut content = Vec::new();
+        stores
+            .objects
+            .get_to(commit.content, ObjectKind::Blob, &mut content)?;
+        contents.insert(commit.content, content);
         commits.insert(id, commit);
     }
     let mut left_behind = Vec::new();

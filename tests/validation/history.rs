@@ -381,3 +381,96 @@ fn rebase_rechecks_edits_and_ref_movement_before_publishing() {
             .is_err()
     );
 }
+
+#[test]
+fn rebase_reads_large_content_independently_of_commit_limit() {
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let mut root_content = vec![b'x'; 32 * 1024];
+    root_content[..2].copy_from_slice(b"a\n");
+    let end = root_content.len();
+    root_content[end - 3..].copy_from_slice(b"\nz\n");
+    let root = folio.commit_internal(&home, &mut lock, &root_content);
+    let mut branch_content = root_content.clone();
+    branch_content[0] = b'A';
+    folio.commit_internal(&home, &mut lock, &branch_content);
+    let mut destination_content = root_content;
+    destination_content[end - 2] = b'Z';
+    let onto = folio.commit_with_parents(&lock, &destination_content, &[root]);
+    let main = RefName::parse("main").unwrap();
+    let fs = PlacementFs::new(&home.home);
+    let stores = HistoryStores {
+        objects: &folio.objects,
+        refs: &folio.refs,
+        object_limit: 16384,
+    };
+    let facts = home
+        .home
+        .gather_rebase(folio.folio.id(), &main, onto, &fs, &stores, &folio.registry)
+        .unwrap();
+    let plan = home.home.judge_rebase(&facts, false).unwrap();
+    let tip = home
+        .home
+        .apply_rebase(&plan, &fs, &stores, &mut folio.registry, &mut lock)
+        .unwrap();
+    branch_content[end - 2] = b'Z';
+    assert_eq!(
+        std::fs::read(folio.internal().path.to_path_buf()).unwrap(),
+        branch_content
+    );
+    assert_eq!(folio.internal().commit_id, Some(tip));
+    let limited = HistoryStores {
+        object_limit: 1,
+        ..stores
+    };
+    assert!(matches!(
+        home.home.gather_rebase(
+            folio.folio.id(),
+            &main,
+            onto,
+            &fs,
+            &limited,
+            &folio.registry
+        ),
+        Err(history::HistoryError::Store(
+            folt_core::store::StoreError::Object(folt_core::object::ObjectError::LimitExceeded)
+        ))
+    ));
+}
+
+#[test]
+fn rebase_accepts_working_content_equal_to_final_replay_without_discard() {
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let root = folio.commit_internal(&home, &mut lock, b"a\nb\nc\n");
+    folio.commit_internal(&home, &mut lock, b"a\nb\nC\n");
+    let onto = folio.commit_with_parents(&lock, b"A\nb\nc\n", &[root]);
+    let row = folio.internal();
+    std::fs::write(row.path.to_path_buf(), b"A\nb\nC\n").unwrap();
+    let main = RefName::parse("main").unwrap();
+    let fs = PlacementFs::new(&home.home);
+    let stores = HistoryStores {
+        objects: &folio.objects,
+        refs: &folio.refs,
+        object_limit: 16384,
+    };
+    let facts = home
+        .home
+        .gather_rebase(folio.folio.id(), &main, onto, &fs, &stores, &folio.registry)
+        .unwrap();
+    let plan = home.home.judge_rebase(&facts, false).unwrap();
+    let tip = home
+        .home
+        .apply_rebase(&plan, &fs, &stores, &mut folio.registry, &mut lock)
+        .unwrap();
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), b"A\nb\nC\n");
+    let updated = folio.internal();
+    assert_eq!(updated.commit_id, Some(tip));
+    assert_eq!(
+        updated.base.unwrap().hash,
+        folt_core::object::hash_blob(b"A\nb\nC\n")
+    );
+    assert_eq!(folio.refs.read(RefKind::Branch, &main).unwrap(), Some(tip));
+}

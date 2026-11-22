@@ -345,3 +345,23 @@ fn rebase_reports_left_behind_and_refuses_inconsistent_placements() {
         HistoryRefusal::InvalidFacts
     );
 }
+
+#[test]
+fn rebase_empty_range_still_judges_placements_against_final_content() {
+    let (mut rebase, _, onto) = rebase_facts();
+    let mut placement = facts();
+    placement.placement_hash = Some(rebase.reset.target.content);
+    rebase.reset.placements.push(placement);
+    assert_eq!(judge_rebase(&rebase, false).unwrap().tip(), onto);
+    rebase.reset.placements[0].placement_hash = Some(hash_blob(b"unrelated edits"));
+    assert!(matches!(
+        judge_rebase(&rebase, false),
+        Err(HistoryRefusal::Move(_))
+    ));
+    assert!(judge_rebase(&rebase, true).is_ok());
+    rebase.reset.placements[0].tip = None;
+    assert_eq!(
+        judge_rebase(&rebase, true).unwrap_err(),
+        HistoryRefusal::InvalidFacts
+    );
+}
