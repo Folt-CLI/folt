@@ -19,6 +19,8 @@ pub enum HistoryRefusal {
     PlacementsChanged,
     BranchInUse(Vec<PathBuf>),
     InvalidFacts,
+    RebaseConflict(ObjectId),
+    RebaseRoot(ObjectId),
     TagMismatch,
     TagExists,
     Move(placement_refusal::PlacementRefusal),
@@ -57,6 +59,8 @@ impl fmt::Display for HistoryRefusal {
             }
             Self::BranchInUse(paths) => write!(f, "branch is used by {} placement(s)", paths.len()),
             Self::InvalidFacts => write!(f, "inconsistent history facts"),
+            Self::RebaseConflict(id) => write!(f, "replay conflicted at commit {id}"),
+            Self::RebaseRoot(id) => write!(f, "cannot replay parentless commit {id}"),
             Self::TagMismatch => write!(f, "annotation name or target differs from the tag ref"),
             Self::TagExists => write!(f, "tag already exists"),
             Self::Move(error) => error.fmt(f),

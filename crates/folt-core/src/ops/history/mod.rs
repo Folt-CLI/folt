@@ -63,6 +63,7 @@ fn require_blob(objects: &ObjectStore, id: ObjectId) -> Result<(), HistoryError>
 mod branch;
 mod commit;
 mod error;
+mod rebase;
 mod refusal;
 mod reset;
 mod tag;
@@ -73,6 +74,8 @@ pub(crate) use branch::{create_branch, delete_branch};
 pub use commit::{CommitFacts, CommitMetadata, CommitPlan};
 pub(crate) use commit::{apply_commit, gather_commit, judge_commit};
 pub use error::HistoryError;
+pub use rebase::{LeftBehind, RebaseFacts, RebasePlan};
+pub(crate) use rebase::{apply_rebase, gather_rebase, judge_rebase};
 pub use refusal::HistoryRefusal;
 pub use reset::{ResetFacts, ResetPlan};
 pub(crate) use reset::{apply_reset, gather_reset, judge_reset};

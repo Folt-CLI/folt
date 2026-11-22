@@ -67,6 +67,22 @@ pub fn merge_base(
     })
 }
 
+/// Commits reachable from `tip` and not reachable from `exclude`.
+/// Every reachable commit on both sides is validated with the caller's per-object limit.
+///
+/// # Errors
+/// Returns the store error for a missing, invalid, unreadable or oversized commit.
+pub fn commit_range(
+    objects: &ObjectStore,
+    tip: ObjectId,
+    exclude: ObjectId,
+    limit: u64,
+) -> Result<HashSet<ObjectId>, StoreError> {
+    let reachable = ancestors(objects, tip, limit)?;
+    let excluded = ancestors(objects, exclude, limit)?;
+    Ok(reachable.difference(&excluded).copied().collect())
+}
+
 fn ancestors(
     objects: &ObjectStore,
     start: ObjectId,

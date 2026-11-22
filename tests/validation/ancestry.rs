@@ -254,3 +254,37 @@ fn corrupt_commits_and_object_read_limits_are_propagated() {
     assert!(merge_base(&folio.objects, root, tip, limit).is_err());
     assert_eq!(snapshot(home.path()), before);
 }
+
+#[test]
+fn commit_range_handles_linear_fork_and_merge_histories() {
+    use folt_core::history::commit_range;
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let root = commit(&folio, &lock, "root", &[]);
+    let left = commit(&folio, &lock, "left", &[root]);
+    let tip = commit(&folio, &lock, "tip", &[left]);
+    let right = commit(&folio, &lock, "right", &[root]);
+    let merge = commit(&folio, &lock, "merge", &[tip, right]);
+    let limit = folio.stores().object_limit;
+    for (tip, exclude, expected) in [
+        (tip, root, vec![left, tip]),
+        (tip, right, vec![left, tip]),
+        (merge, left, vec![tip, right, merge]),
+        (left, merge, vec![]),
+        (root, root, vec![]),
+    ] {
+        assert_eq!(
+            commit_range(&folio.objects, tip, exclude, limit).unwrap(),
+            expected.into_iter().collect()
+        );
+    }
+    assert!(matches!(
+        commit_range(&folio.objects, tip, right, 1),
+        Err(StoreError::Object(ObjectError::LimitExceeded))
+    ));
+    let missing = ObjectId::from_bytes([77; 32]);
+    assert!(commit_range(&folio.objects, tip, missing, limit).is_err());
+    let broken = commit(&folio, &lock, "broken", &[root, missing]);
+    assert!(commit_range(&folio.objects, broken, broken, limit).is_err());
+}
