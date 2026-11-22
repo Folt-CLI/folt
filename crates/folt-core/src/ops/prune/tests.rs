@@ -248,3 +248,20 @@ fn scope_matches_whole_path_segments() {
         assert_eq!(in_scope(&row, &scope), expected);
     }
 }
+
+#[test]
+fn missing_copy_with_conflict_state_is_kept_and_warned() {
+    let mut input = missing();
+    input.row.conflict = crate::test_support::conflicted_facts().placement.conflict;
+    assert!(judge(&input).unwrap().contains("conflict"));
+    let result = report(
+        std::slice::from_ref(&input),
+        std::slice::from_ref(&input.row),
+        true,
+    );
+    assert!(result.dropped.is_empty());
+    assert_eq!(result.kept[0].path, input.row.path);
+    assert!(result.kept[0].reason.contains("conflict"));
+    assert!(result.warnings[0].contains("conflict"));
+    assert!(result.warnings[0].contains(&input.row.path.to_path_buf().display().to_string()));
+}

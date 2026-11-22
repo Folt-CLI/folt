@@ -4,7 +4,7 @@ use crate::history::{RefError, RefStore};
 use crate::id::FolioId;
 use crate::ops::facts::{self, Behind, PlacementFacts};
 use crate::ops::rules_error::RulesError;
-use crate::placement::{self, Drift, Observation, PlacementKind, PlacementOps};
+use crate::placement::{self, ConflictOperation, Drift, Observation, PlacementKind, PlacementOps};
 use crate::registry::{self, Registry};
 
 use crate::id::ObjectId;
@@ -69,6 +69,7 @@ pub(crate) fn judge_working(facts: &PlacementFacts) -> WorkingStatus {
 pub struct PlacementStatus {
     pub placement: registry::Placement,
     pub drift: Drift,
+    pub conflict: Option<ConflictOperation>,
     /// Links always show `folio.main` and have no recorded-commit comparison.
     pub behind: Option<Behind>,
     pub staged: Staged,
@@ -99,6 +100,11 @@ pub(crate) fn judge_status(facts_set: &[PlacementFacts]) -> Vec<PlacementStatus>
             PlacementStatus {
                 placement: facts.placement.clone(),
                 drift: placement::classify(&placement, &facts.observation, facts.placement_hash),
+                conflict: facts
+                    .placement
+                    .conflict
+                    .as_ref()
+                    .map(|state| state.operation),
                 behind,
                 staged: working.staged,
                 edit: working.edit,

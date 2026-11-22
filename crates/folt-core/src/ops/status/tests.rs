@@ -82,3 +82,16 @@ fn stage_distinguishes_later_edits() {
     facts.observation = Observation::Missing;
     assert_eq!(judge_working(&facts).staged, Staged::StagedThenModified);
 }
+
+#[test]
+fn status_reports_each_placements_own_conflict_operation() {
+    let conflicted = crate::test_support::conflicted_facts();
+    let ordinary = facts();
+    let mut link = facts();
+    link.placement.kind = PlacementKind::Link;
+    link.observation = Observation::IntactLink;
+    let status = judge_status(&[conflicted, ordinary, link]);
+    assert_eq!(status[0].conflict, Some(ConflictOperation::Merge));
+    assert_eq!(status[1].conflict, None);
+    assert_eq!(status[2].conflict, None);
+}

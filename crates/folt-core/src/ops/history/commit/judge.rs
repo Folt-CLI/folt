@@ -3,7 +3,8 @@ use super::gather::CommitFacts;
 use super::plan::{CommitPlan, resume_commit};
 use crate::config::names::DEFAULT_BRANCH;
 use crate::ops::placement::move_::{MoveTarget, judge_move};
-use crate::ops::stage::refuse::is_staged;
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
+use crate::ops::stage::refuse::{is_conflicted, is_staged};
 use crate::ops::status::{Edit, judge_working};
 use crate::placement::{Observation, PlacementKind};
 use crate::ref_name::RefName;
@@ -12,6 +13,12 @@ pub(crate) fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRef
     let row = &facts.working.placement;
     if row.kind == PlacementKind::Link {
         return Err(HistoryRefusal::Link(row.path.to_path_buf()));
+    }
+    if is_conflicted(row) {
+        return Err(HistoryRefusal::Move(PlacementRefusal {
+            path: row.path.to_path_buf(),
+            reason: RefusalReason::Conflicted,
+        }));
     }
     let staged = row.staged.ok_or(HistoryRefusal::NothingStaged)?;
     if !matches!(facts.working.observation, Observation::File { .. }) {

@@ -1,5 +1,6 @@
 use super::model::PruneFacts;
 use crate::config::limits::PRUNE_CONFIRM_MIN;
+use crate::ops::stage::refuse::is_conflicted;
 use crate::placement::{self, Drift, Observation, PlacementKind};
 
 /// Returns None only for a missing external row with an existing parent.
@@ -13,6 +14,11 @@ pub(crate) fn judge(facts: &PruneFacts) -> Option<String> {
             Ok(Observation::Missing) => "internal placement missing; damaged home (#51)".into(),
             Ok(_) => "internal placement".into(),
         });
+    }
+    if is_conflicted(&facts.row) {
+        return Some(
+            "copy has a conflict state; resolve and stage, or remove the placement".into(),
+        );
     }
     let observation = match &facts.observation {
         Ok(observation) => observation,

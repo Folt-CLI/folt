@@ -83,3 +83,20 @@ fn relocation_and_removal_refusal_table() {
         RefusalReason::InsideSource
     );
 }
+
+#[test]
+fn conflict_refusal_precedes_destination_checks() {
+    let (fixture, _lock, registry) = crate::test_support::RelocateFixture::new(false);
+    let mut facts = fixture.facts();
+    facts.placement.conflict = crate::test_support::conflicted_facts().placement.conflict;
+    let target = fixture.plan(&registry).target;
+    let mut occupied = target;
+    occupied.registered = true;
+    let refusal = judge_relocate(&facts, &occupied).unwrap_err();
+    assert_eq!(refusal.reason, RefusalReason::Conflicted);
+    assert!(
+        refusal
+            .to_string()
+            .contains(&facts.placement.path.to_path_buf().display().to_string())
+    );
+}
