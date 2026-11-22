@@ -38,13 +38,15 @@ fn merge(
     )
 }
 
-fn snapshot(path: &Path) -> Vec<(PathBuf, ObjectId)> {
+fn snapshot(path: &Path, home_lock: &Path) -> Vec<(PathBuf, ObjectId)> {
     let mut files = Vec::new();
     for entry in std::fs::read_dir(path).unwrap() {
         let path = entry.unwrap().path();
         if path.is_dir() {
-            files.extend(snapshot(&path));
-        } else if path.file_name().unwrap() != "registry.db-shm" {
+            files.extend(snapshot(&path, home_lock));
+        // Windows prevents reading the held home lock. SQLite shared memory
+        // changes during reads; neither file contains the state under test.
+        } else if path != home_lock && path.file_name().unwrap() != "registry.db-shm" {
             files.push((
                 path.clone(),
                 folt_core::object::hash_blob(&std::fs::read(path).unwrap()),
@@ -61,13 +63,35 @@ fn refused(
     lock: &mut HomeLock,
     row: &Placement,
 ) -> HistoryRefusal {
-    let before = snapshot(home.root());
+    let home_lock = home.path().join("lock");
+    let before = snapshot(home.root(), &home_lock);
     let error = merge(home, folio, lock, row).unwrap_err();
-    assert_eq!(snapshot(home.root()), before, "refusal must write nothing");
+    assert_eq!(
+        snapshot(home.root(), &home_lock),
+        before,
+        "refusal must write nothing"
+    );
     let HistoryError::Refused(refusal) = error else {
         panic!("unexpected error: {error}");
     };
     refusal
+}
+
+#[test]
+fn snapshot_skips_held_home_lock_but_keeps_working_file_named_lock() {
+    let home = TempHome::new();
+    let _lock = home.lock();
+    let home_lock = home.path().join("lock");
+    let working_file = home.root().join("lock");
+    std::fs::write(&working_file, b"working content").unwrap();
+    let files = snapshot(home.root(), &home_lock);
+    assert!(!files.iter().any(|(path, _)| path == &home_lock));
+    assert!(files.contains(&(
+        working_file.clone(),
+        folt_core::object::hash_blob(b"working content")
+    )));
+    std::fs::write(&working_file, b"edited content").unwrap();
+    assert_ne!(snapshot(home.root(), &home_lock), files);
 }
 
 fn copy(
