@@ -3,10 +3,10 @@ use rusqlite::{Connection, OptionalExtension};
 use crate::config::names::DEFAULT_BRANCH;
 use crate::home::Home;
 use crate::id::{FolioId, ObjectId};
-use crate::placement::{PlacementBase, PlacementKind, StagedBlob};
+use crate::placement::{ConflictState, PlacementBase, PlacementKind, StagedBlob};
 use crate::placement_path::{PlacementPath, RegistryError};
 
-use super::codec::{decode_base, decode_staged, read_id};
+use super::codec::{decode_base, decode_conflict, decode_staged, read_id};
 
 /// A placement stored by the registry.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -19,6 +19,7 @@ pub struct Placement {
     /// Links have no base; working files may have an uncaptured or cleared base.
     pub base: Option<PlacementBase>,
     pub staged: Option<StagedBlob>,
+    pub conflict: Option<ConflictState>,
 }
 
 impl Placement {
@@ -110,6 +111,8 @@ fn read_placement(row: &rusqlite::Row<'_>) -> rusqlite::Result<Placement> {
             row.get(9)?,
         )
         .map_err(|e| invalid(5, rusqlite::types::Type::Blob, e))?,
+        conflict: decode_conflict(row.get(12)?, row.get(13)?, row.get(14)?, row.get(15)?)
+            .map_err(|e| invalid(12, rusqlite::types::Type::Blob, e))?,
         staged: decode_staged(row.get(10)?, row.get(11)?)
             .map_err(|e| invalid(10, rusqlite::types::Type::Blob, e))?,
     })

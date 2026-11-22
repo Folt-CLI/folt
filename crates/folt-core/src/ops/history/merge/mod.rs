@@ -6,15 +6,18 @@ use crate::merge::{MergeResult, merge3};
 use crate::object::ObjectKind;
 use crate::ops::stage::validate_merged;
 use crate::ops::working::resolve_working;
-use crate::placement::{PlacementKind, PlacementOps};
+use crate::placement::{ConflictState, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
 
 mod apply;
+pub(crate) mod conflict;
 mod judge;
 mod virtual_base;
 
 pub(crate) use apply::merge_branch;
+#[cfg(test)]
+pub(super) use apply::merge_branch_steps;
 #[cfg(test)]
 pub(super) use judge::judge_merge;
 
@@ -29,9 +32,26 @@ pub(crate) struct MergeFacts {
     pub validation: Result<(), String>,
 }
 
-/// A clean combination with both parent tips fixed by the decision.
+/// The published result of combining another branch.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MergePlan {
+pub enum MergeOutcome {
+    Merged(ObjectId),
+    Conflicted(ConflictState),
+}
+
+/// A combination with both parent tips fixed by the decision.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MergePlan {
+    Clean(MergePlanData),
+    Conflicted {
+        plan: MergePlanData,
+        marker_lines: Vec<Vec<u8>>,
+    },
+}
+
+/// Fixed inputs and resulting bytes retained by a merge plan.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MergePlanData {
     facts: MergeFacts,
     bytes: Vec<u8>,
 }

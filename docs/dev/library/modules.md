@@ -55,6 +55,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 
 | Rule | Owner |
 | --- | --- |
+| Conflict state of a copy: type and columns | `placement` and `registry`; writing it: `ops::history` merge |
 | Fixed names, file names and the marker name | `config::names` |
 | Scan limit and the window that reads past it | `config::limits` (`SCAN_LIMIT`, `SCAN_WINDOW`) |
 | Registry application id | `config::formats` (`APPLICATION_ID`) |

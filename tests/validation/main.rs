@@ -35,3 +35,5 @@ mod register;
 mod registry;
 mod rename;
 mod support;
+
+mod merge_conflict;

@@ -448,6 +448,17 @@ fn merge_refuses_already_merged_no_base_conflict_then_validation() {
     facts.base = merge_facts().base;
     facts.merged = crate::merge::merge3(b"a\nb\nc\n", b"A\nb\nc\n", b"different\nb\nc\n");
     facts.validation = Err("invalid".into());
+    assert!(matches!(
+        merge::judge_merge(&facts),
+        Ok(MergePlan::Conflicted { .. })
+    ));
+    facts.history.working.placement.kind = PlacementKind::Internal;
+    assert_eq!(
+        merge::judge_merge(&facts).unwrap_err(),
+        HistoryRefusal::MergeConflict
+    );
+    facts.history.working.placement.kind = PlacementKind::Copy;
+    facts.merged = crate::merge::merge3(b"base", b"ours\0", b"theirs");
     assert_eq!(
         merge::judge_merge(&facts).unwrap_err(),
         HistoryRefusal::MergeConflict
@@ -497,5 +508,176 @@ fn merge_refuses_binary_ancestors_before_content_conflict_and_validation() {
     assert_eq!(
         merge::judge_merge(&facts).unwrap_err(),
         HistoryRefusal::MergeNoBase
+    );
+}
+
+fn conflict_fixture(
+    home: &crate::home::Home,
+    lock: &mut crate::home::HomeLock,
+) -> (Registry, crate::store::ObjectStore, RefStore, Placement) {
+    use crate::folio::{
+        dir::{Durability, FolioSpec, create_folio},
+        format::FolioFormat,
+        row::NewFolio,
+    };
+    use crate::object::{Author, Commit, CommitTime};
+    use crate::placement::PlacementOps;
+    let folio = create_folio(
+        home.path(),
+        lock,
+        FolioSpec {
+            content: b"base\n".to_vec(),
+        },
+        Durability::None,
+    )
+    .unwrap();
+    let format = FolioFormat {
+        layout: crate::layout::FOLIO_LAYOUT_VERSION,
+        algorithm: crate::config::formats::OBJECT_ALGORITHM.into(),
+    };
+    let objects = crate::store::ObjectStore::open(&folio, &format).unwrap();
+    let refs = RefStore::open(&folio, &format).unwrap();
+    let make_commit = |bytes: &[u8], parents| {
+        let content = objects.put(lock, ObjectKind::Blob, bytes).unwrap();
+        objects
+            .put_commit(
+                lock,
+                &Commit {
+                    content,
+                    parents,
+                    author: Author::anonymous(),
+                    time: CommitTime::from_unix_seconds(0).unwrap(),
+                    message: "fixture".into(),
+                    body: None,
+                    group: None,
+                },
+            )
+            .unwrap()
+    };
+    let base = make_commit(b"base\n", vec![]);
+    let ours = make_commit(b"ours\n", vec![base]);
+    let theirs = make_commit(b"theirs\n", vec![base]);
+    for (branch, tip) in [("main", ours), ("topic", theirs)] {
+        refs.update(
+            lock,
+            RefKind::Branch,
+            &RefName::parse(branch).unwrap(),
+            tip,
+            crate::history::Expect::Absent,
+        )
+        .unwrap();
+    }
+    let mut row = facts().placement;
+    row.id = folio.id();
+    row.path = crate::placement_path::PlacementPath::resolve(home.path().join("copy.txt")).unwrap();
+    row.head = "main".into();
+    row.commit_id = Some(ours);
+    row.base = crate::placement_fs::PlacementFs::new(home)
+        .create(
+            row.id,
+            &row.to_placement().1,
+            &objects,
+            hash_blob(b"ours\n"),
+        )
+        .unwrap()
+        .base;
+    let mut registry = Registry::open_or_create(home, lock).unwrap();
+    registry
+        .write(lock, |tx| {
+            tx.add_folio(&NewFolio { id: row.id, format })?;
+            tx.insert_placement(&row)
+        })
+        .unwrap();
+    (registry, objects, refs, row)
+}
+
+#[test]
+fn conflict_failure_after_file_write_leaves_no_state_and_discard_checkout_restores_copy() {
+    use crate::placement::PlacementOps;
+    let home = crate::test_support::TempHome::new().unwrap();
+    let mut lock = home.home.try_lock().unwrap();
+    let (mut registry, objects, refs, row) = conflict_fixture(&home.home, &mut lock);
+    let fs = crate::placement_fs::PlacementFs::new(&home.home);
+    let stores = HistoryStores {
+        objects: &objects,
+        refs: &refs,
+        object_limit: 16384,
+    };
+    let topic = RefName::parse("topic").unwrap();
+    let metadata = || CommitMetadata {
+        author: crate::object::Author::anonymous(),
+        time: crate::object::CommitTime::from_unix_seconds(0).unwrap(),
+        message: "merge".into(),
+        body: None,
+        group: None,
+    };
+    let result = merge::merge_branch_steps(
+        &row,
+        MergeRequest {
+            other: &topic,
+            metadata: metadata(),
+        },
+        &fs,
+        &stores,
+        &mut registry,
+        &mut lock,
+        |step| {
+            assert_eq!(step, merge::conflict::ConflictStep::FileWritten);
+            Err(HistoryRefusal::InvalidFacts.into())
+        },
+    );
+    assert!(matches!(
+        result,
+        Err(HistoryError::Refused(HistoryRefusal::InvalidFacts))
+    ));
+    let crate::merge::MergeResult::Conflicted {
+        merged: Some(expected),
+        ..
+    } = crate::merge::merge3(b"base\n", b"ours\n", b"theirs\n")
+    else {
+        panic!("expected text conflict")
+    };
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), expected);
+    assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+    assert_eq!(
+        home.home.conflict_state(&row.path, &registry).unwrap(),
+        None
+    );
+    assert_eq!(
+        refs.read(RefKind::Branch, &RefName::parse("main").unwrap())
+            .unwrap(),
+        row.commit_id
+    );
+    let request = MergeRequest {
+        other: &topic,
+        metadata: metadata(),
+    };
+    assert!(matches!(
+        home.home
+            .merge_branch(&row, request, &fs, &stores, &mut registry, &mut lock),
+        Err(HistoryError::Refused(HistoryRefusal::MergeEdited(_)))
+    ));
+    home.home
+        .checkout_placement(
+            &row,
+            &RefName::parse("main").unwrap(),
+            true,
+            &fs,
+            &crate::ops::checkout::CheckoutStores {
+                objects: &objects,
+                refs: &refs,
+                object_limit: 16384,
+            },
+            &mut registry,
+            &lock,
+        )
+        .unwrap();
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), b"ours\n");
+    let restored = registry.placement_at(&row.path).unwrap().unwrap();
+    assert_eq!(restored.commit_id, row.commit_id);
+    assert_eq!(restored.conflict, None);
+    assert_eq!(
+        fs.hash_placement(&restored.to_placement().1).unwrap(),
+        hash_blob(b"ours\n")
     );
 }

@@ -1,4 +1,4 @@
-use super::{MergePlan, MergeRequest, gather_merge, judge::judge_merge};
+use super::{MergeOutcome, MergePlan, MergeRequest, gather_merge, judge::judge_merge};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::{ObjectKind, hash_blob};
@@ -22,10 +22,17 @@ pub(crate) fn merge_branch(
     stores: &HistoryStores<'_>,
     registry: &mut Registry,
     lock: &mut HomeLock,
-) -> Result<ObjectId, HistoryError> {
+) -> Result<MergeOutcome, HistoryError> {
     let facts = gather_merge(row, request.other, fs, stores, registry)?;
     let plan = judge_merge(&facts)?;
-    apply_merge(&plan, request.metadata, fs, stores, registry, lock)
+    match &plan {
+        MergePlan::Clean(_) => apply_merge(&plan, request.metadata, fs, stores, registry, lock)
+            .map(MergeOutcome::Merged),
+        MergePlan::Conflicted { .. } => {
+            super::conflict::apply_conflict(&plan, fs, stores, registry, lock)
+                .map(MergeOutcome::Conflicted)
+        }
+    }
 }
 
 pub(super) fn apply_merge(
@@ -36,6 +43,10 @@ pub(super) fn apply_merge(
     registry: &mut Registry,
     lock: &mut HomeLock,
 ) -> Result<ObjectId, HistoryError> {
+    let MergePlan::Clean(plan) = plan else {
+        return Err(HistoryRefusal::InvalidFacts.into());
+    };
+    let bytes = &plan.bytes;
     let mut facts = plan.facts.history.clone();
     require_row(registry, &facts.working.placement)?;
     require_observation(&facts.working, fs)?;
@@ -50,12 +61,12 @@ pub(super) fn apply_merge(
         facts.working.tip = tip;
         return Err(branch_moved(&facts).into());
     }
-    validate_merged(row, &plan.bytes, registry).map_err(HistoryRefusal::MergeInvalid)?;
-    let references = stage_references(row, &plan.bytes)
+    validate_merged(row, bytes, registry).map_err(HistoryRefusal::MergeInvalid)?;
+    let references = stage_references(row, bytes)
         .map_err(|error| HistoryRefusal::MergeInvalid(error.to_string()))?;
     let content = StagedBlob {
-        hash: hash_blob(&plan.bytes),
-        size: plan.bytes.len() as u64,
+        hash: hash_blob(bytes),
+        size: bytes.len() as u64,
     };
     let commit = build_commit(
         content.hash,
@@ -65,7 +76,7 @@ pub(super) fn apply_merge(
         ],
         metadata,
     )?;
-    stores.objects.put(lock, ObjectKind::Blob, &plan.bytes)?;
+    stores.objects.put(lock, ObjectKind::Blob, bytes)?;
     let id = stores.objects.put_commit(lock, &commit)?;
     stores.objects.sync_blobs()?;
     let (id, name) = advance_branch(id, &commit, &mut facts, Recovery::Refuse, stores, lock)?;
@@ -92,4 +103,26 @@ pub(super) fn apply_merge(
         lock,
     )?;
     Ok(id)
+}
+
+#[cfg(test)]
+pub(crate) fn merge_branch_steps(
+    row: &Placement,
+    request: MergeRequest<'_>,
+    fs: &impl PlacementOps,
+    stores: &HistoryStores<'_>,
+    registry: &mut Registry,
+    lock: &mut HomeLock,
+    hook: impl crate::ops::step_hook::StepHook<super::conflict::ConflictStep, HistoryError>,
+) -> Result<MergeOutcome, HistoryError> {
+    let facts = gather_merge(row, request.other, fs, stores, registry)?;
+    let plan = judge_merge(&facts)?;
+    match &plan {
+        MergePlan::Clean(_) => apply_merge(&plan, request.metadata, fs, stores, registry, lock)
+            .map(MergeOutcome::Merged),
+        MergePlan::Conflicted { .. } => {
+            super::conflict::apply_conflict_steps(&plan, fs, stores, registry, lock, hook)
+                .map(MergeOutcome::Conflicted)
+        }
+    }
 }
