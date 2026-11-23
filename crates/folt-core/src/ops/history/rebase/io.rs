@@ -1,0 +1,116 @@
+use super::{LeftBehind, RebaseFacts, RebaseOutcome, RebasePlan};
+use crate::history::commit_range;
+use crate::home::HomeLock;
+use crate::id::{FolioId, ObjectId};
+use crate::object::ObjectKind;
+use crate::ops::history::{HistoryError, HistoryRefusal, HistoryStores, apply_reset, gather_reset};
+use crate::placement::PlacementOps;
+use crate::ref_name::{RefKind, RefName};
+use crate::registry::{Placement, Registry};
+
+pub(crate) fn gather_rebase(
+    id: FolioId,
+    branch: &RefName,
+    onto: ObjectId,
+    from: Option<&Placement>,
+    fs: &impl PlacementOps,
+    stores: &HistoryStores<'_>,
+    registry: &Registry,
+) -> Result<RebaseFacts, HistoryError> {
+    let stopped = registry.stopped_rebase(id)?;
+    if stopped.is_some() {
+        return Err(HistoryRefusal::RebaseStopped.into());
+    }
+    if let Some(row) = from {
+        super::super::require_row(registry, row)?;
+        if row.id != id
+            || row.head != branch.as_str()
+            || row.kind != crate::placement::PlacementKind::Copy
+        {
+            return Err(HistoryRefusal::InvalidFacts.into());
+        }
+    }
+    let reset = gather_reset(id, branch, onto, fs, stores, registry)?;
+    let range = commit_range(stores.objects, reset.old, onto, stores.object_limit)?;
+    let mut commits = std::collections::HashMap::new();
+    let mut contents = std::collections::HashMap::new();
+    let mut ids: Vec<_> = range.iter().copied().collect();
+    ids.push(onto);
+    for id in ids.clone() {
+        ids.extend(stores.objects.get_commit(id, stores.object_limit)?.parents);
+    }
+    for id in ids {
+        if commits.contains_key(&id) {
+            continue;
+        }
+        let commit = stores.objects.get_commit(id, stores.object_limit)?;
+        // Replay needs full content; the caller's limit bounds commit reads only.
+        let mut content = Vec::new();
+        stores
+            .objects
+            .get_to(commit.content, ObjectKind::Blob, &mut content)?;
+        contents.insert(commit.content, content);
+        commits.insert(id, commit);
+    }
+    let mut left_behind = Vec::new();
+    for kind in [RefKind::Tag, RefKind::Pin] {
+        for (name, target) in stores.refs.list(kind)? {
+            let commit = if stores.objects.kind_of(target)? == ObjectKind::Tag {
+                stores.objects.get_tag(target, stores.object_limit)?.target
+            } else {
+                target
+            };
+            if range.contains(&commit) {
+                left_behind.push(LeftBehind { kind, name, commit });
+            }
+        }
+    }
+    Ok(RebaseFacts {
+        reset,
+        copy: from.map(|row| row.path.clone()),
+        stopped,
+        range,
+        commits,
+        contents,
+        left_behind,
+    })
+}
+
+pub(crate) fn apply_rebase(
+    plan: &RebasePlan,
+    fs: &impl PlacementOps,
+    stores: &HistoryStores<'_>,
+    registry: &mut Registry,
+    lock: &mut HomeLock,
+) -> Result<RebaseOutcome, HistoryError> {
+    let facts = &plan.facts;
+    let from = facts
+        .copy
+        .as_ref()
+        .map(|path| registry.placement_at(path))
+        .transpose()?
+        .flatten();
+    let current = gather_rebase(
+        facts.reset.id,
+        &facts.reset.target.branch,
+        facts.reset.target.commit,
+        from.as_ref(),
+        fs,
+        stores,
+        registry,
+    )?;
+    if current != *facts || super::judge_rebase(&current, plan.discard)? != *plan {
+        return Err(HistoryRefusal::InvalidFacts.into());
+    }
+    if plan.stop.is_some() {
+        return super::stopped::apply_stop(plan, fs, stores, registry, lock);
+    }
+    // All mutable inputs were rechecked before publishing any replay objects.
+    for (_, commit, content) in &plan.replayed {
+        stores.objects.put(lock, ObjectKind::Blob, content)?;
+        stores.objects.put_commit(lock, commit)?;
+    }
+    stores.objects.sync_blobs()?;
+    apply_reset(&plan.reset, fs, stores, registry, lock)?;
+    Ok(RebaseOutcome::Finished(plan.tip))
+}

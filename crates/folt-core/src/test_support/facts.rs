@@ -30,11 +30,27 @@ pub(crate) fn facts() -> PlacementFacts {
                 signature: signature.clone(),
             }),
             staged: None,
+            conflict: None,
         },
         observation: Observation::File { signature },
         placement_hash: Some(hash),
         tip: Some(hash),
     }
+}
+
+pub(crate) fn conflicted_facts() -> PlacementFacts {
+    let mut facts = facts();
+    facts.placement.conflict = Some(crate::placement::ConflictState {
+        operation: crate::placement::ConflictOperation::Merge,
+        other: hash_blob(b"other"),
+        marker_lines: vec![
+            b"<<<<<<<\n".to_vec(),
+            b"=======\n".to_vec(),
+            b">>>>>>>\n".to_vec(),
+        ],
+        pre_merge: hash_blob(b"pre-merge"),
+    });
+    facts
 }
 
 pub(crate) fn target() -> MoveTarget {

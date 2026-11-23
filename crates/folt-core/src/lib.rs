@@ -9,6 +9,7 @@ pub mod history;
 pub mod home;
 pub mod id;
 pub mod layout;
+pub mod merge;
 pub mod object;
 pub mod ops;
 pub mod placement;

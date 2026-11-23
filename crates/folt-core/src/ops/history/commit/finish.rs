@@ -1,23 +1,29 @@
 use super::super::{HistoryError, HistoryRefusal, HistoryStores, judge_commit};
 use super::gather::CommitFacts;
 use super::judge::branch_moved;
-use super::plan::{CommitPlan, matches_requested_commit};
+use super::plan::matches_requested_commit;
 use crate::fsx::Signature;
 use crate::history::{Expect, RefError};
 use crate::home::HomeLock;
 use crate::id::ObjectId;
 use crate::object::Commit;
 use crate::ops::placement::move_::{MoveTarget, apply_move_file, judge_move, moved_row};
-use crate::placement::{Observation, PlacementBase, PlacementOps};
+use crate::placement::{Observation, PlacementBase, PlacementOps, StagedBlob};
 use crate::placement_path::RegistryError;
 use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 
-pub(super) fn advance_branch(
+pub(crate) enum Recovery {
+    Resume,
+    Refuse,
+}
+
+pub(crate) fn advance_branch(
     mut id: ObjectId,
     commit: &Commit,
     facts: &mut CommitFacts,
+    recovery: Recovery,
     stores: &HistoryStores<'_>,
     lock: &mut HomeLock,
 ) -> Result<(ObjectId, RefName), HistoryError> {
@@ -33,6 +39,9 @@ pub(super) fn advance_branch(
         Ok(()) => {}
         Err(RefError::Stale { actual }) => {
             facts.working.tip = actual;
+            if matches!(recovery, Recovery::Refuse) {
+                return Err(branch_moved(facts).into());
+            }
             facts.tip_commit = actual
                 .map(|id| objects.get_commit(id, object_limit))
                 .transpose()?;
@@ -53,26 +62,15 @@ pub(super) fn advance_branch(
     Ok((id, name))
 }
 
-pub(super) fn move_internal(
+pub(crate) fn move_internal(
     facts: &CommitFacts,
-    id: ObjectId,
-    name: RefName,
+    target: MoveTarget,
     fs: &impl PlacementOps,
     objects: &ObjectStore,
     registry: &Registry,
     lock: &HomeLock,
 ) -> Result<Option<(Placement, Placement)>, HistoryError> {
-    let staged = facts
-        .working
-        .placement
-        .staged
-        .ok_or(HistoryRefusal::InvalidFacts)?;
     let internal = if let Some(internal) = &facts.internal {
-        let target = MoveTarget {
-            branch: name,
-            commit: id,
-            content: staged.hash,
-        };
         let move_plan = judge_move(internal, &target, false)?;
         let base = apply_move_file(&move_plan, fs, objects, registry, lock)?;
         Some((internal.placement.clone(), moved_row(&move_plan, base)))
@@ -82,30 +80,31 @@ pub(super) fn move_internal(
     Ok(internal)
 }
 
-pub(super) fn write_rows(
-    plan: &CommitPlan,
+pub(crate) fn write_rows(
     facts: &CommitFacts,
     id: ObjectId,
+    content: StagedBlob,
     internal: Option<(Placement, Placement)>,
+    references: Option<&[crate::front_matter::Reference<'_>]>,
     registry: &mut Registry,
     lock: &HomeLock,
 ) -> Result<(), HistoryError> {
-    let row = plan.placement();
-    let staged = row.staged.ok_or(HistoryRefusal::InvalidFacts)?;
+    let row = &facts.working.placement;
     let mut updated = row.clone();
     updated.commit_id = Some(id);
     updated.staged = None;
+    updated.conflict = None;
     let Observation::File { signature } = &facts.working.observation else {
         return Err(HistoryRefusal::InvalidFacts.into());
     };
     updated.base = Some(PlacementBase {
-        hash: staged.hash,
-        signature: if facts.working.placement_hash == Some(staged.hash) {
+        hash: content.hash,
+        signature: if facts.working.placement_hash == Some(content.hash) {
             signature.clone()
         } else {
             // Post-stage edits stay in the file; their metadata is not the staged base.
             Signature {
-                size: staged.size,
+                size: content.size,
                 mtime: None,
                 ctime: None,
                 inode: None,
@@ -122,7 +121,11 @@ pub(super) fn write_rows(
             }
             tx.update_placement(after)?;
         }
-        tx.update_placement(&updated)
+        tx.update_placement(&updated)?;
+        if let Some(references) = references {
+            tx.rebuild_references(row.id, &row.head, references)?;
+        }
+        Ok(())
     })?;
     Ok(())
 }

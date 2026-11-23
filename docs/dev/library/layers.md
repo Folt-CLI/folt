@@ -14,6 +14,7 @@ A module may import from another module only when its table row lists that modul
 | L0 | layout | none |
 | L0 | id | config |
 | L1 | fsx | config |
+| L1 | merge | config |
 | L1 | ref_name | config, id |
 | L1 | front_matter | config, id |
 | L2 | object | config, id, ref_name |
@@ -24,7 +25,7 @@ A module may import from another module only when its table row lists that modul
 | L6 | placement, placement_fs | config, layout, id, object, folio, store, fsx, home, placement_path |
 | L6 | history | config, id, ref_name, object, folio, store, fsx, home |
 | L7 | registry | config, layout, id, object, folio, placement, placement_fs, placement_path, front_matter, fsx, home |
-| L8 | ops | config, layout, id, fsx, ref_name, front_matter, object, home, folio, store, placement_path, placement, placement_fs, history, registry |
+| L8 | ops | merge, config, layout, id, fsx, ref_name, front_matter, object, home, folio, store, placement_path, placement, placement_fs, history, registry |
 
 `none` means std and external crates only.
 

@@ -11,6 +11,8 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod ancestry;
+mod branch_merge;
 mod checkout;
 mod declared_references;
 mod facade;
@@ -22,6 +24,7 @@ mod front_matter_properties;
 mod history;
 mod home;
 mod link_commit;
+mod merge;
 #[cfg(unix)]
 mod non_regular;
 mod placement;
@@ -32,3 +35,5 @@ mod register;
 mod registry;
 mod rename;
 mod support;
+
+mod merge_conflict;

@@ -6,8 +6,10 @@ Read this file before analysis or implementation. Terms are exact: use each only
 
 ## A-Z index
 
+- [abort](#abort)
 - [alias](#alias)
 - [analysis agent](#analysis-agent)
+- [ancestor](#ancestor)
 - [base](#base)
 - [behind](#behind)
 - [blob](#blob)
@@ -15,6 +17,9 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [checkout](#checkout)
 - [child](#child)
 - [commit](#commit)
+- [conflict marker](#conflict-marker)
+- [conflict state](#conflict-state)
+- [continue](#continue)
 - [copy](#copy)
 - [directory Folio](#directory-folio)
 - [Disposition](#disposition)
@@ -41,6 +46,9 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [issue type](#issue-type)
 - [link](#link)
 - [marker](#marker)
+- [merge](#merge)
+- [merge base](#merge-base)
+- [merge commit](#merge-commit)
 - [milestone](#milestone)
 - [Node (syntax tree node)](#node-syntax-tree-node)
 - [object](#object)
@@ -59,6 +67,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [prune](#prune)
 - [publish](#publish)
 - [Question](#question)
+- [rebase](#rebase)
 - [ref name](#ref-name)
 - [reference](#reference)
 - [refs table](#refs-table)
@@ -66,6 +75,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [register](#register)
 - [registry](#registry)
 - [rename](#rename)
+- [replay](#replay)
 - [review agent](#review-agent)
 - [role file](#role-file)
 - [Rollback](#rollback)
@@ -77,14 +87,17 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - [size](#size)
 - [stage](#stage)
 - [StepHook](#stephook)
+- [stopped rebase](#stopped-rebase)
 - [tag](#tag)
 - [TempFile](#tempfile)
 - [test_support](#test_support)
+- [three-way merge](#three-way-merge)
 - [tip](#tip)
 - [tree](#tree)
 - [trigger](#trigger)
 - [unresolved reference](#unresolved-reference)
 - [unstage](#unstage)
+- [virtual base](#virtual-base)
 - [work item](#work-item)
 - [worktree](#worktree)
 
@@ -102,7 +115,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### registry
 
 - **Layer:** Storage and identity
-- **Definition:** The SQLite database `registry.db` in the home records Folio existence, names, placements and cached references. Its tables are `folios`, `placements`, `refs` and `folt_metadata`.
+- **Definition:** The SQLite database `registry.db` in the home records Folio existence, names, placements, cached references and stopped rebase progress. Its tables are `folios`, `placements`, `refs`, `stopped_rebases` and `folt_metadata`.
 - **Code:** `crates/folt-core/src/registry/mod.rs:27` (`Registry`)
 - **Related:** [home](#home), [Folio](#folio), [placement](#placement), [refs table](#refs-table).
 - **Not:** Just the placements table, a tracked-roots list or the on-disk history refs.
@@ -200,6 +213,67 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Not:** A Git commit of this repository or a placement’s recorded starting commit id.
 - **Status:** decided
 
+### ancestor
+
+- **Layer:** History
+- **Definition:** A commit reachable from another commit by following zero or more ids in `Commit::parents`, through every parent. A commit is its own ancestor.
+- **Code:** `crates/folt-core/src/history/ancestry.rs:25` (`is_ancestor`)
+- **Related:** [commit](#commit), [merge base](#merge-base).
+- **Not:** A comparison of a placement’s recorded commit with its branch tip, or an issue parent.
+- **Status:** decided
+
+### merge
+
+- **Layer:** History
+- **Definition:** To combine the tip of another branch into the target branch from one clean copy on it: a three-way merge from the merge base, a check of the merged result, then a merge commit. Several merge bases are folded into a virtual base first. A text conflict on a copy writes conflict markers and a conflict state instead of a merge commit; that state ends by abort or continue. Binary conflicts and non-copy conflicts are refused; a binary conflict between merge base ancestors, no merge base or an already merged branch writes nothing.
+- **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
+- **Related:** [merge base](#merge-base), [three-way merge](#three-way-merge), [merge commit](#merge-commit).
+- **Status:** decided
+
+### abort
+
+- **Layer:** History
+- **Definition:** To end the merge of a copy with conflict state by restoring its pre-merge bytes and clearing its stage and conflict state, without moving the branch ref or removing the pre-merge blob.
+- **Code:** `crates/folt-core/src/ops/history/merge/abort.rs` (`abort_merge`)
+- **Related:** [merge](#merge), [conflict state](#conflict-state), [continue](#continue).
+- **Not:** Rebase continue or abort.
+- **Status:** decided
+
+### continue
+
+- **Layer:** History
+- **Definition:** To end the merge of a copy with conflict state by committing its staged resolution with the recorded target commit first and the other commit second as parents, clearing its stage and conflict state together with recording the merge commit.
+- **Code:** `crates/folt-core/src/ops/history/merge/continue_merge.rs` (`continue_merge`)
+- **Related:** [merge](#merge), [conflict state](#conflict-state), [abort](#abort).
+- **Not:** Rebase continue or abort.
+- **Status:** decided
+
+### merge commit
+
+- **Layer:** History
+- **Definition:** A commit with two parents, the target tip first and the other branch tip second, written by a merge.
+- **Code:** `crates/folt-core/src/ops/history/merge/apply.rs` (`merge_branch`)
+- **Related:** [merge](#merge), [commit](#commit), [parent](#parent).
+- **Status:** decided
+
+### merge base
+
+- **Layer:** History
+- **Definition:** A best common ancestor of two commits: a common ancestor that is not a proper ancestor of another common ancestor. There may be none, one or several; several are returned in object id byte order and folded into a virtual base by the merge.
+- **Code:** `crates/folt-core/src/history/ancestry.rs:10` (`MergeBase`); `crates/folt-core/src/history/ancestry.rs:40` (`merge_base`)
+- **Related:** [ancestor](#ancestor), [commit](#commit), [base](#base).
+- **Not:** The placement base, which records a content hash and file signature, or a merge operation.
+- **Status:** decided
+
+### virtual base
+
+- **Layer:** History
+- **Definition:** In-memory content produced by folding several best common ancestors from left to right in object id byte order for a merge. Each pair uses its merge base content, recursively folding several merge bases and using empty bytes when there is none. Text conflicts remain as conflict marker lines in these bytes; a binary conflict between the ancestors refuses the merge. No object is stored for the virtual base.
+- **Code:** `crates/folt-core/src/ops/history/merge/virtual_base.rs` (`fold`)
+- **Related:** [merge](#merge), [merge base](#merge-base), [three-way merge](#three-way-merge), [conflict marker](#conflict-marker).
+- **Not:** A stored commit or blob, a placement base, or conflict markers written into a working file.
+- **Status:** decided
+
 ### ref name
 
 - **Layer:** History
@@ -245,12 +319,39 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Not:** The branch name stored in `head`, a content blob id or an ancestry comparison.
 - **Status:** decided
 
+### three-way merge
+
+- **Layer:** History
+- **Definition:** A pure combination of supplied merge base, ours and theirs content bytes. Whole-file equality rules run first, then a NUL in the first 8,000 bytes of any input causes a binary conflict with no merged bytes; otherwise line changes combine or produce text containing recorded conflict marker lines.
+- **Code:** `crates/folt-core/src/merge/mod.rs` (`merge3`, `MergeResult`)
+- **Related:** [conflict marker](#conflict-marker), [blob](#blob).
+- **Not:** History traversal, merge base search, a placement base, validation for stage or a commit operation.
+- **Status:** decided
+
+### conflict marker
+
+- **Layer:** History
+- **Definition:** One of the exact `<<<<<<<`, `=======` and `>>>>>>>` lines written around conflicting text by a three-way merge, with an LF terminator. The result records these lines as bytes in file order; binary conflicts have none.
+- **Code:** `crates/folt-core/src/merge/render.rs` (`Render`); `crates/folt-core/src/merge/mod.rs` (`MergeResult`)
+- **Related:** [three-way merge](#three-way-merge), [marker](#marker).
+- **Not:** A directory Folio marker, object codec byte or registry conflict state.
+- **Status:** decided
+
 ## Placements and working state
+
+### conflict state
+
+- **Layer:** Placements and working state
+- **Definition:** A nullable state on a copy's placement row holding the operation (merge or rebase), the other commit (the other branch tip for a merge or the commit being replayed for a rebase), the exact conflict marker lines and the file blob id before the merge or rebase. Merge conflict state ends by abort or continue; rebase conflict state ends when the stopped rebase finishes or is aborted.
+- **Code:** `crates/folt-core/src/placement.rs` (`ConflictState`)
+- **Related:** [copy](#copy), [placement](#placement), [conflict marker](#conflict-marker), [merge](#merge).
+- **Not:** A conflict marker, a link row field, or recoverable by registry rebuild.
+- **Status:** decided
 
 ### placement
 
 - **Layer:** Placements and working state
-- **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base and optional stage. The path is the key, and the kind is link, copy or internal.
+- **Definition:** A registry row identifying where a Folio appears, with a [placement path](#placement-path), Folio id, kind, branch, recorded commit, optional base, optional stage and optional conflict state. The path is the key, and the kind is link, copy or internal.
 - **Code:** `crates/folt-core/src/registry/rows.rs:13` (`Placement`); `crates/folt-core/src/placement.rs:9` (`PlacementKind`); `crates/folt-core/src/placement.rs:57` (`PlacementSpec`)
 - **Related:** [link](#link), [copy](#copy), [internal row](#internal-row), [base](#base), [stage](#stage).
 - **Not:** The file itself or `PlacementSpec`, the in-memory record the file-system layer reads, which has no Folio id or stage.
@@ -537,6 +638,30 @@ Read this file before analysis or implementation. Terms are exact: use each only
 - **Code:** `crates/folt-core/src/ops/prune/judge.rs:7` (`judge`); `crates/folt-core/src/ops/prune/apply.rs:65` (`prune_placements`)
 - **Related:** [placement](#placement), [internal row](#internal-row), [stage](#stage), [home lock](#home-lock).
 - **Not:** Object garbage collection or Folio deletion; a missing path alone does not settle the lifecycle rules in [#15](https://github.com/Folt-CLI/folt/issues/15).
+- **Status:** decided
+
+### rebase
+
+- **Layer:** Operations
+- **Definition:** A plan and apply operation for one Folio and branch that replays commits reachable from its tip but not from a chosen destination commit, drops merge commits and uses reset to advance the branch and move its placements once. Tags and retention pins stay on the original commits and are reported. A parentless commit in the range is refused. A text conflict stops a rebase run from a copy; a conflict without a copy or a binary conflict is refused.
+- **Code:** `crates/folt-core/src/ops/history/rebase.rs` (`RebaseFacts`, `RebasePlan`, `LeftBehind`, `judge_rebase`)
+- **Related:** [replay](#replay), [branch](#branch), [plan and apply](#plan-and-apply).
+- **Status:** decided
+
+### replay
+
+- **Layer:** Operations
+- **Definition:** Applying an ordinary commit's content change to the accumulated destination content with a three-way merge using the original parent's content. Rebase orders commits parent-first with object id byte order as the tie-break, preserves author, time, message, body and group, and chains each new commit to the previous result. A text conflict stops a rebase run from a copy at the original commit id; without a copy, or for a binary conflict, it refuses the operation with that id.
+- **Code:** `crates/folt-core/src/ops/history/rebase/replay.rs` (`replay`)
+- **Related:** [rebase](#rebase), [three-way merge](#three-way-merge), [commit](#commit).
+- **Status:** decided
+
+### stopped rebase
+
+- **Layer:** Operations
+- **Definition:** Durable progress for one Folio whose rebase has stopped at a replay conflict from a copy. The registry table holds the branch, copy path, original tip, destination, remaining commits, current replay and new tip so far. Its copy has a rebase conflict state. Continue uses the resolved working bytes for the current replay, then replays the remaining commits and either stops again or advances the branch once and moves its placements. Abort restores the pre-rebase file blob and removes the progress and conflict state; edited conflict content requires discard. Durable progress also recovers interrupted conflict-file publication and final placement movement.
+- **Code:** `crates/folt-core/src/ops/history/rebase/stopped.rs`
+- **Related:** [rebase](#rebase), [replay](#replay), [conflict state](#conflict-state), [registry](#registry).
 - **Status:** decided
 
 ### publish
@@ -841,7 +966,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | explicit | YAML `? key` syntax; user-given name; registration confirmation | [Explicit key](#explicit-key) means the YAML syntax; explicit name means a user-given name; explicit confirmation means registration confirmation. |
 | rollback | Test wording for undoing writes; restore in registration code | Say restore, the word used in the code. |
 | internal row | Registry row; internal placement; internal file; internal main file; `folio.main` | Internal row means the registry row; `folio.main` means the file. Say the internal row on `main`. |
-| stale | Failed ref compare-and-swap; differing branch tip; old child label; reference cache older than edits; obsolete path | Say failed ref update, behind, cached child label or references from the last stage. Merge and rebase have a selected solution in [#74](https://github.com/Folt-CLI/folt/issues/74), but are not implemented here; local path resolution is open: [#28](https://github.com/Folt-CLI/folt/issues/28). |
+| stale | Failed ref compare-and-swap; differing branch tip; old child label; reference cache older than edits; obsolete path | Say failed ref update, behind, cached child label or references from the last stage. Merge is implemented here. Rebase has a selected solution in [#74](https://github.com/Folt-CLI/folt/issues/74), but is not implemented here; local path resolution is open: [#28](https://github.com/Folt-CLI/folt/issues/28). |
 | name | Folio label; path-derived label; reference target name; child_label; ref name; object hash; path holding a reserved label | Use folio-name for the Folio label, ref name for history refs, and object id for the hash. Upper case works today; lowercase-only policy is open: [#47](https://github.com/Folt-CLI/folt/issues/47). |
 | link | Symbolic-link placement; link row; Markdown link; hard link | Link means the symbolic-link placement; qualify Markdown links and hard links. The row records the expected kind even if the filesystem entry changes. |
 | copy | Regular-file placement; duplicated Folio or directory; ordinary copying action | Copy means the regular-file placement. Identity after duplication is open: [#16](https://github.com/Folt-CLI/folt/issues/16). |
@@ -853,7 +978,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | placement and same-named types | Registry Placement and PlacementSpec; working-state and front-matter Edit; `HistoryRefusal` and `PlacementRefusal` and RefusalReason and registration RegisterRefusalReason; RefKind, ObjectKind and PlacementKind | Placement means the registry row; the in-memory record is `PlacementSpec`. Working-state Edit means Clean/Edited; front-matter Edit means a byte-span replacement. Refusal types use `HistoryRefusal` and `PlacementRefusal`; kind enums require module or domain qualification and their renames wait for [#178](https://github.com/Folt-CLI/folt/issues/178). |
 | ref, refs, reference, edge, pin | History pointers; registry reference rows; declared relationships; informal edge; retention pin; reference pin field | Reference is the declared relationship, with edge an informal synonym. Distinguish the refs table from history refs and retention pins from opaque reference pin fields; [#152](https://github.com/Folt-CLI/folt/issues/152) implements commit-hash pins. |
 | unresolved | Unknown reference target; undecodable front matter key | Use unresolved reference for the cached unknown target, and unresolved key for parser ambiguity. |
-| marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; planned conflict markers; build-skip marker | Marker means `__folio__.md`; qualify codec, conflict and build-skip markers. Workspace and home format markers are retired below. |
+| marker | `__folio__.md`; workspace `.folt/`; home format file; codec marker; [conflict markers](#conflict-marker); build-skip marker | Marker means `__folio__.md`; qualify codec and build-skip markers and use [conflict marker](#conflict-marker) for three-way merge output. Workspace and home format markers are retired below. |
 | plan and apply | Judged operation plan; dry-run report; CI plan job; forbidden Implementation plan issue section | Plan and apply means the operation pattern; qualify a CI plan. Registration and prune expose dry-run reports; do not add an Implementation plan section to work items. |
 | commit | Folt history object or operation; placement’s starting commit id; repository Git commit | Commit means Folt history in domain text; qualify Git commits and a placement’s recorded commit. |
 | head, tip, branch | Placement branch name; branch’s current commit; removed Folio HEAD file; Git HEAD | Head is the placement’s branch name, tip is the ref’s commit id, branch is the named history ref. Qualify Git HEAD. |

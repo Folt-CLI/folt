@@ -9,7 +9,7 @@ mod paths;
 pub(crate) mod registry;
 
 #[cfg(test)]
-pub(crate) use facts::{RelocateFixture, facts, target};
+pub(crate) use facts::{RelocateFixture, conflicted_facts, facts, target};
 #[cfg(test)]
 pub(crate) use home::{TempDir, TempHome};
 pub use paths::expected_path;

@@ -5,6 +5,7 @@ use std::{error::Error, fmt, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HistoryRefusal {
     NothingStaged,
+    NotConflicted(PathBuf),
     BranchMoved {
         tip: Option<ObjectId>,
         ahead: Vec<PathBuf>,
@@ -19,6 +20,16 @@ pub enum HistoryRefusal {
     PlacementsChanged,
     BranchInUse(Vec<PathBuf>),
     InvalidFacts,
+    RebaseConflict(ObjectId),
+    RebaseRoot(ObjectId),
+    RebaseStopped,
+    NoStoppedRebase,
+    MergeConflict,
+    MergeBaseBinaryConflict,
+    MergeAlreadyMerged,
+    MergeNoBase,
+    MergeEdited(PathBuf),
+    MergeInvalid(String),
     TagMismatch,
     TagExists,
     Move(placement_refusal::PlacementRefusal),
@@ -33,6 +44,11 @@ impl From<placement_refusal::PlacementRefusal> for HistoryRefusal {
 impl fmt::Display for HistoryRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NotConflicted(path) => write!(
+                f,
+                "copy has no merge to abort or continue: {}",
+                path.display()
+            ),
             Self::NothingStaged => write!(f, "nothing staged"),
             Self::BranchMoved { tip, ahead } => {
                 write!(f, "branch moved to {tip:?}")?;
@@ -57,6 +73,22 @@ impl fmt::Display for HistoryRefusal {
             }
             Self::BranchInUse(paths) => write!(f, "branch is used by {} placement(s)", paths.len()),
             Self::InvalidFacts => write!(f, "inconsistent history facts"),
+            Self::RebaseConflict(id) => write!(f, "replay conflicted at commit {id}"),
+            Self::RebaseStopped => write!(f, "a rebase of this Folio is already stopped"),
+            Self::NoStoppedRebase => write!(f, "no stopped rebase for this Folio"),
+            Self::RebaseRoot(id) => write!(f, "cannot replay parentless commit {id}"),
+            Self::MergeConflict => write!(f, "merge content conflicts"),
+            Self::MergeBaseBinaryConflict => {
+                write!(f, "merge base ancestors have a binary conflict")
+            }
+            Self::MergeAlreadyMerged => write!(f, "branch is already merged"),
+            Self::MergeNoBase => write!(f, "branches have no merge base"),
+            Self::MergeEdited(path) => write!(
+                f,
+                "merge requires a clean file without a stage: {}",
+                path.display()
+            ),
+            Self::MergeInvalid(message) => write!(f, "merged content is invalid: {message}"),
             Self::TagMismatch => write!(f, "annotation name or target differs from the tag ref"),
             Self::TagExists => write!(f, "tag already exists"),
             Self::Move(error) => error.fmt(f),

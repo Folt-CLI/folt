@@ -109,6 +109,52 @@ impl TestFolio {
             .unwrap()
     }
 
+    pub fn commit_with_parents(
+        &self,
+        lock: &HomeLock,
+        content: &[u8],
+        parents: &[ObjectId],
+    ) -> ObjectId {
+        let blob = self.objects.put(lock, ObjectKind::Blob, content).unwrap();
+        let meta = metadata();
+        self.objects
+            .put_commit(
+                lock,
+                &Commit {
+                    content: blob,
+                    parents: parents.to_vec(),
+                    author: meta.author,
+                    time: meta.time,
+                    message: meta.message,
+                    body: Some("preserved body".into()),
+                    group: Some("preserved group".into()),
+                },
+            )
+            .unwrap()
+    }
+
+    pub fn second_branch(
+        &mut self,
+        home: &TempHome,
+        lock: &mut HomeLock,
+        name: &str,
+        parent: ObjectId,
+        content: &[u8],
+    ) -> ObjectId {
+        let tip = self.commit_with_parents(lock, content, &[parent]);
+        home.home
+            .create_branch(
+                self.folio.id(),
+                &folt_core::ref_name::RefName::parse(name).unwrap(),
+                tip,
+                &self.refs,
+                &mut self.registry,
+                lock,
+            )
+            .unwrap();
+        tip
+    }
+
     pub fn copy(&mut self, home: &TempHome, lock: &HomeLock) -> Placement {
         let path = home.root().join("copy.txt");
         let blob = self

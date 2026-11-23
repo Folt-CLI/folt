@@ -1,5 +1,6 @@
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
+use crate::ops::stage::refuse::is_conflicted;
 use crate::placement::{Observation, PlacementKind};
 
 use super::target::RelocateTarget;
@@ -44,6 +45,9 @@ pub(super) fn judge_relocate_checked(
     };
     if facts.placement.kind == PlacementKind::Internal {
         return Err(refuse(RefusalReason::Internal));
+    }
+    if is_conflicted(&facts.placement) {
+        return Err(refuse(RefusalReason::Conflicted));
     }
     let destination = target.path.to_path_buf();
     if destination == path || destination.starts_with(&path) {

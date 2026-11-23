@@ -405,6 +405,7 @@ dependencies = [
  "rustix",
  "serde",
  "sha2",
+ "similar",
  "toml",
  "uuid",
  "winapi-util",

@@ -61,3 +61,19 @@ fn clean_move_preserves_target_and_row() {
     assert_eq!(plan.placement(), &facts.placement);
     assert_eq!(plan.target(), &target);
 }
+
+#[test]
+fn conflict_refusal_precedes_edits_even_with_discard() {
+    let mut facts = crate::test_support::conflicted_facts();
+    facts.placement_hash = Some(hash_blob(b"edits"));
+    for discard in [false, true] {
+        let refusal = judge_move(&facts, &target(), discard).unwrap_err();
+        assert_eq!(refusal.reason, RefusalReason::Conflicted);
+        assert!(
+            refusal
+                .to_string()
+                .contains(&facts.placement.path.to_path_buf().display().to_string())
+        );
+    }
+    assert!(judge_move(&crate::test_support::facts(), &target(), false).is_ok());
+}

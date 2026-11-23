@@ -6,6 +6,7 @@ use crate::home::HomeLock;
 use crate::id::{FolioId, ObjectId};
 use crate::ops::facts::PlacementFacts;
 use crate::ops::placement::move_::{MovePlan, MoveTarget, apply_move, judge_move};
+use crate::ops::stage::refuse::is_conflicted;
 use crate::placement::{PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
 use crate::registry::Registry;
@@ -61,10 +62,19 @@ pub(crate) fn gather_reset(
 pub struct ResetPlan {
     facts: ResetFacts,
     moves: Vec<MovePlan>,
+    skipped: Vec<std::path::PathBuf>,
+}
+
+impl ResetPlan {
+    /// Paths of copies kept unchanged because they have a conflict state.
+    pub fn skipped(&self) -> &[std::path::PathBuf] {
+        &self.skipped
+    }
 }
 
 pub(crate) fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan, HistoryRefusal> {
     let mut moves = Vec::new();
+    let mut skipped = Vec::new();
     for placement in &facts.placements {
         if placement.placement.id != facts.id
             || placement.placement.head != facts.target.branch.as_str()
@@ -72,11 +82,16 @@ pub(crate) fn judge_reset(facts: &ResetFacts, discard: bool) -> Result<ResetPlan
         {
             return Err(HistoryRefusal::InvalidFacts);
         }
+        if is_conflicted(&placement.placement) {
+            skipped.push(placement.placement.path.to_path_buf());
+            continue;
+        }
         moves.push(judge_move(placement, &facts.target, discard)?);
     }
     Ok(ResetPlan {
         facts: facts.clone(),
         moves,
+        skipped,
     })
 }
 

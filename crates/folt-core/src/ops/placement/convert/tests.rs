@@ -174,3 +174,21 @@ fn conversion_without_history_keeps_all_copy_refusals() {
     link.observation = Observation::IntactLink;
     assert!(judge_convert(&link, PlacementKind::Copy, None, None).is_err());
 }
+
+#[test]
+fn conflict_refusal_precedes_stage_and_edits() {
+    let mut facts = crate::test_support::conflicted_facts();
+    facts.placement.head = "main".into();
+    facts.placement.staged = Some(placement::StagedBlob {
+        hash: hash_blob(b"stage"),
+        size: 5,
+    });
+    facts.placement_hash = Some(hash_blob(b"edits"));
+    let refusal = judge_convert(&facts, PlacementKind::Link, None, None).unwrap_err();
+    assert_eq!(refusal.reason, RefusalReason::Conflicted);
+    assert!(
+        refusal
+            .to_string()
+            .contains(&facts.placement.path.to_path_buf().display().to_string())
+    );
+}

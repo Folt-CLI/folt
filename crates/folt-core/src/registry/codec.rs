@@ -106,3 +106,88 @@ pub(super) fn prefix_boundary(prefix: &[u8]) -> Vec<u8> {
     boundary.extend_from_slice(&[b'\\', 0]);
     boundary
 }
+
+pub(super) struct EncodedConflict {
+    pub operation: Option<&'static str>,
+    pub other: Option<Vec<u8>>,
+    pub markers: Option<Vec<u8>>,
+    pub pre_merge: Option<Vec<u8>>,
+}
+
+pub(super) fn encode_conflict(
+    state: Option<&crate::placement::ConflictState>,
+) -> Result<EncodedConflict, RegistryError> {
+    let Some(state) = state else {
+        return Ok(EncodedConflict {
+            operation: None,
+            other: None,
+            markers: None,
+            pre_merge: None,
+        });
+    };
+    let mut markers = Vec::new();
+    for line in &state.marker_lines {
+        let length = u64::try_from(line.len()).map_err(|_| RegistryError::InvalidConflictState)?;
+        markers.extend_from_slice(&length.to_be_bytes());
+        markers.extend_from_slice(line);
+    }
+    Ok(EncodedConflict {
+        operation: Some(match state.operation {
+            crate::placement::ConflictOperation::Merge => "merge",
+            crate::placement::ConflictOperation::Rebase => "rebase",
+        }),
+        other: Some(state.other.as_bytes().to_vec()),
+        markers: Some(markers),
+        pre_merge: Some(state.pre_merge.as_bytes().to_vec()),
+    })
+}
+
+pub(super) fn decode_conflict(
+    operation: Option<String>,
+    other: Option<Vec<u8>>,
+    markers: Option<Vec<u8>>,
+    pre_merge: Option<Vec<u8>>,
+) -> Result<Option<crate::placement::ConflictState>, RegistryError> {
+    use crate::placement::{ConflictOperation, ConflictState};
+    let invalid = || RegistryError::InvalidConflictState;
+    let (operation, other, markers, pre_merge) = match (operation, other, markers, pre_merge) {
+        (None, None, None, None) => return Ok(None),
+        (Some(operation), Some(other), Some(markers), Some(pre_merge)) => {
+            (operation, other, markers, pre_merge)
+        }
+        _ => return Err(invalid()),
+    };
+    let operation = match operation.as_str() {
+        "merge" => ConflictOperation::Merge,
+        "rebase" => ConflictOperation::Rebase,
+        _ => return Err(invalid()),
+    };
+    let mut remaining = markers.as_slice();
+    let mut marker_lines = Vec::new();
+    while !remaining.is_empty() {
+        let (length, rest) = remaining.split_at_checked(8).ok_or_else(invalid)?;
+        let length = u64::from_be_bytes(length.try_into().map_err(|_| invalid())?);
+        let length = usize::try_from(length).map_err(|_| invalid())?;
+        let (line, rest) = rest.split_at_checked(length).ok_or_else(invalid)?;
+        marker_lines.push(line.to_vec());
+        remaining = rest;
+    }
+    Ok(Some(ConflictState {
+        operation,
+        other: ObjectId::from_bytes(other.try_into().map_err(|_| invalid())?),
+        marker_lines,
+        pre_merge: ObjectId::from_bytes(pre_merge.try_into().map_err(|_| invalid())?),
+    }))
+}
+
+pub(super) fn encode_commits(ids: &[ObjectId]) -> Vec<u8> {
+    ids.iter().flat_map(|id| *id.as_bytes()).collect()
+}
+
+pub(super) fn decode_commits(bytes: &[u8]) -> Result<Vec<ObjectId>, RegistryError> {
+    let (chunks, rest) = bytes.as_chunks::<32>();
+    if !rest.is_empty() {
+        return Err(RegistryError::InvalidConflictState);
+    }
+    Ok(chunks.iter().map(|id| ObjectId::from_bytes(*id)).collect())
+}

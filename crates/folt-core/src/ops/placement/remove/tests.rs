@@ -21,3 +21,19 @@ fn remove_crash_leaves_only_an_unregistered_file() {
         );
     }
 }
+
+#[test]
+fn remove_deletes_row_with_its_conflict_state() {
+    for delete_file in [false, true] {
+        let (mut fixture, lock, mut registry) = RelocateFixture::new(false);
+        fixture.row.conflict = crate::test_support::conflicted_facts().placement.conflict;
+        registry
+            .write(&lock, |tx| tx.update_placement(&fixture.row))
+            .unwrap();
+        let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
+        let plan = judge_remove(&fixture.facts(), delete_file, true).unwrap();
+        apply_remove(&plan, &fs, &mut registry, &lock).unwrap();
+        assert_eq!(registry.placement_at(&fixture.row.path).unwrap(), None);
+        assert_eq!(fixture.row.path.to_path_buf().exists(), !delete_file);
+    }
+}

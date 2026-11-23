@@ -12,6 +12,7 @@ The modules are listed in reading order, from the modules with no imports to the
 | `layout` | The home format version and layout support. |
 | `id` | Folio ids and object ids. |
 | `fsx` | File-system writes, the `FileSystem` trait, `TempFile` and the file signature. |
+| `merge` | Pure three-way merge of bytes, with binary conflicts and recorded conflict marker lines. |
 | `ref_name` | Validated names of history refs and retention pin names. |
 | `front_matter` | Locating, reading and editing front matter through the syntax tree. |
 | `object` | Immutable history objects: blobs, commits and tags. |
@@ -21,7 +22,7 @@ The modules are listed in reading order, from the modules with no imports to the
 | `placement_path` | The resolved placement path. |
 | `placement` | Placement kinds, observations, drift and the in-memory placement records. Still a flat file. |
 | `placement_fs` | File-system access for placements. Still a flat file. |
-| `history` | The ref store of one Folio. Still a flat file with submodules; the history operations live in `ops/history`. |
+| `history` | The ref store, commit ancestry and merge bases of one Folio. Still a flat file with submodules; the history operations live in `ops/history`. |
 | `registry` | The SQLite registry: schema, rows, lookups and transactions. |
 | `ops` | The operations, which gather facts, judge them and apply the plan. |
 | `test_support` | Shared test fixtures, enabled by the `test-support` feature and by `cfg(test)`. |
@@ -42,7 +43,7 @@ The order is `refusal`, `facts`, `working`, `status`, `step_hook`, `stage`, `pla
 | `ops::open` | Opening or creating a home, as a `Home` method. |
 | `ops::stage` | Stage and unstage, with the stage refusal checks in `ops::stage::refuse`. |
 | `ops::placement` | Placement convert, move, rehome, relocate, remove and repair. |
-| `ops::history` | History operations: commit, branch, tag and reset. |
+| `ops::history` | History operations: commit, merge, branch, tag, reset and rebase. |
 | `ops::register` | Registration. |
 | `ops::rename` | Rename. |
 | `ops::checkout` | Checkout. |
@@ -54,6 +55,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 
 | Rule | Owner |
 | --- | --- |
+| Conflict state of a copy: type and columns | `placement` and `registry`; writing it: `ops::history` |
 | Fixed names, file names and the marker name | `config::names` |
 | Scan limit and the window that reads past it | `config::limits` (`SCAN_LIMIT`, `SCAN_WINDOW`) |
 | Registry application id | `config::formats` (`APPLICATION_ID`) |
@@ -66,15 +68,22 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Restoring files and removing created files when an operation fails | `ops::rollback` (`Rollback`) |
 | Placement refusals | `ops::refusal` |
 | Gathered facts of a placement | `ops::facts` |
+| Checks of a copy's conflict state in existing operations and whether recorded conflict marker lines remain | `ops::stage::refuse` (checks), `ops::refusal` (refusal reasons) |
 | Whether a placement has a stage | `ops::stage::refuse` |
+| Binary test, whole-file equality rules, line merge and conflict marker rendering | `merge` |
 | History operations and their refusals | `ops::history` |
+| Merge entry, two-parent merge commit, merge refusals, and abort and continue of a copy with conflict state | `ops::history` |
+| Validation of merged content: reference keys, reference cycles and folio-name collisions | `ops::stage::validate` |
 | Registration plan, apply and refusals | `ops::register` |
 | Rename plan and apply | `ops::rename` |
 | Prune judge and apply | `ops::prune` |
 | Exclusive access to one home | `home::lock` (`HomeLock`) |
 | Resolving a path to a placement path | `placement_path` (`PlacementPath`) |
+| Stopped rebase table, row codec and transactions | `registry` |
+| Starting, stopping, continuing and aborting a rebase, including replay ordering and metadata | `ops::history` |
 | Registry schema, rows and transactions | `registry` |
 | Branch, tag and pin refs on disk | `history::RefStore` |
+| Commit ancestry and merge base computation | `history::ancestry` |
 
 ## Forbidden patterns
 

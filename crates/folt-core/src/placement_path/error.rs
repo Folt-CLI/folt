@@ -42,6 +42,7 @@ pub enum RegistryError {
     InvalidBaseHash,
     InvalidBaseSignature,
     InvalidStaged,
+    InvalidConflictState,
     PlacementChanged(PlacementPath),
 }
 impl From<rusqlite::Error> for RegistryError {
@@ -115,6 +116,7 @@ impl fmt::Display for RegistryError {
             }
             Self::InvalidCommitId => write!(f, "registry contains an invalid placement commit id"),
             Self::InvalidBaseHash => write!(f, "registry contains an invalid placement base hash"),
+            Self::InvalidConflictState => write!(f, "registry contains an invalid conflict state"),
             Self::InvalidStaged => write!(f, "registry contains an invalid staged blob"),
             Self::PlacementChanged(path) => write!(
                 f,

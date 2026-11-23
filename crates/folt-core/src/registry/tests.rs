@@ -20,7 +20,7 @@ fn schema_three_indexes_names_and_rejects_invalid_stored_names() {
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 3);
+    assert_eq!(version, 5);
     let plan: String = connection
         .query_row(
             "EXPLAIN QUERY PLAN SELECT id FROM folios WHERE name=?1",
@@ -162,7 +162,7 @@ fn fresh_writer_creates_a_current_schema_that_both_paths_reopen() {
     let app: i64 = connection
         .pragma_query_value(None, "application_id", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 3);
+    assert_eq!(version, 5);
     assert_eq!(app, i64::from(APPLICATION_ID));
     assert!(matches!(
         classify_schema(version, app, &path).unwrap(),
@@ -190,13 +190,19 @@ fn schema_version_and_application_id_preserve_both_open_paths() {
         (1, folt, "outdated", "outdated"),
         (2, 0, "foreign", "foreign"),
         (2, 42, "foreign", "foreign"),
-        (2, folt, "ok", "foreign"),
+        (2, folt, "outdated", "outdated"),
         (3, 0, "foreign", "foreign"),
         (3, 42, "foreign", "foreign"),
-        (3, folt, "ok", "ok"),
-        (4, 0, "unsupported", "unsupported"),
-        (4, 42, "unsupported", "unsupported"),
-        (4, folt, "unsupported", "unsupported"),
+        (3, folt, "outdated", "outdated"),
+        (4, folt, "outdated", "outdated"),
+        (5, folt, "ok", "ok"),
+        (5, 0, "foreign", "foreign"),
+        (5, 42, "foreign", "foreign"),
+        (4, 0, "foreign", "foreign"),
+        (4, 42, "foreign", "foreign"),
+        (6, 0, "unsupported", "unsupported"),
+        (6, 42, "unsupported", "unsupported"),
+        (6, folt, "unsupported", "unsupported"),
     ];
     for (version, app, writer_expected, reader_expected) in cases {
         for (writer, expected) in [(true, writer_expected), (false, reader_expected)] {
@@ -234,13 +240,13 @@ fn schema_version_and_application_id_preserve_both_open_paths() {
                 }
                 ("outdated", Err(error @ RegistryError::OutdatedSchema { .. })) => {
                     assert!(
-                        matches!(&error, RegistryError::OutdatedSchema { found: 1, required: 3, path: found } if found == &path),
+                        matches!(&error, RegistryError::OutdatedSchema { found: old, required: 5, path: found } if found == &path && *old == version),
                         "{context}"
                     );
                     assert_eq!(
                         error.to_string(),
                         format!(
-                            "registry {} uses pre-release schema version 1; required version is 3; delete this registry before continuing",
+                            "registry {} uses pre-release schema version {version}; required version is 5; delete this registry before continuing",
                             path.display()
                         ),
                         "{context}"
@@ -251,15 +257,15 @@ fn schema_version_and_application_id_preserve_both_open_paths() {
                         matches!(
                             error,
                             RegistryError::UnsupportedSchemaVersion {
-                                found: 4,
-                                supported: 3
+                                found: 6,
+                                supported: 5
                             }
                         ),
                         "{context}"
                     );
                     assert_eq!(
                         error.to_string(),
-                        "registry schema version 4 is newer than supported version 3",
+                        "registry schema version 6 is newer than supported version 5",
                         "{context}"
                     );
                 }
@@ -320,4 +326,207 @@ fn failed_backup_publication_leaves_no_temporary_file() {
         .map(|entry| entry.unwrap().file_name())
         .collect();
     assert_eq!(names, vec![std::ffi::OsString::from("registry.db")]);
+}
+
+#[test]
+fn conflict_state_round_trip_and_copy_only_checks() {
+    use crate::object::hash_blob;
+    use crate::placement::{ConflictOperation, ConflictState, PlacementKind};
+    let directory = TempDir::new().unwrap();
+    let (home, lock) = open_registry(&directory);
+    let mut registry = Registry::open_or_create(&home, &lock).unwrap();
+    let mut row = crate::test_support::facts().placement;
+    row.conflict = Some(ConflictState {
+        operation: ConflictOperation::Merge,
+        other: hash_blob(b"other"),
+        marker_lines: vec![
+            b"<<<<<<<\n".to_vec(),
+            vec![],
+            b"=======\n".to_vec(),
+            b">>>>>>>\n".to_vec(),
+        ],
+        pre_merge: hash_blob(b"before"),
+    });
+    registry
+        .write(&lock, |tx| {
+            tx.add_folio(&crate::folio::row::NewFolio {
+                id: row.id,
+                format: crate::folio::format::FolioFormat {
+                    layout: crate::layout::FOLIO_LAYOUT_VERSION,
+                    algorithm: crate::config::formats::OBJECT_ALGORITHM.into(),
+                },
+            })?;
+            tx.insert_placement(&row)
+        })
+        .unwrap();
+    assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+    assert_eq!(registry.all_placements().unwrap(), vec![row.clone()]);
+    assert_eq!(registry.placements_of(row.id).unwrap(), vec![row.clone()]);
+    assert_eq!(
+        registry.placements_of_head(row.id, &row.head).unwrap(),
+        vec![row.clone()]
+    );
+    registry
+        .write(&lock, |tx| {
+            assert_eq!(tx.placement_at(&row.path)?, Some(row.clone()));
+            Ok(())
+        })
+        .unwrap();
+    drop(registry);
+    let mut registry = Registry::open_or_create(&home, &lock).unwrap();
+    assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+    row.conflict.as_mut().unwrap().marker_lines = vec![b"changed\0\n".to_vec()];
+    registry
+        .write(&lock, |tx| tx.update_placement(&row))
+        .unwrap();
+    assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+    for kind in [PlacementKind::Internal, PlacementKind::Link] {
+        let mut invalid = row.clone();
+        invalid.kind = kind;
+        invalid.head = "main".into();
+        invalid.base = None;
+        invalid.commit_id = None;
+        assert!(
+            registry
+                .write(&lock, |tx| tx.update_placement(&invalid))
+                .is_err()
+        );
+        assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+    }
+    let connection = registry.connection.as_ref().unwrap();
+    assert!(
+        connection
+            .execute("UPDATE placements SET conflict_other=NULL", [])
+            .is_err()
+    );
+    connection
+        .execute("UPDATE placements SET conflict_markers=?1", [vec![0u8; 7]])
+        .unwrap();
+    assert!(registry.placement_at(&row.path).is_err());
+}
+
+#[test]
+fn malformed_conflict_encodings_return_registry_errors() {
+    use super::codec::decode_conflict;
+    let id = || Some(vec![0; 32]);
+    for markers in [
+        vec![0; 7],
+        u64::MAX.to_be_bytes().to_vec(),
+        [1u64.to_be_bytes().as_slice()].concat(),
+    ] {
+        assert!(matches!(
+            decode_conflict(Some("merge".into()), id(), Some(markers), id()),
+            Err(RegistryError::InvalidConflictState)
+        ));
+    }
+    assert!(decode_conflict(Some("unknown".into()), id(), Some(vec![]), id()).is_err());
+    assert!(decode_conflict(Some("merge".into()), Some(vec![0; 31]), Some(vec![]), id()).is_err());
+    assert!(decode_conflict(None, id(), Some(vec![]), id()).is_err());
+}
+
+#[test]
+fn stopped_rebase_round_trip_update_remove_and_transaction_rollback() {
+    use super::StoppedRebase;
+    use crate::object::hash_blob;
+    use crate::placement::{ConflictOperation, ConflictState};
+    let directory = TempDir::new().unwrap();
+    let (home, lock) = open_registry(&directory);
+    let mut registry = Registry::open_or_create(&home, &lock).unwrap();
+    let mut copy = crate::test_support::facts().placement;
+    copy.conflict = Some(ConflictState {
+        operation: ConflictOperation::Rebase,
+        other: hash_blob(b"current"),
+        marker_lines: vec![
+            b"<<<<<<<\n".to_vec(),
+            b"=======\n".to_vec(),
+            b">>>>>>>\n".to_vec(),
+        ],
+        pre_merge: hash_blob(b"original file"),
+    });
+    let mut progress = StoppedRebase {
+        id: copy.id,
+        branch: copy.head.clone(),
+        copy: copy.path.clone(),
+        original_tip: hash_blob(b"original tip"),
+        destination: hash_blob(b"destination"),
+        remaining: vec![hash_blob(b"one"), hash_blob(b"two")],
+        current_replay: Some(copy.conflict.as_ref().unwrap().other),
+        new_tip: hash_blob(b"new tip"),
+        file_before: hash_blob(b"before"),
+        marker_blob: Some(hash_blob(b"markers")),
+        discard: false,
+    };
+    registry
+        .write(&lock, |tx| {
+            tx.add_folio(&crate::folio::row::NewFolio {
+                id: copy.id,
+                format: crate::folio::format::FolioFormat {
+                    layout: crate::layout::FOLIO_LAYOUT_VERSION,
+                    algorithm: crate::config::formats::OBJECT_ALGORITHM.into(),
+                },
+            })?;
+            tx.insert_placement(&copy)?;
+            tx.insert_stopped_rebase(&progress)
+        })
+        .unwrap();
+    assert!(
+        registry
+            .write(&lock, |tx| tx.insert_stopped_rebase(&progress))
+            .is_err()
+    );
+    drop(registry);
+    let mut registry = Registry::open_or_create(&home, &lock).unwrap();
+    assert_eq!(
+        registry.stopped_rebase(copy.id).unwrap(),
+        Some(progress.clone())
+    );
+    assert_eq!(
+        registry.placement_at(&copy.path).unwrap(),
+        Some(copy.clone())
+    );
+    progress.remaining.clear();
+    progress.current_replay = None;
+    progress.marker_blob = None;
+    registry
+        .write(&lock, |tx| tx.update_stopped_rebase(&progress))
+        .unwrap();
+    assert_eq!(
+        registry.stopped_rebase(copy.id).unwrap(),
+        Some(progress.clone())
+    );
+    assert!(
+        registry
+            .write(&lock, |tx| {
+                tx.remove_stopped_rebase(copy.id)?;
+                Err::<(), _>(RegistryError::InvalidConflictState)
+            })
+            .is_err()
+    );
+    assert_eq!(registry.stopped_rebase(copy.id).unwrap(), Some(progress));
+    registry
+        .write(&lock, |tx| tx.remove_stopped_rebase(copy.id))
+        .unwrap();
+    assert!(registry.stopped_rebase(copy.id).unwrap().is_none());
+}
+
+#[test]
+fn remaining_commit_codec_rejects_partial_ids_and_preserves_order() {
+    use super::codec::{decode_commits, encode_commits};
+    use crate::object::hash_blob;
+    for length in [1, 31, 33, 63, 65] {
+        assert!(matches!(
+            decode_commits(&vec![0; length]),
+            Err(RegistryError::InvalidConflictState)
+        ));
+    }
+    for ids in [
+        vec![],
+        vec![
+            hash_blob(b"first"),
+            hash_blob(b"second"),
+            hash_blob(b"first"),
+        ],
+    ] {
+        assert_eq!(decode_commits(&encode_commits(&ids)).unwrap(), ids);
+    }
 }

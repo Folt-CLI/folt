@@ -4,6 +4,7 @@ use crate::id::ObjectId;
 use crate::ops::facts::PlacementFacts;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
+use crate::ops::stage::refuse::is_conflicted;
 use crate::placement::{self, Drift, Observation, PlacementError, PlacementKind, PlacementOps};
 use crate::ref_name::RefName;
 use crate::registry::{self, Registry};
@@ -50,6 +51,9 @@ pub(crate) fn judge_move(
     }
     if placement.kind == PlacementKind::Internal && target.branch.as_str() != DEFAULT_BRANCH {
         return Err(refuse(RefusalReason::InternalBranch));
+    }
+    if is_conflicted(&facts.placement) {
+        return Err(refuse(RefusalReason::Conflicted));
     }
     match &facts.observation {
         Observation::Missing => return Err(refuse(RefusalReason::Gone)),

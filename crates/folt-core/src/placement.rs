@@ -9,6 +9,22 @@ use crate::id::ObjectId;
 use crate::placement_path;
 use std::path::{Path, PathBuf};
 
+/// The operation that left a copy with a conflict state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConflictOperation {
+    Merge,
+    Rebase,
+}
+
+/// Conflict state belongs to one copy, independently of other placements of its Folio.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConflictState {
+    pub operation: ConflictOperation,
+    pub other: ObjectId,
+    pub marker_lines: Vec<Vec<u8>>,
+    pub pre_merge: ObjectId,
+}
+
 /// The way a Folio is presented at a placement path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlacementKind {
