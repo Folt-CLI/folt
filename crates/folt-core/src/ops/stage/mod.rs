@@ -4,7 +4,7 @@ use crate::object::ObjectKind;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::rules_error::RulesError;
 use crate::ops::working::{read_working, resolve_working};
-use crate::placement::{Observation, PlacementError, PlacementOps, StagedBlob};
+use crate::placement::{ConflictOperation, Observation, PlacementError, PlacementOps, StagedBlob};
 use crate::registry::{Placement, Registry};
 use crate::store::ObjectStore;
 use write::write_stage;
@@ -53,7 +53,12 @@ pub(crate) fn stage(
         }
         .into());
     };
-    let staged = if row.base.as_ref().is_some_and(|base| base.hash == hash) {
+    let staged = if row.base.as_ref().is_some_and(|base| base.hash == hash)
+        && !row
+            .conflict
+            .as_ref()
+            .is_some_and(|state| state.operation == ConflictOperation::Merge)
+    {
         None
     } else {
         Some(StagedBlob {

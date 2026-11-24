@@ -432,7 +432,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### stage
 
 - **Layer:** Placements and working state
-- **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage; later changes to staged bytes show StagedThenModified.
+- **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage unless the copy has merge conflict state; in that case stage records the resolution even when it equals the base. Later changes to staged bytes show StagedThenModified.
 - **Code:** `crates/folt-core/src/ops/stage/mod.rs:14` (`stage`); `crates/folt-core/src/placement.rs:93` (`StagedBlob`); `crates/folt-core/src/ops/status.rs:20` (`Staged`)
 - **Related:** [blob](#blob), [commit](#commit), [unstage](#unstage), [refs table](#refs-table).
 - **Not:** Git staging or a development workflow stage; staging does not change the base.
