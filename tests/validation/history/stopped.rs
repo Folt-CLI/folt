@@ -9,13 +9,22 @@ fn fixture(
     lock: &mut folt_core::home::HomeLock,
     twice: bool,
 ) -> (TestFolio, Placement, ObjectId, ObjectId) {
+    fixture_content(home, lock, twice, [b"base\n", b"ours\n", b"theirs\n"])
+}
+
+fn fixture_content(
+    home: &TempHome,
+    lock: &mut folt_core::home::HomeLock,
+    twice: bool,
+    content: [&[u8]; 3],
+) -> (TestFolio, Placement, ObjectId, ObjectId) {
     let mut folio = TestFolio::new(home, lock);
-    let root = folio.commit_internal(home, lock, b"base\n");
-    let first = folio.commit_internal(home, lock, b"ours\n");
+    let root = folio.commit_internal(home, lock, content[0]);
+    let first = folio.commit_internal(home, lock, content[1]);
     if twice {
         folio.commit_internal(home, lock, b"later\n");
     }
-    let onto = folio.commit_with_parents(lock, b"theirs\n", &[root]);
+    let onto = folio.commit_with_parents(lock, content[2], &[root]);
     let copy = folio.copy(home, lock);
     let tip = folio.internal().commit_id.unwrap();
     let fs = PlacementFs::new(&home.home);
@@ -432,3 +441,101 @@ fn continue_accepts_resolution_equal_to_pre_rebase_bytes() {
 }
 
 mod abort;
+
+#[test]
+fn two_region_rebase_refuses_partial_stage() {
+    two_region_partial_resolution(true);
+}
+
+#[test]
+fn two_region_rebase_refuses_partial_continue() {
+    two_region_partial_resolution(false);
+}
+
+fn two_region_partial_resolution(stage: bool) {
+    use folt_core::ops::refusal::{PlacementRefusal, RefusalReason};
+    use folt_core::ops::rules_error::RulesError;
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let (mut folio, copy, onto, _) = fixture_content(
+        &home,
+        &mut lock,
+        false,
+        [
+            b"base first\nseparator\nbase second\n",
+            b"ours first\nseparator\nours second\n",
+            b"theirs first\nseparator\ntheirs second\n",
+        ],
+    );
+    let state = start(&home, &mut lock, &mut folio, &copy, onto);
+    assert_eq!(state.marker_lines.len(), 6);
+    let text = String::from_utf8(std::fs::read(copy.path.to_path_buf()).unwrap()).unwrap();
+    let regions: Vec<_> = text.split("separator\n").collect();
+    let row = current(&folio, &copy);
+    let progress = folio.registry.stopped_rebase(copy.id).unwrap();
+    let placements = folio
+        .registry
+        .placements_of_head(copy.id, &copy.head)
+        .unwrap();
+    for partial in [
+        format!("resolved first\nseparator\n{}", regions[1]),
+        format!("{}separator\nresolved second\n", regions[0]),
+    ] {
+        std::fs::write(copy.path.to_path_buf(), partial.as_bytes()).unwrap();
+        if stage {
+            assert!(matches!(
+                home.home.stage(
+                    &row,
+                    &PlacementFs::new(&home.home),
+                    &folio.objects,
+                    &folio.refs,
+                    &mut folio.registry,
+                    &lock
+                ),
+                Err(RulesError::Refused(PlacementRefusal {
+                    reason: RefusalReason::ConflictMarkers,
+                    ..
+                }))
+            ));
+        }
+        assert!(matches!(
+            continue_now(&home, &mut lock, &mut folio, &copy),
+            Err(HistoryError::Refused(HistoryRefusal::Move(
+                PlacementRefusal {
+                    reason: RefusalReason::ConflictMarkers,
+                    ..
+                }
+            )))
+        ));
+        drop(folio.registry);
+        folio.registry = folt_core::registry::Registry::open_or_create(&home.home, &lock).unwrap();
+        assert_eq!(folio.registry.stopped_rebase(copy.id).unwrap(), progress);
+        assert_eq!(
+            folio
+                .registry
+                .placements_of_head(copy.id, &copy.head)
+                .unwrap(),
+            placements
+        );
+        assert_eq!(
+            std::fs::read(copy.path.to_path_buf()).unwrap(),
+            partial.as_bytes()
+        );
+        assert_eq!(
+            folio
+                .refs
+                .read(RefKind::Branch, &RefName::parse("main").unwrap())
+                .unwrap(),
+            copy.commit_id
+        );
+    }
+    let resolved = b"resolved first\nseparator\nresolved second\n";
+    std::fs::write(copy.path.to_path_buf(), resolved).unwrap();
+    assert!(matches!(
+        continue_now(&home, &mut lock, &mut folio, &copy).unwrap(),
+        RebaseOutcome::Finished(_)
+    ));
+    assert!(folio.registry.stopped_rebase(copy.id).unwrap().is_none());
+    assert!(current(&folio, &copy).conflict.is_none());
+    assert_eq!(std::fs::read(copy.path.to_path_buf()).unwrap(), resolved);
+}

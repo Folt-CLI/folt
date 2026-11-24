@@ -920,7 +920,11 @@ fn continue_merge_records_staged_content_two_parents_and_clears_state() {
         let staged = registry.placement_at(&row.path).unwrap().unwrap();
         let content = staged.staged.unwrap();
         // The merge commit uses the stage even if the file is edited afterwards.
-        std::fs::write(row.path.to_path_buf(), b"later edits\n").unwrap();
+        std::fs::write(
+            row.path.to_path_buf(),
+            b"later edits\n<<<<<<<\n=======\n>>>>>>>\n",
+        )
+        .unwrap();
         let id = home
             .continue_merge(&staged, merge_metadata(), fs, stores, registry, lock)
             .unwrap();
@@ -948,7 +952,7 @@ fn continue_merge_records_staged_content_two_parents_and_clears_state() {
         assert_eq!(home.conflict_state(&row.path, registry).unwrap(), None);
         assert_eq!(
             std::fs::read(row.path.to_path_buf()).unwrap(),
-            b"later edits\n"
+            b"later edits\n<<<<<<<\n=======\n>>>>>>>\n"
         );
         let internal = registry.internal_placement(row.id).unwrap().unwrap();
         assert_eq!(internal.commit_id, Some(id));
@@ -1084,4 +1088,83 @@ fn continue_merge_requires_stage_and_stage_refuses_recorded_markers() {
         ));
         assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row));
     });
+}
+
+#[test]
+fn continue_merge_refuses_persisted_staged_conflict_lines() {
+    use crate::ops::refusal::{PlacementRefusal, RefusalReason};
+    let mut large = vec![b'x'; 20000];
+    large.extend_from_slice(b"\n=======\n");
+    for bytes in [
+        large.as_slice(),
+        b"<<<<<<<\nours\n=======\ntheirs\n>>>>>>>\n".as_slice(),
+        b"resolved first\nseparator\n<<<<<<<\nours second\n=======\ntheirs second\n>>>>>>>\n",
+        b"<<<<<<<\nours first\n=======\ntheirs first\n>>>>>>>\nseparator\nresolved second\n",
+        b"Heading\n=======\n",
+    ] {
+        with_conflicted_copy(|home, lock, registry, stores, fs, mut row| {
+            row.conflict.as_mut().unwrap().marker_lines.extend([
+                b"<<<<<<<\n".to_vec(),
+                b"=======\n".to_vec(),
+                b">>>>>>>\n".to_vec(),
+            ]);
+            let hash = stores.objects.put(lock, ObjectKind::Blob, bytes).unwrap();
+            row.staged = Some(StagedBlob {
+                hash,
+                size: bytes.len() as u64,
+            });
+            registry
+                .write(lock, |tx| tx.update_placement(&row))
+                .unwrap();
+            std::fs::write(row.path.to_path_buf(), b"resolved\n").unwrap();
+            let mut reopened = Registry::open_existing(home).unwrap();
+            let row = reopened.placement_at(&row.path).unwrap().unwrap();
+            let placements = reopened.placements_of_head(row.id, &row.head).unwrap();
+            let references = reopened.references(row.id, &row.head).unwrap();
+            let before = std::fs::read_dir(
+                home.path()
+                    .join("folios")
+                    .join(row.id.to_string())
+                    .join("blobs"),
+            )
+            .unwrap()
+            .count();
+            assert!(matches!(
+                home.continue_merge(&row, merge_metadata(), fs, stores, &mut reopened, lock),
+                Err(HistoryError::Refused(HistoryRefusal::Move(
+                    PlacementRefusal {
+                        reason: RefusalReason::ConflictMarkers,
+                        ..
+                    }
+                )))
+            ));
+            assert_eq!(
+                reopened.placements_of_head(row.id, &row.head).unwrap(),
+                placements
+            );
+            assert_eq!(reopened.references(row.id, &row.head).unwrap(), references);
+            assert_eq!(
+                std::fs::read(row.path.to_path_buf()).unwrap(),
+                b"resolved\n"
+            );
+            assert_eq!(
+                std::fs::read_dir(
+                    home.path()
+                        .join("folios")
+                        .join(row.id.to_string())
+                        .join("blobs")
+                )
+                .unwrap()
+                .count(),
+                before
+            );
+            assert_eq!(
+                stores
+                    .refs
+                    .read(RefKind::Branch, &RefName::parse(&row.head).unwrap())
+                    .unwrap(),
+                row.commit_id
+            );
+        });
+    }
 }
