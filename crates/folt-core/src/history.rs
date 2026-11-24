@@ -5,7 +5,7 @@ mod error;
 mod expect;
 mod ref_store;
 
-pub use ancestry::{MergeBase, commit_range, is_ancestor, merge_base};
+pub use ancestry::{MergeBase, commit_range, is_ancestor, merge_base, merge_base_from};
 pub use error::RefError;
 pub use expect::Expect;
 pub use ref_store::RefStore;
