@@ -25,6 +25,8 @@ Folt is in early development. **The CLI currently only prints its version.** The
 - **Library-level rename:** update a Folio's registered name and internal file.
 - **Library-level prune:** report or remove absent external placement records without deleting files. See [pruning details](docs/dev/library/prune.md).
 - **Library-level checkout:** move a placement to a branch tip; internal placements can only check out `main`.
+- **Library-level merge:** combine branches with two-parent merge commits; resolve text conflicts in a copy using conflict markers and conflict state, then stage the resolution and continue, or abort to restore the pre-merge bytes.
+- **Library-level rebase:** replay ordinary commits in deterministic order, dropping merge commits; text conflicts stop a rebase from a copy, with continue using the resolved working bytes and abort restoring the pre-rebase bytes.
 
 ## Build from source
 
