@@ -911,6 +911,142 @@ fn abort_merge_restores_bytes_base_and_state_and_retains_pre_merge_blob() {
 }
 
 #[test]
+fn continue_merge_keep_ours_records_resolution_and_two_parents() {
+    for restage in [false, true] {
+        with_conflicted_copy(|home, lock, registry, stores, fs, row| {
+            let state = row.conflict.as_ref().unwrap();
+            let bytes = stores
+                .objects
+                .get(state.pre_merge, ObjectKind::Blob, stores.object_limit)
+                .unwrap();
+            if restage {
+                std::fs::write(row.path.to_path_buf(), b"resolved differently\n").unwrap();
+                home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+                    .unwrap();
+                let staged = registry.placement_at(&row.path).unwrap().unwrap();
+                assert_eq!(
+                    staged.staged.unwrap().hash,
+                    hash_blob(b"resolved differently\n")
+                );
+            }
+            std::fs::write(row.path.to_path_buf(), &bytes).unwrap();
+            let current = registry.placement_at(&row.path).unwrap().unwrap();
+            home.stage(&current, fs, stores.objects, stores.refs, registry, lock)
+                .unwrap();
+            let staged = registry.placement_at(&row.path).unwrap().unwrap();
+            assert_eq!(
+                staged.staged,
+                Some(StagedBlob {
+                    hash: state.pre_merge,
+                    size: bytes.len() as u64,
+                }),
+                "an explicitly staged keep-ours resolution must retain its stage"
+            );
+            assert_eq!(staged.base, row.base);
+            assert_eq!(staged.commit_id, row.commit_id);
+            assert_eq!(staged.conflict, row.conflict);
+            let id = home
+                .continue_merge(&staged, merge_metadata(), fs, stores, registry, lock)
+                .unwrap();
+            let commit = stores.objects.get_commit(id, stores.object_limit).unwrap();
+            assert_eq!(commit.content, state.pre_merge);
+            assert_eq!(commit.parents, vec![row.commit_id.unwrap(), state.other]);
+            assert_eq!(
+                stores
+                    .refs
+                    .read(RefKind::Branch, &RefName::parse("main").unwrap())
+                    .unwrap(),
+                Some(id)
+            );
+            let updated = registry.placement_at(&row.path).unwrap().unwrap();
+            let internal = registry.internal_placement(row.id).unwrap().unwrap();
+            for placement in [&updated, &internal] {
+                assert_eq!(placement.commit_id, Some(id));
+                assert_eq!(placement.base.as_ref().unwrap().hash, state.pre_merge);
+                assert_eq!(placement.staged, None);
+                assert_eq!(placement.conflict, None);
+                assert_eq!(std::fs::read(placement.path.to_path_buf()).unwrap(), bytes);
+            }
+        });
+    }
+}
+
+#[test]
+fn continue_merge_keep_ours_requires_stage_after_restore_and_unstage() {
+    with_conflicted_copy(|home, lock, registry, stores, fs, row| {
+        let state = row.conflict.as_ref().unwrap();
+        let bytes = stores
+            .objects
+            .get(state.pre_merge, ObjectKind::Blob, stores.object_limit)
+            .unwrap();
+        std::fs::write(row.path.to_path_buf(), &bytes).unwrap();
+        for unstage in [false, true] {
+            if unstage {
+                home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+                    .unwrap();
+                let staged = registry.placement_at(&row.path).unwrap().unwrap();
+                assert!(staged.staged.is_some());
+                home.unstage(&staged, fs, registry, lock).unwrap();
+            }
+            let current = registry.placement_at(&row.path).unwrap().unwrap();
+            assert_eq!(current.staged, None);
+            assert_eq!(current.conflict, row.conflict);
+            let error = home
+                .continue_merge(&current, merge_metadata(), fs, stores, registry, lock)
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                HistoryError::Refused(HistoryRefusal::NothingStaged)
+            ));
+            assert_eq!(registry.placement_at(&row.path).unwrap(), Some(current));
+            assert_eq!(
+                stores
+                    .refs
+                    .read(RefKind::Branch, &RefName::parse("main").unwrap())
+                    .unwrap(),
+                row.commit_id
+            );
+            assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), bytes);
+        }
+        home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+            .unwrap();
+        let staged = registry.placement_at(&row.path).unwrap().unwrap();
+        home.continue_merge(&staged, merge_metadata(), fs, stores, registry, lock)
+            .unwrap();
+    });
+}
+
+#[test]
+fn stage_equal_to_base_clears_stage_without_merge_conflict_state() {
+    use crate::placement::ConflictOperation;
+    for operation in [None, Some(ConflictOperation::Rebase)] {
+        with_conflicted_copy(|home, lock, registry, stores, fs, mut row| {
+            row.conflict = operation.map(|operation| {
+                let mut state = row.conflict.clone().unwrap();
+                state.operation = operation;
+                state
+            });
+            registry
+                .write(lock, |tx| tx.update_placement(&row))
+                .unwrap();
+            std::fs::write(row.path.to_path_buf(), b"different\n").unwrap();
+            home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+                .unwrap();
+            let staged = registry.placement_at(&row.path).unwrap().unwrap();
+            assert!(staged.staged.is_some());
+            std::fs::write(row.path.to_path_buf(), b"ours\n").unwrap();
+            home.stage(&staged, fs, stores.objects, stores.refs, registry, lock)
+                .unwrap();
+            let updated = registry.placement_at(&row.path).unwrap().unwrap();
+            assert_eq!(updated.staged, None);
+            assert_eq!(updated.base, row.base);
+            assert_eq!(updated.conflict, row.conflict);
+            assert_eq!(updated.commit_id, row.commit_id);
+        });
+    }
+}
+
+#[test]
 fn continue_merge_records_staged_content_two_parents_and_clears_state() {
     with_conflicted_copy(|home, lock, registry, stores, fs, row| {
         let other = row.conflict.as_ref().unwrap().other;
@@ -1078,6 +1214,13 @@ fn continue_merge_requires_stage_and_stage_refuses_recorded_markers() {
             })
         ));
         assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+        assert_eq!(
+            stores
+                .refs
+                .read(RefKind::Branch, &RefName::parse("main").unwrap())
+                .unwrap(),
+            row.commit_id
+        );
         std::fs::write(row.path.to_path_buf(), b"resolved\n").unwrap();
         let error = home
             .continue_merge(&row, merge_metadata(), fs, stores, registry, lock)
