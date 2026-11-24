@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use folt_core::history::{Expect, MergeBase, is_ancestor, merge_base};
+use folt_core::history::{Expect, MergeBase, is_ancestor, merge_base, merge_base_from};
 use folt_core::home::HomeLock;
 use folt_core::id::ObjectId;
 use folt_core::object::{Author, Commit, CommitTime, ObjectError, hash_blob};
@@ -79,6 +79,10 @@ fn merge_base_handles_divergence_descendants_and_self() {
             merge_base(&folio.objects, a, b, limit).unwrap(),
             MergeBase::One(expected)
         );
+        assert_eq!(
+            merge_base_from(&folio.objects, &[a], b, limit).unwrap(),
+            merge_base(&folio.objects, a, b, limit).unwrap()
+        );
     }
 }
 
@@ -92,6 +96,10 @@ fn disjoint_roots_have_no_merge_base() {
     assert_eq!(
         merge_base(&folio.objects, a, b, folio.stores().object_limit).unwrap(),
         MergeBase::None
+    );
+    assert_eq!(
+        merge_base_from(&folio.objects, &[a], b, folio.stores().object_limit).unwrap(),
+        merge_base(&folio.objects, a, b, folio.stores().object_limit).unwrap()
     );
 }
 
@@ -111,6 +119,10 @@ fn criss_cross_reports_sorted_best_ancestors_in_either_argument_order() {
         assert_eq!(
             merge_base(&folio.objects, a, b, folio.stores().object_limit).unwrap(),
             MergeBase::Several(expected.clone())
+        );
+        assert_eq!(
+            merge_base_from(&folio.objects, &[a], b, folio.stores().object_limit).unwrap(),
+            merge_base(&folio.objects, a, b, folio.stores().object_limit).unwrap()
         );
     }
 }
@@ -287,4 +299,166 @@ fn commit_range_handles_linear_fork_and_merge_histories() {
     assert!(commit_range(&folio.objects, tip, missing, limit).is_err());
     let broken = commit(&folio, &lock, "broken", &[root, missing]);
     assert!(commit_range(&folio.objects, broken, broken, limit).is_err());
+}
+
+#[test]
+fn merge_base_from_unites_starts_without_writing_objects_or_refs() {
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let a = commit(&folio, &lock, "a", &[]);
+    let b = commit(&folio, &lock, "b", &[]);
+    let s1 = commit(&folio, &lock, "s1", &[a]);
+    let s2 = commit(&folio, &lock, "s2", &[b]);
+    let t = commit(&folio, &lock, "t", &[a, b]);
+    folio
+        .refs
+        .update(
+            &mut lock,
+            RefKind::Branch,
+            &RefName::parse("topic").unwrap(),
+            t,
+            Expect::Absent,
+        )
+        .unwrap();
+    let limit = folio.stores().object_limit;
+    let mut expected = vec![a, b];
+    expected.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+    // Release database and home lock files before raw reads on Windows.
+    drop(folio.registry);
+    drop(lock);
+    let before = snapshot(home.path());
+    for starts in [vec![s1, s2], vec![s2, s1], vec![s1, s2, s1, s2]] {
+        assert_eq!(
+            merge_base_from(&folio.objects, &starts, t, limit).unwrap(),
+            MergeBase::Several(expected.clone())
+        );
+    }
+    assert_eq!(
+        merge_base_from(&folio.objects, &[], t, limit).unwrap(),
+        MergeBase::None
+    );
+    assert_eq!(snapshot(home.path()), before);
+}
+
+#[test]
+fn merge_base_from_reduces_common_ancestors_across_starts() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let a = commit(&folio, &lock, "a", &[]);
+    let b = commit(&folio, &lock, "b", &[a]);
+    let s1 = commit(&folio, &lock, "s1", &[a]);
+    let s2 = commit(&folio, &lock, "s2", &[b]);
+    let t = commit(&folio, &lock, "t", &[b]);
+    let limit = folio.stores().object_limit;
+    assert_eq!(
+        merge_base_from(&folio.objects, &[s1], t, limit).unwrap(),
+        MergeBase::One(a)
+    );
+    for starts in [vec![s1, s2], vec![s2, s1], vec![s2, s2, s1]] {
+        assert_eq!(
+            merge_base_from(&folio.objects, &starts, t, limit).unwrap(),
+            MergeBase::One(b)
+        );
+    }
+}
+
+#[test]
+fn merge_base_from_validates_all_starts_and_the_other_side() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let root = commit(&folio, &lock, "root", &[]);
+    let valid = commit(&folio, &lock, "valid", &[root]);
+    let missing = ObjectId::from_bytes([42; 32]);
+    let broken = commit(&folio, &lock, "broken", &[root, missing]);
+    let limit = folio.stores().object_limit;
+    drop(folio.registry);
+    drop(lock);
+    let before = snapshot(home.path());
+    for id in [missing, broken] {
+        for (starts, other) in [
+            (vec![id, valid], root),
+            (vec![valid, id], root),
+            (vec![root, valid], id),
+            (vec![], id),
+        ] {
+            let error = merge_base_from(&folio.objects, &starts, other, limit).unwrap_err();
+            let underlying = folio.objects.get_commit(missing, limit).unwrap_err();
+            match (error, underlying) {
+                (
+                    StoreError::Io { path, source },
+                    StoreError::Io {
+                        path: expected_path,
+                        source: expected_source,
+                    },
+                ) => {
+                    assert_eq!(path, expected_path);
+                    assert_eq!(source.kind(), expected_source.kind());
+                }
+                (StoreError::NotRegularFile(path), StoreError::NotRegularFile(expected)) => {
+                    assert_eq!(path, expected);
+                }
+                errors => panic!("unexpected store errors: {errors:?}"),
+            }
+        }
+    }
+    assert_eq!(snapshot(home.path()), before);
+}
+
+#[test]
+fn merge_base_from_propagates_corruption_and_per_object_limits() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let folio = TestFolio::new(&home, &lock);
+    let root = commit(&folio, &lock, "root", &[]);
+    let large = commit(&folio, &lock, &"large".repeat(100), &[root]);
+    let broken = commit(&folio, &lock, "broken", &[root, large]);
+    let limit = folio.stores().object_limit;
+    let root_size = folio
+        .objects
+        .get_commit(root, limit)
+        .unwrap()
+        .encode_body()
+        .unwrap()
+        .len() as u64;
+    assert_eq!(
+        merge_base_from(&folio.objects, &[root, root], root, root_size).unwrap(),
+        MergeBase::One(root)
+    );
+    for (starts, other) in [
+        (vec![large, root], root),
+        (vec![root, large], root),
+        (vec![root], broken),
+        (vec![], broken),
+    ] {
+        assert!(matches!(
+            merge_base_from(&folio.objects, &starts, other, root_size),
+            Err(StoreError::Object(ObjectError::LimitExceeded))
+        ));
+    }
+    drop(folio.registry);
+    drop(lock);
+    let path = snapshot(home.path())
+        .into_keys()
+        .find(|path| {
+            path.file_stem()
+                .is_some_and(|stem| stem == large.to_string().as_str())
+        })
+        .unwrap();
+    std::fs::write(path, b"corrupt").unwrap();
+    let before = snapshot(home.path());
+    for (starts, other) in [
+        (vec![broken, root], root),
+        (vec![root, broken], root),
+        (vec![root], broken),
+        (vec![], broken),
+    ] {
+        assert!(matches!(
+            merge_base_from(&folio.objects, &starts, other, limit),
+            Err(StoreError::Object(_))
+        ));
+    }
+    assert_eq!(snapshot(home.path()), before);
 }

@@ -28,7 +28,7 @@ pub fn is_ancestor(
     descendant: ObjectId,
     limit: u64,
 ) -> Result<bool, StoreError> {
-    Ok(ancestors(objects, descendant, limit)?.contains(&ancestor))
+    Ok(ancestors(objects, &[descendant], limit)?.contains(&ancestor))
 }
 
 /// Finds common ancestors that are not proper ancestors of another common ancestor.
@@ -43,8 +43,25 @@ pub fn merge_base(
     b: ObjectId,
     limit: u64,
 ) -> Result<MergeBase, StoreError> {
-    let a_ancestors = ancestors(objects, a, limit)?;
-    let b_ancestors = ancestors(objects, b, limit)?;
+    merge_base_from(objects, &[a], b, limit)
+}
+
+/// Finds the best common ancestors of the union of `starts`' ancestors and `b`.
+/// Several results are sorted by object id bytes, without creating a virtual base or storing objects.
+/// Reordered or duplicate starts do not affect the result; empty starts yield `MergeBase::None`.
+/// Every reachable commit on both sides is read and validated, even when `starts` is empty.
+/// `limit` bounds each object read, rather than the number of commits visited.
+///
+/// # Errors
+/// Returns the store error if any reachable commit is missing, unreadable, invalid or over `limit`.
+pub fn merge_base_from(
+    objects: &ObjectStore,
+    starts: &[ObjectId],
+    b: ObjectId,
+    limit: u64,
+) -> Result<MergeBase, StoreError> {
+    let a_ancestors = ancestors(objects, starts, limit)?;
+    let b_ancestors = ancestors(objects, &[b], limit)?;
     let mut best: HashSet<_> = a_ancestors.intersection(&b_ancestors).copied().collect();
     let mut stack: Vec<_> = best.iter().copied().collect();
     let mut visited = HashSet::new();
@@ -78,17 +95,17 @@ pub fn commit_range(
     exclude: ObjectId,
     limit: u64,
 ) -> Result<HashSet<ObjectId>, StoreError> {
-    let reachable = ancestors(objects, tip, limit)?;
-    let excluded = ancestors(objects, exclude, limit)?;
+    let reachable = ancestors(objects, &[tip], limit)?;
+    let excluded = ancestors(objects, &[exclude], limit)?;
     Ok(reachable.difference(&excluded).copied().collect())
 }
 
 fn ancestors(
     objects: &ObjectStore,
-    start: ObjectId,
+    starts: &[ObjectId],
     limit: u64,
 ) -> Result<HashSet<ObjectId>, StoreError> {
-    let mut stack = vec![start];
+    let mut stack = starts.to_vec();
     let mut visited = HashSet::new();
     while let Some(id) = stack.pop() {
         if visited.insert(id) {
