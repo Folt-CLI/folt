@@ -432,3 +432,5 @@ fn continue_accepts_resolution_equal_to_pre_rebase_bytes() {
 }
 
 mod abort;
+
+mod remove;

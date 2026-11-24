@@ -6,6 +6,23 @@ use crate::test_support::RelocateFixture;
 fn remove_crash_leaves_only_an_unregistered_file() {
     for delete_file in [false, true] {
         let (fixture, lock, mut registry) = RelocateFixture::new(false);
+        let tip = crate::object::hash_blob(b"tip");
+        let progress = crate::registry::StoppedRebase {
+            id: fixture.row.id,
+            branch: fixture.row.head.clone(),
+            copy: fixture.row.path.clone(),
+            original_tip: tip,
+            destination: tip,
+            remaining: vec![tip],
+            current_replay: Some(tip),
+            new_tip: tip,
+            file_before: tip,
+            marker_blob: Some(tip),
+            discard: false,
+        };
+        registry
+            .write(&lock, |tx| tx.insert_stopped_rebase(&progress))
+            .unwrap();
         let fs = crate::placement_fs::PlacementFs::new(&fixture.home);
         let plan = judge_remove(&fixture.facts(), delete_file, true).unwrap();
         assert!(
@@ -15,6 +32,7 @@ fn remove_crash_leaves_only_an_unregistered_file() {
             .is_err()
         );
         assert!(registry.placement_at(&fixture.row.path).unwrap().is_none());
+        assert!(registry.stopped_rebase(fixture.row.id).unwrap().is_none());
         assert_eq!(
             std::fs::read(fixture.row.path.to_path_buf()).unwrap(),
             b"edited content"
