@@ -12,7 +12,7 @@ use crate::ops::history::{
 };
 use crate::ops::placement::move_::MoveTarget;
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
-use crate::ops::stage::refuse::markers_remain;
+use crate::ops::stage::{refuse::markers_remain, validate_merged};
 use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement::{ConflictOperation, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
@@ -121,6 +121,7 @@ fn continue_steps(
         }
         .into());
     }
+    validate_merged(row, &bytes, registry).map_err(HistoryRefusal::MergeInvalid)?;
     let commit = build_commit(
         staged.hash,
         vec![

@@ -1233,6 +1233,251 @@ fn continue_merge_requires_stage_and_stage_refuses_recorded_markers() {
     });
 }
 
+fn merge_validation_files(path: &std::path::Path) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(path).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files.extend(merge_validation_files(&path));
+        } else {
+            let bytes = std::fs::read(&path).unwrap();
+            files.push((path, bytes));
+        }
+    }
+    files.sort();
+    files
+}
+
+fn merge_validation_reference_chain(
+    registry: &mut Registry,
+    lock: &crate::home::HomeLock,
+    id: FolioId,
+) {
+    use crate::folio::{name::FolioName, row::NewFolio};
+    use crate::front_matter::Reference;
+    let child = FolioId::generate();
+    let grandchild = FolioId::generate();
+    let format = registry.folio_row(id).unwrap().unwrap().format;
+    registry
+        .write(lock, |tx| {
+            for id in [child, grandchild] {
+                tx.add_folio(&NewFolio {
+                    id,
+                    format: format.clone(),
+                })?;
+            }
+            tx.set_name(child, &FolioName::parse("taken").unwrap())?;
+            for (parent, target) in [(child, grandchild), (grandchild, id)] {
+                tx.rebuild_references(
+                    parent,
+                    "main",
+                    &[Reference {
+                        alias: "next".into(),
+                        name: None,
+                        id: Some(target),
+                        pin: None,
+                    }],
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
+fn continue_merge_validates_staged_markdown_and_preserves_state_on_refusal() {
+    for scenario in [
+        "self-reference",
+        "indirect-cycle",
+        "taken-name",
+        "working-edited",
+    ] {
+        with_conflicted_copy(|home, lock, registry, stores, fs, row| {
+            merge_validation_reference_chain(registry, lock, row.id);
+            let resolved = match scenario {
+                "indirect-cycle" => {
+                    "---\nfolio-references:\n  next: {name: taken}\n---\nresolved\n".into()
+                }
+                "taken-name" => "---\nfolio-name: taken\n---\nresolved\n".into(),
+                _ => format!(
+                    "---\nfolio-references:\n  self: {{id: {}}}\n---\nresolved\n",
+                    row.id
+                ),
+            };
+            std::fs::write(row.path.to_path_buf(), resolved).unwrap();
+            home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+                .unwrap();
+            let staged = registry.placement_at(&row.path).unwrap().unwrap();
+            if scenario == "working-edited" {
+                std::fs::write(
+                    row.path.to_path_buf(),
+                    b"---\nfolio-name: valid\n---\nvalid\n",
+                )
+                .unwrap();
+            }
+            let snapshot = |registry: &Registry| {
+                let placements = registry.placements_of(row.id).unwrap();
+                let working: Vec<_> = placements
+                    .iter()
+                    .map(|row| std::fs::read(row.path.to_path_buf()).unwrap())
+                    .collect();
+                let cached: Vec<_> = registry
+                    .folios()
+                    .unwrap()
+                    .into_iter()
+                    .map(|id| {
+                        (
+                            id,
+                            registry.references(id, "main").unwrap(),
+                            registry.references(id, "topic").unwrap(),
+                        )
+                    })
+                    .collect();
+                (
+                    merge_validation_files(&home.path().join(crate::config::names::FOLIOS_DIR)),
+                    placements,
+                    working,
+                    cached,
+                )
+            };
+            let before = snapshot(registry);
+            let error = home
+                .continue_merge(&staged, merge_metadata(), fs, stores, registry, lock)
+                .unwrap_err();
+            let expected = if scenario == "taken-name" {
+                "folio-name 'taken' belongs to a different Folio".into()
+            } else {
+                format!("reference cycle returns to Folio {}", row.id)
+            };
+            assert!(
+                matches!(error, HistoryError::Refused(HistoryRefusal::MergeInvalid(ref message)) if *message == expected),
+                "{scenario}: {error}"
+            );
+            assert_eq!(snapshot(registry), before, "{scenario}");
+        });
+    }
+}
+
+#[test]
+fn continue_merge_valid_markdown_commits_staged_blob_and_clears_state() {
+    with_conflicted_copy(|home, lock, registry, stores, fs, row| {
+        let bytes =
+            b"---\nfolio-name: valid\nfolio-references:\n  next: {name: missing}\n---\nresolved\n";
+        std::fs::write(row.path.to_path_buf(), bytes).unwrap();
+        home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+            .unwrap();
+        let staged = registry.placement_at(&row.path).unwrap().unwrap();
+        let cached = registry.references(row.id, &row.head).unwrap();
+        // An invalid working edit must not replace the valid staged resolution.
+        let later = format!("---\nfolio-references:\n  self: {{id: {}}}\n---\n", row.id);
+        std::fs::write(row.path.to_path_buf(), &later).unwrap();
+        let id = home
+            .continue_merge(&staged, merge_metadata(), fs, stores, registry, lock)
+            .unwrap();
+        let commit = stores.objects.get_commit(id, stores.object_limit).unwrap();
+        assert_eq!(commit.content, staged.staged.unwrap().hash);
+        assert_eq!(
+            stores
+                .objects
+                .get(commit.content, ObjectKind::Blob, stores.object_limit)
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(
+            commit.parents,
+            vec![row.commit_id.unwrap(), row.conflict.unwrap().other]
+        );
+        assert_eq!(
+            stores
+                .refs
+                .read(RefKind::Branch, &RefName::parse("main").unwrap())
+                .unwrap(),
+            Some(id)
+        );
+        for placement in registry.placements_of(row.id).unwrap() {
+            assert_eq!(placement.commit_id, Some(id));
+            assert_eq!(placement.staged, None);
+            assert_eq!(placement.conflict, None);
+            if placement.kind == PlacementKind::Internal {
+                assert_eq!(std::fs::read(placement.path.to_path_buf()).unwrap(), bytes);
+            }
+        }
+        assert_eq!(
+            std::fs::read(row.path.to_path_buf()).unwrap(),
+            later.as_bytes()
+        );
+        assert_eq!(registry.references(row.id, &row.head).unwrap(), cached);
+    });
+}
+
+#[test]
+fn continue_merge_non_markdown_keeps_front_matter_gating() {
+    with_conflicted_copy(|home, lock, registry, stores, fs, mut row| {
+        merge_validation_reference_chain(registry, lock, row.id);
+        let path = crate::placement_path::PlacementPath::resolve(home.path().join("resolved.txt"))
+            .unwrap();
+        std::fs::rename(row.path.to_path_buf(), path.to_path_buf()).unwrap();
+        registry
+            .write(lock, |tx| tx.move_placement(&row.path, &path))
+            .unwrap();
+        row.path = path;
+        let bytes = format!(
+            "---\nfolio-name: taken\nfolio-references:\n  self: {{id: {}}}\n---\nresolved\n",
+            row.id
+        );
+        std::fs::write(row.path.to_path_buf(), &bytes).unwrap();
+        home.stage(&row, fs, stores.objects, stores.refs, registry, lock)
+            .unwrap();
+        let staged = registry.placement_at(&row.path).unwrap().unwrap();
+        let id = home
+            .continue_merge(&staged, merge_metadata(), fs, stores, registry, lock)
+            .unwrap();
+        assert_eq!(
+            stores
+                .objects
+                .get_commit(id, stores.object_limit)
+                .unwrap()
+                .content,
+            hash_blob(bytes.as_bytes())
+        );
+    });
+}
+
+#[test]
+fn continue_merge_refuses_rebase_conflict_operation_before_validation() {
+    with_conflicted_copy(|home, lock, registry, stores, fs, mut row| {
+        std::fs::write(
+            row.path.to_path_buf(),
+            b"---\nfolio-name: invalid name\n---\nresolved\n",
+        )
+        .unwrap();
+        // Install the stage directly so this checks continue's operation refusal.
+        let bytes = std::fs::read(row.path.to_path_buf()).unwrap();
+        row.staged = Some(StagedBlob {
+            hash: stores.objects.put(lock, ObjectKind::Blob, &bytes).unwrap(),
+            size: bytes.len() as u64,
+        });
+        row.conflict.as_mut().unwrap().operation = crate::placement::ConflictOperation::Rebase;
+        registry
+            .write(lock, |tx| tx.update_placement(&row))
+            .unwrap();
+        let before = merge_validation_files(&home.path().join(crate::config::names::FOLIOS_DIR));
+        let error = home
+            .continue_merge(&row, merge_metadata(), fs, stores, registry, lock)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            HistoryError::Refused(HistoryRefusal::NotConflicted(_))
+        ));
+        assert_eq!(registry.placement_at(&row.path).unwrap(), Some(row.clone()));
+        assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), bytes);
+        assert_eq!(
+            merge_validation_files(&home.path().join(crate::config::names::FOLIOS_DIR)),
+            before
+        );
+    });
+}
+
 #[test]
 fn continue_merge_refuses_persisted_staged_conflict_lines() {
     use crate::ops::refusal::{PlacementRefusal, RefusalReason};
