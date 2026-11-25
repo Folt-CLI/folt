@@ -1,14 +1,16 @@
 use crate::config::names::DEFAULT_BRANCH;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
+use crate::object::ObjectKind;
 use crate::ops::history::commit::{
     Recovery, advance_branch, branch_moved, build_commit, move_internal, write_rows,
 };
 use crate::ops::history::{
     CommitFacts, CommitMetadata, HistoryError, HistoryRefusal, HistoryStores, gather_file,
-    judge_commit, require_blob, require_observation, require_row,
+    judge_commit, require_observation, require_row,
 };
 use crate::ops::placement::move_::MoveTarget;
+use crate::ops::stage::validate_merged;
 use crate::placement::{ConflictOperation, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
@@ -80,7 +82,10 @@ pub(crate) fn continue_merge(
     }
     let state = row.conflict.as_ref().ok_or(HistoryRefusal::InvalidFacts)?;
     let staged = row.staged.ok_or(HistoryRefusal::NothingStaged)?;
-    require_blob(stores.objects, staged.hash)?;
+    let bytes = stores
+        .objects
+        .get(staged.hash, ObjectKind::Blob, stores.object_limit)?;
+    validate_merged(row, &bytes, registry).map_err(HistoryRefusal::MergeInvalid)?;
     let commit = build_commit(
         staged.hash,
         vec![
