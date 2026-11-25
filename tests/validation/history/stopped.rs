@@ -442,6 +442,8 @@ fn continue_accepts_resolution_equal_to_pre_rebase_bytes() {
 
 mod abort;
 
+mod remove;
+
 #[test]
 fn two_region_rebase_refuses_partial_stage() {
     two_region_partial_resolution(true);
