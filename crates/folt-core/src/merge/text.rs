@@ -18,8 +18,8 @@ fn lines(bytes: &[u8]) -> Vec<&[u8]> {
 }
 
 fn changes<'a>(base: &[&[u8]], side: &[&'a [u8]], index: usize) -> Vec<Change<'a>> {
-    // similar 2.7 Myers::conquer emits delete + insert for the entire remaining
-    // range when find_middle_snake hits its deadline. Capture/Replace therefore
+    // similar 3.2.1 Myers falls back to delete + insert for remaining ranges
+    // when its search deadline is reached. Capture/Replace therefore
     // returns a complete valid diff, though it may be less precise. Compaction
     // and preprocessing are outside the search deadline: it is not a hard cap.
     capture_diff_slices_deadline(
