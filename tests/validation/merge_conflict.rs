@@ -213,12 +213,16 @@ struct ConflictedCopies {
 
 impl ConflictedCopies {
     fn new() -> Self {
+        Self::with_content(b"base\n", b"ours\n", b"theirs\n")
+    }
+
+    fn with_content(base_bytes: &[u8], ours: &[u8], theirs: &[u8]) -> Self {
         let home = TempHome::new();
         let mut lock = home.lock();
         let mut folio = TestFolio::new(&home, &lock);
-        let base = folio.commit_internal(&home, &mut lock, b"base\n");
-        folio.second_branch(&home, &mut lock, "topic", base, b"theirs\n");
-        folio.commit_internal(&home, &mut lock, b"ours\n");
+        let base = folio.commit_internal(&home, &mut lock, base_bytes);
+        folio.second_branch(&home, &mut lock, "topic", base, theirs);
+        folio.commit_internal(&home, &mut lock, ours);
         let flagged = copy(&home, &mut folio, &lock, "main", "flagged.md");
         let second = copy(&home, &mut folio, &lock, "main", "ordinary.md");
         let outcome = home
@@ -364,34 +368,47 @@ fn conflicted_copy_refuses_stage_and_commit_while_second_copy_commits() {
 
 #[test]
 fn stage_accepts_resolution_and_ordinary_marker_like_content() {
-    for resolved in [
-        b"resolved\n".as_slice(),
-        b"Heading\n=======\n",
-        b"<<<<<<< ours\n=======\n>>>>>>>\n",
+    for (resolved, accepted) in [
+        (b"resolved\n".as_slice(), true),
+        (b"Heading\n========\n", true),
+        (b"<<<<<<< ours\n========\n>>>>>>> theirs\n", true),
+        (b"Heading\n=======\n", false),
+        (b"<<<<<<< ours\n=======\n>>>>>>>\n", false),
     ] {
         let mut case = ConflictedCopies::new();
         let fs = PlacementFs::new(&case.home.home);
         std::fs::write(case.flagged.path.to_path_buf(), resolved).unwrap();
-        case.home
-            .home
-            .stage(
-                &case.flagged,
-                &fs,
-                &case.folio.objects,
-                &case.folio.refs,
-                &mut case.folio.registry,
-                &case.lock,
-            )
-            .unwrap();
-        assert!(
-            case.folio
-                .registry
-                .placement_at(&case.flagged.path)
-                .unwrap()
-                .unwrap()
-                .staged
-                .is_some()
+        let result = case.home.home.stage(
+            &case.flagged,
+            &fs,
+            &case.folio.objects,
+            &case.folio.refs,
+            &mut case.folio.registry,
+            &case.lock,
         );
+        if accepted {
+            result.unwrap();
+            assert!(
+                case.folio
+                    .registry
+                    .placement_at(&case.flagged.path)
+                    .unwrap()
+                    .unwrap()
+                    .staged
+                    .is_some()
+            );
+        } else {
+            assert!(matches!(
+                result,
+                Err(folt_core::ops::rules_error::RulesError::Refused(
+                    folt_core::ops::refusal::PlacementRefusal {
+                        reason: folt_core::ops::refusal::RefusalReason::ConflictMarkers,
+                        ..
+                    }
+                ))
+            ));
+            case.assert_flagged_unchanged(resolved);
+        }
         std::fs::write(
             case.second.path.to_path_buf(),
             b"<<<<<<<\n=======\n>>>>>>>\n",
@@ -676,4 +693,122 @@ fn status_prune_and_remove_handle_each_copys_own_conflict_state() {
         case.folio.registry.placement_at(&second.path).unwrap(),
         None
     );
+}
+
+#[test]
+fn two_region_merge_refuses_partial_resolution_then_continues() {
+    use folt_core::ops::refusal::{PlacementRefusal, RefusalReason};
+    use folt_core::ops::rules_error::RulesError;
+    let mut case = ConflictedCopies::with_content(
+        b"base first\nseparator\nbase second\n",
+        b"ours first\nseparator\nours second\n",
+        b"theirs first\nseparator\ntheirs second\n",
+    );
+    let bytes = std::fs::read(case.flagged.path.to_path_buf()).unwrap();
+    let text = String::from_utf8(bytes).unwrap();
+    assert_eq!(
+        case.flagged.conflict.as_ref().unwrap().marker_lines.len(),
+        6
+    );
+    let regions: Vec<_> = text.split("separator\n").collect();
+    for partial in [
+        format!("resolved first\nseparator\n{}", regions[1]),
+        format!("{}separator\nresolved second\n", regions[0]),
+        "Heading\n=======\n".to_owned(),
+    ] {
+        std::fs::write(case.flagged.path.to_path_buf(), partial.as_bytes()).unwrap();
+        let before = case
+            .folio
+            .registry
+            .references(case.flagged.id, &case.flagged.head)
+            .unwrap();
+        assert!(matches!(
+            case.home.home.stage(
+                &case.flagged,
+                &PlacementFs::new(&case.home.home),
+                &case.folio.objects,
+                &case.folio.refs,
+                &mut case.folio.registry,
+                &case.lock,
+            ),
+            Err(RulesError::Refused(PlacementRefusal {
+                reason: RefusalReason::ConflictMarkers,
+                ..
+            }))
+        ));
+        case.assert_flagged_unchanged(partial.as_bytes());
+        assert_eq!(
+            case.folio
+                .registry
+                .references(case.flagged.id, &case.flagged.head)
+                .unwrap(),
+            before
+        );
+        assert_eq!(
+            case.folio
+                .refs
+                .read(RefKind::Branch, &RefName::parse("main").unwrap())
+                .unwrap(),
+            case.flagged.commit_id
+        );
+    }
+    let resolved = b"resolved first\nseparator\nresolved second\n";
+    std::fs::write(case.flagged.path.to_path_buf(), resolved).unwrap();
+    let fs = PlacementFs::new(&case.home.home);
+    case.home
+        .home
+        .stage(
+            &case.flagged,
+            &fs,
+            &case.folio.objects,
+            &case.folio.refs,
+            &mut case.folio.registry,
+            &case.lock,
+        )
+        .unwrap();
+    let staged = case
+        .folio
+        .registry
+        .placement_at(&case.flagged.path)
+        .unwrap()
+        .unwrap();
+    let id = case
+        .home
+        .home
+        .continue_merge(
+            &staged,
+            metadata(),
+            &fs,
+            &HistoryStores {
+                objects: &case.folio.objects,
+                refs: &case.folio.refs,
+                object_limit: 16384,
+            },
+            &mut case.folio.registry,
+            &mut case.lock,
+        )
+        .unwrap();
+    let commit = case.folio.objects.get_commit(id, 16384).unwrap();
+    assert_eq!(
+        commit.parents,
+        vec![
+            case.flagged.commit_id.unwrap(),
+            case.flagged.conflict.as_ref().unwrap().other
+        ]
+    );
+    assert_eq!(
+        case.folio
+            .objects
+            .get(commit.content, ObjectKind::Blob, u64::MAX)
+            .unwrap(),
+        resolved
+    );
+    let row = case
+        .folio
+        .registry
+        .placement_at(&staged.path)
+        .unwrap()
+        .unwrap();
+    assert!(row.staged.is_none());
+    assert!(row.conflict.is_none());
 }
