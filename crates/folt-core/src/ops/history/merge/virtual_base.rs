@@ -1,4 +1,4 @@
-use crate::history::{MergeBase, merge_base};
+use crate::history::{MergeBase, merge_base_from};
 use crate::id::ObjectId;
 use crate::merge::{MergeResult, merge3};
 use crate::object::ObjectKind;
@@ -15,9 +15,9 @@ pub(super) fn fold(
         return Ok(Some(Vec::new()));
     };
     let mut bytes = content(objects, first, limit)?;
-    let mut previous = first;
+    let mut folded_ids = vec![first];
     for &next in rest {
-        let base = match merge_base(objects, previous, next, limit)? {
+        let base = match merge_base_from(objects, &folded_ids, next, limit)? {
             MergeBase::None => Vec::new(),
             MergeBase::One(id) => content(objects, id, limit)?,
             MergeBase::Several(ids) => {
@@ -35,9 +35,9 @@ pub(super) fn fold(
             } => bytes,
             MergeResult::Conflicted { merged: None, .. } => return Ok(None),
         };
-        // The accumulated bytes stay in memory; the next pair uses these
-        // adjacent ancestors for its ancestry search.
-        previous = next;
+        // The in-memory bytes represent every folded ancestor, so the next
+        // ancestry search must include all of their histories.
+        folded_ids.push(next);
     }
     Ok(Some(bytes))
 }

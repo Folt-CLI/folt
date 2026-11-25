@@ -2,6 +2,7 @@ use super::*;
 use crate::config::formats::OBJECT_ALGORITHM;
 use crate::folio::dir::{Durability, FolioSpec, create_folio};
 use crate::folio::format::FolioFormat;
+use crate::history::{merge_base, merge_base_from};
 use crate::home::HomeLock;
 use crate::layout::FOLIO_LAYOUT_VERSION;
 use crate::object::{Author, Commit, CommitTime};
@@ -121,4 +122,106 @@ fn unrelated_ancestors_use_empty_bytes_and_object_errors_propagate() {
     );
     assert!(fold(&objects, &[a, b], 1).is_err());
     assert!(fold(&objects, &[a, ObjectId::from_bytes([0; 32])], 16384).is_err());
+}
+
+// Use disjoint first-byte ranges to keep the supplied order deterministic.
+fn ordered_commit(
+    objects: &ObjectStore,
+    lock: &HomeLock,
+    bytes: &[u8],
+    parent: ObjectId,
+    range: std::ops::Range<u8>,
+) -> ObjectId {
+    let seed = commit(objects, lock, bytes, &[parent]);
+    let mut candidate = objects.get_commit(seed, 16384).unwrap();
+    for nonce in 0..256 {
+        candidate.message = format!("ordered ancestor {nonce}");
+        let id = crate::object::hash_object(ObjectKind::Commit, &candidate.encode_body().unwrap());
+        if range.contains(&id.as_bytes()[0]) {
+            assert_eq!(objects.put_commit(lock, &candidate).unwrap(), id);
+            return id;
+        }
+    }
+    panic!("bounded metadata search must find an ordered ancestor");
+}
+
+#[test]
+fn fold_searches_against_all_accumulated_ancestors() {
+    let home = TempHome::new().unwrap();
+    let lock = home.home.try_lock().unwrap();
+    let objects = store(&home, &lock);
+    let r = commit(&objects, &lock, b"a\nb\nc\nd\ne\n", &[]);
+    let d = commit(&objects, &lock, b"A\nb\nc\nd\ne\n", &[r]);
+    let a = ordered_commit(&objects, &lock, b"A\nb\nc\nd\ne\n", d, 0..64);
+    let b = ordered_commit(&objects, &lock, b"a\nb\nc\nd\ne\n", r, 64..128);
+    let c = ordered_commit(&objects, &lock, b"a\nb\nc\nd\ne\n", d, 128..255);
+    assert!(a.as_bytes() < b.as_bytes() && b.as_bytes() < c.as_bytes());
+    assert_eq!(
+        merge_base(&objects, a, b, 16384).unwrap(),
+        MergeBase::One(r)
+    );
+    assert_eq!(
+        merge_base(&objects, b, c, 16384).unwrap(),
+        MergeBase::One(r)
+    );
+    assert_eq!(
+        merge_base_from(&objects, &[a, b], c, 16384).unwrap(),
+        MergeBase::One(d)
+    );
+    let MergeResult::Clean(pair) = merge3(
+        &content(&objects, r, 16384).unwrap(),
+        &content(&objects, a, 16384).unwrap(),
+        &content(&objects, b, 16384).unwrap(),
+    ) else {
+        panic!("first fold must be clean");
+    };
+    assert_eq!(
+        merge3(
+            &content(&objects, r, 16384).unwrap(),
+            &pair,
+            &content(&objects, c, 16384).unwrap()
+        ),
+        MergeResult::Clean(b"A\nb\nc\nd\ne\n".to_vec())
+    );
+    assert_eq!(
+        fold(&objects, &[a, b, c], 16384).unwrap(),
+        Some(b"a\nb\nc\nd\ne\n".to_vec())
+    );
+}
+
+#[test]
+fn missing_ancestor_preserves_store_io_error() {
+    let home = TempHome::new().unwrap();
+    let lock = home.home.try_lock().unwrap();
+    let objects = store(&home, &lock);
+    let a = commit(&objects, &lock, b"content\n", &[]);
+    let missing = ObjectId::from_bytes([0; 32]);
+    let StoreError::Io { path, source } = fold(&objects, &[a, missing], 16384).unwrap_err() else {
+        panic!("expected missing-object I/O error");
+    };
+    assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(
+        path.file_stem().unwrap().to_str().unwrap(),
+        missing.to_string()
+    );
+}
+
+#[test]
+fn two_ancestors_keep_clean_text_conflict_and_binary_results() {
+    let home = TempHome::new().unwrap();
+    let lock = home.home.try_lock().unwrap();
+    let objects = store(&home, &lock);
+    let original = commit(&objects, &lock, b"a\nb\nc\n", &[]);
+    let a = commit(&objects, &lock, b"A\nb\nc\n", &[original]);
+    for (other, expected) in [
+        (b"a\nb\nC\n".as_slice(), Some(b"A\nb\nC\n".as_slice())),
+        (
+            b"other\nb\nc\n",
+            Some(b"<<<<<<<\nA\n=======\nother\n>>>>>>>\nb\nc\n"),
+        ),
+        (b"other\0\n", None),
+    ] {
+        let b = commit(&objects, &lock, other, &[original]);
+        assert_eq!(fold(&objects, &[a, b], 16384).unwrap().as_deref(), expected);
+    }
 }
