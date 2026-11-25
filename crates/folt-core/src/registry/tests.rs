@@ -61,7 +61,10 @@ fn schema_three_indexes_names_and_rejects_invalid_stored_names() {
 fn placement_writers_report_outcomes_without_partial_prefix_moves() {
     let mut connection = Connection::open_in_memory().unwrap();
     connection
-        .execute_batch("CREATE TABLE placements(path BLOB PRIMARY KEY);")
+        .execute_batch(
+            "CREATE TABLE placements(path BLOB PRIMARY KEY);
+             CREATE TABLE stopped_rebases(copy_path BLOB NOT NULL);",
+        )
         .unwrap();
     let key = |text: &str| {
         PlacementPath(path_bytes(Path::new(
@@ -528,5 +531,143 @@ fn remaining_commit_codec_rejects_partial_ids_and_preserves_order() {
         ],
     ] {
         assert_eq!(decode_commits(&encode_commits(&ids)).unwrap(), ids);
+    }
+}
+
+fn removal_progress(copy: &super::Placement) -> super::StoppedRebase {
+    let tip = crate::object::hash_blob(b"tip");
+    super::StoppedRebase {
+        id: copy.id,
+        branch: copy.head.clone(),
+        copy: copy.path.clone(),
+        original_tip: tip,
+        destination: tip,
+        remaining: vec![tip],
+        current_replay: Some(tip),
+        new_tip: tip,
+        file_before: tip,
+        marker_blob: Some(tip),
+        discard: false,
+    }
+}
+
+fn insert_removal_copy(tx: &mut RegistryTransaction<'_>, copy: &super::Placement) {
+    tx.add_folio(&crate::folio::row::NewFolio {
+        id: copy.id,
+        format: crate::folio::format::FolioFormat {
+            layout: crate::layout::FOLIO_LAYOUT_VERSION,
+            algorithm: crate::config::formats::OBJECT_ALGORITHM.into(),
+        },
+    })
+    .unwrap();
+    tx.insert_placement(copy).unwrap();
+    tx.insert_stopped_rebase(&removal_progress(copy)).unwrap();
+}
+
+#[test]
+fn placement_removal_clears_only_matching_path_progress() {
+    let directory = TempDir::new().unwrap();
+    let (home, lock) = open_registry(&directory);
+    let mut registry = Registry::open_or_create(&home, &lock).unwrap();
+    let copy = crate::test_support::facts().placement;
+    let mut other = copy.clone();
+    other.path = PlacementPath(path_bytes(&directory.path().join("other")));
+    let mut unrelated = copy.clone();
+    unrelated.id = FolioId::generate();
+    unrelated.path = PlacementPath(path_bytes(&directory.path().join("unrelated")));
+    registry
+        .write(&lock, |tx| {
+            insert_removal_copy(tx, &copy);
+            tx.insert_placement(&other)?;
+            insert_removal_copy(tx, &unrelated);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        registry
+            .write(&lock, |tx| tx.remove_placement(&other.path))
+            .unwrap(),
+        RemoveResult::Removed
+    );
+    assert_eq!(
+        registry.placement_at(&copy.path).unwrap(),
+        Some(copy.clone())
+    );
+    assert_eq!(
+        registry.stopped_rebase(copy.id).unwrap(),
+        Some(removal_progress(&copy))
+    );
+    assert_eq!(
+        registry
+            .write(&lock, |tx| tx.remove_placement(&copy.path))
+            .unwrap(),
+        RemoveResult::Removed
+    );
+    assert!(registry.placement_at(&copy.path).unwrap().is_none());
+    assert!(registry.stopped_rebase(copy.id).unwrap().is_none());
+    assert_eq!(
+        registry.placement_at(&unrelated.path).unwrap(),
+        Some(unrelated.clone())
+    );
+    assert_eq!(
+        registry.stopped_rebase(unrelated.id).unwrap(),
+        Some(removal_progress(&unrelated))
+    );
+    // An unregistered path does not repair previously orphaned progress.
+    registry
+        .write(&lock, |tx| {
+            tx.insert_stopped_rebase(&removal_progress(&copy))
+        })
+        .unwrap();
+    assert_eq!(
+        registry
+            .write(&lock, |tx| tx.remove_placement(&copy.path))
+            .unwrap(),
+        RemoveResult::NotRegistered
+    );
+    assert_eq!(
+        registry.stopped_rebase(copy.id).unwrap(),
+        Some(removal_progress(&copy))
+    );
+}
+
+#[test]
+fn failed_placement_removal_restores_placement_and_progress() {
+    for fail_cleanup in [false, true] {
+        let directory = TempDir::new().unwrap();
+        let (home, lock) = open_registry(&directory);
+        let mut registry = Registry::open_or_create(&home, &lock).unwrap();
+        let copy = crate::test_support::facts().placement;
+        registry
+            .write(&lock, |tx| {
+                insert_removal_copy(tx, &copy);
+                Ok(())
+            })
+            .unwrap();
+        if fail_cleanup {
+            registry.connection.as_ref().unwrap().execute_batch(
+                "CREATE TRIGGER fail_cleanup BEFORE DELETE ON stopped_rebases BEGIN SELECT RAISE(ABORT, 'injected cleanup failure'); END;"
+            ).unwrap();
+        }
+        let result = registry.write(&lock, |tx| {
+            assert_eq!(tx.remove_placement(&copy.path)?, RemoveResult::Removed);
+            assert!(tx.placement_at(&copy.path)?.is_none());
+            assert_eq!(
+                tx.tx
+                    .query_row("SELECT count(*) FROM stopped_rebases", [], |row| row
+                        .get::<_, i64>(0))?,
+                0
+            );
+            Err::<(), _>(RegistryError::InvalidConflictState)
+        });
+        assert!(result.is_err());
+        assert_eq!(
+            registry.placement_at(&copy.path).unwrap(),
+            Some(copy.clone())
+        );
+        assert_eq!(
+            registry.stopped_rebase(copy.id).unwrap(),
+            Some(removal_progress(&copy))
+        );
     }
 }

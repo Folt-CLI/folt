@@ -20,31 +20,49 @@ fn row_with_stage_is_staged() {
 }
 
 #[test]
-fn conflict_checks_use_recorded_whole_lines_in_order() {
+fn conflict_checks_refuse_any_recorded_whole_line() {
     let row = crate::test_support::conflicted_facts().placement;
     assert!(is_conflicted(&row));
     assert!(!is_conflicted(&facts().placement));
     let state = row.conflict.unwrap();
-    for (bytes, expected) in [
-        (
-            b"before\n<<<<<<<\nours\n=======\ntheirs\n>>>>>>>\nafter\n".as_slice(),
-            true,
-        ),
-        (b"<<<<<<<\nours\ntheirs\n>>>>>>>\n", false),
-        (b"<<<<<<< ours\n=======\n>>>>>>>\n", false),
-        (b"<<<<<<<\n========\n>>>>>>>\n", false),
-        (b"Heading\n=======\nbody\n", false),
-        (b">>>>>>>\n=======\n<<<<<<<\n", false),
-        (b"<<<<<<<\n=======\n>>>>>>>", false),
-        (b"\xff\n<<<<<<<\n=======\n>>>>>>>\n", true),
+    for bytes in [
+        b"<<<<<<<\n".as_slice(),
+        b"=======\n",
+        b">>>>>>>\n",
+        b">>>>>>>\n=======\n<<<<<<<\n",
+        b"Heading\n=======\nbody\n",
+        b"<<<<<<< ours\n=======\n>>>>>>>\n",
+        b"\xff\n<<<<<<<\n",
+        b"<<<<<<<\n=======\n>>>>>>>",
     ] {
-        assert_eq!(markers_remain(&state, bytes), expected, "{bytes:?}");
+        assert!(markers_remain(&state, bytes), "{bytes:?}");
     }
     let mut repeated = state.clone();
     repeated.marker_lines.extend(state.marker_lines.clone());
+    assert!(markers_remain(&repeated, b"=======\n"));
+    repeated.marker_lines.clear();
     assert!(!markers_remain(&repeated, b"<<<<<<<\n=======\n>>>>>>>\n"));
-    assert!(markers_remain(
-        &repeated,
-        b"<<<<<<<\n=======\n>>>>>>>\n<<<<<<<\n=======\n>>>>>>>\n"
-    ));
+}
+
+#[test]
+fn conflict_checks_preserve_byte_exact_boundaries() {
+    let state = crate::test_support::conflicted_facts()
+        .placement
+        .conflict
+        .unwrap();
+    for bytes in [
+        b"resolved\n".as_slice(),
+        b"",
+        b"prefix<<<<<<<\n",
+        b"<<<<<<< suffix\n",
+        b" <<<<<<<\n",
+        b"<<<<<<<\r\n",
+        b"<<<<<<<",
+        b"Heading\n========\n",
+    ] {
+        assert!(!markers_remain(&state, bytes), "{bytes:?}");
+        let mut with_exact_line = bytes.to_vec();
+        with_exact_line.extend_from_slice(b"\n=======\n");
+        assert!(markers_remain(&state, &with_exact_line));
+    }
 }
