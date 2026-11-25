@@ -38,6 +38,9 @@ pub(super) fn write_stage(
             }
         }
     }
+    if let Some(prefix) = &prefix {
+        super::validate::validate_id(selected, prefix).map_err(RegistryError::References)?;
+    }
     let references = blob
         .map(|_| stage_references(selected, prefix.as_deref().unwrap_or_default()))
         .transpose()
