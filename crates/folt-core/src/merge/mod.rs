@@ -23,8 +23,8 @@ pub enum MergeResult {
 ///
 /// Whole-file equality rules run before the binary test. Otherwise a NUL in
 /// any input's probe prefix produces a binary conflict. Text is merged by line,
-/// preserving input terminators. Deadline fallback can coarsen conflict regions
-/// depending on machine speed, but always yields a complete, valid diff.
+/// preserving input terminators. Lines are diffed with Histogram, bounded by
+/// input size, so equal inputs give equal results.
 pub fn merge3(base: &[u8], ours: &[u8], theirs: &[u8]) -> MergeResult {
     if ours == base {
         return MergeResult::Clean(theirs.to_vec());

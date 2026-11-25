@@ -7,7 +7,6 @@ use crate::ops::stage::stage_references;
 use crate::ops::step_hook::{NoHook, StepHook};
 use crate::placement::{ConflictOperation, ConflictState, PlacementOps};
 use crate::placement_path::RegistryError;
-use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry, StoppedRebase};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -107,11 +106,7 @@ pub(crate) fn continue_rebase(
     super::resume::continue_steps(row, fs, stores, registry, lock, NoHook)
 }
 
-pub(super) fn checked(
-    row: &Placement,
-    registry: &Registry,
-    stores: &HistoryStores<'_>,
-) -> Result<StoppedRebase, HistoryError> {
+pub(super) fn checked(row: &Placement, registry: &Registry) -> Result<StoppedRebase, HistoryError> {
     let progress = registry
         .stopped_rebase(row.id)?
         .ok_or(HistoryRefusal::NoStoppedRebase)?;
@@ -125,17 +120,6 @@ pub(super) fn checked(
     {
         return Err(HistoryRefusal::InvalidFacts.into());
     }
-    let branch = RefName::parse(&progress.branch).map_err(crate::history::RefError::from)?;
-    let tip = stores.refs.read(RefKind::Branch, &branch)?;
-    if tip != Some(progress.original_tip)
-        && !(progress.current_replay.is_none() && tip == Some(progress.new_tip))
-    {
-        return Err(HistoryRefusal::BranchMoved {
-            tip,
-            ahead: Vec::new(),
-        }
-        .into());
-    }
     Ok(progress)
 }
 
@@ -147,7 +131,7 @@ pub(crate) fn abort_rebase(
     registry: &mut Registry,
     lock: &mut HomeLock,
 ) -> Result<(), HistoryError> {
-    let progress = checked(row, registry, stores)?;
+    let progress = checked(row, registry)?;
     if progress.current_replay.is_none() {
         return Err(HistoryRefusal::InvalidFacts.into());
     }

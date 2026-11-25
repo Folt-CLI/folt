@@ -480,6 +480,215 @@ fn scenario_7_name_collision_and_markdown_gating() {
     assert!(merge(&home, &mut folio, &mut lock, &internal).is_ok());
 }
 
+// Historical inputs bypass ordinary stage so invalid metadata remains testable.
+fn identity_history(
+    home: &TempHome,
+    folio: &mut TestFolio,
+    lock: &mut HomeLock,
+    contents: [&[u8]; 3],
+) -> (ObjectId, ObjectId) {
+    let base = folio.commit_internal(home, lock, contents[0]);
+    let theirs = folio.second_branch(home, lock, "topic", base, contents[2]);
+    let ours = folio.commit_with_parents(lock, contents[1], &[base]);
+    install_tip(home, folio, lock, "main", ours);
+    (ours, theirs)
+}
+
+#[test]
+fn clean_merge_rejects_combined_duplicate_identity_without_writes() {
+    for internal in [false, true] {
+        for name in ["", "folio-name: named\n"] {
+            for equal in [false, true] {
+                let home = TempHome::new();
+                let mut lock = home.lock();
+                let mut folio = TestFolio::new(&home, &lock);
+                let id = folio.folio.id();
+                let other = if equal {
+                    id
+                } else {
+                    folt_core::id::FolioId::generate()
+                };
+                let base = format!(
+                    "---\n{name}left: original\nspacer: unchanged\nright: original\nfolio-references: {{edge: {{name: target}}}}\n---\nbody\n"
+                );
+                let ours = base.replace("left: original", &format!("folio-id: {id}"));
+                let theirs = base.replace("right: original", &format!("folio-id: {other}"));
+                let expected = ours.replace("right: original", &format!("folio-id: {other}"));
+                assert_eq!(
+                    folt_core::merge::merge3(base.as_bytes(), ours.as_bytes(), theirs.as_bytes()),
+                    folt_core::merge::MergeResult::Clean(expected.into_bytes())
+                );
+                identity_history(
+                    &home,
+                    &mut folio,
+                    &mut lock,
+                    [base.as_bytes(), ours.as_bytes(), theirs.as_bytes()],
+                );
+                let row = if internal {
+                    folio.internal()
+                } else {
+                    copy(&home, &mut folio, &lock, "main", "copy.md")
+                };
+                assert_eq!(
+                    refused(&home, &mut folio, &mut lock, &row),
+                    HistoryRefusal::MergeInvalid(
+                        folt_core::front_matter::FrontMatterError::Duplicate.to_string()
+                    )
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn historical_malformed_or_mismatched_merge_identity_writes_nothing() {
+    for internal in [false, true] {
+        for name in ["", "folio-name: named\n"] {
+            for malformed in [false, true] {
+                let home = TempHome::new();
+                let mut lock = home.lock();
+                let mut folio = TestFolio::new(&home, &lock);
+                let wrong = folt_core::id::FolioId::generate();
+                let value = if malformed {
+                    "invalid".into()
+                } else {
+                    wrong.to_string()
+                };
+                let base = format!("---\n{name}foreign: value\n---\na\nb\nc\n");
+                let ours = base.replace("\na\n", "\nA\n");
+                let theirs = base.replace(
+                    "foreign: value",
+                    &format!("foreign: value\nfolio-id: {value}"),
+                );
+                identity_history(
+                    &home,
+                    &mut folio,
+                    &mut lock,
+                    [base.as_bytes(), ours.as_bytes(), theirs.as_bytes()],
+                );
+                let row = if internal {
+                    folio.internal()
+                } else {
+                    copy(&home, &mut folio, &lock, "main", "copy.md")
+                };
+                let diagnostic = if malformed {
+                    folt_core::front_matter::FrontMatterError::InvalidValue.to_string()
+                } else {
+                    format!(
+                        "folio-id: expected Folio id {}, actual Folio id {wrong}",
+                        row.id
+                    )
+                };
+                assert_eq!(
+                    refused(&home, &mut folio, &mut lock, &row),
+                    HistoryRefusal::MergeInvalid(diagnostic)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn clean_merge_accepts_absent_or_matching_identity_with_existing_updates() {
+    for internal in [false, true] {
+        for name in ["", "folio-name: named\n"] {
+            for matching in [false, true] {
+                let home = TempHome::new();
+                let mut lock = home.lock();
+                let mut folio = TestFolio::new(&home, &lock);
+                let identity = if matching {
+                    format!("folio-id: {}\n", folio.folio.id())
+                } else {
+                    String::new()
+                };
+                let base = format!(
+                    "---\n{name}{identity}folio-references: {{edge: {{name: target}}}}\n---\na\nb\nc\n"
+                );
+                let ours = base.replace("\na\n", "\nA\n");
+                let theirs = base.replace("\nc\n", "\nC\n");
+                let expected = ours.replace("\nc\n", "\nC\n");
+                let (ours, theirs) = identity_history(
+                    &home,
+                    &mut folio,
+                    &mut lock,
+                    [base.as_bytes(), ours.as_bytes(), theirs.as_bytes()],
+                );
+                let row = if internal {
+                    folio.internal()
+                } else {
+                    copy(&home, &mut folio, &lock, "main", "copy.md")
+                };
+                let id = merge(&home, &mut folio, &mut lock, &row).unwrap();
+                assert_eq!(
+                    folio.objects.get_commit(id, 16384).unwrap().parents,
+                    vec![ours, theirs]
+                );
+                let after = folio.registry.placement_at(&row.path).unwrap().unwrap();
+                assert_eq!(after.commit_id, Some(id));
+                assert_eq!(
+                    after.base.unwrap().hash,
+                    folt_core::object::hash_blob(expected.as_bytes())
+                );
+                assert!(after.staged.is_none());
+                assert_eq!(
+                    std::fs::read(row.path.to_path_buf()).unwrap(),
+                    expected.as_bytes()
+                );
+                assert_eq!(
+                    std::fs::read(folio.internal().path.to_path_buf()).unwrap(),
+                    expected.as_bytes()
+                );
+                assert_eq!(folio.internal().commit_id, Some(id));
+                let cached = folio.registry.references(row.id, "main").unwrap();
+                assert_eq!(cached.len(), usize::from(!internal || !name.is_empty()));
+                if let Some(reference) = cached.first() {
+                    assert_eq!(reference.key, "edge");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn merge_identity_retains_non_markdown_and_binary_bypasses() {
+    for path in ["copy.txt", "copy.md", "internal"] {
+        let home = TempHome::new();
+        let mut lock = home.lock();
+        let mut folio = TestFolio::new(&home, &lock);
+        let binary = if path == "copy.txt" { "" } else { "\0" };
+        let invalid = format!(
+            "---\nfolio-id: invalid\nfolio-references: {{edge: {{name: target}}}}\n---\n{binary}"
+        );
+        let (ours, theirs) = identity_history(
+            &home,
+            &mut folio,
+            &mut lock,
+            [b"base", b"base", invalid.as_bytes()],
+        );
+        let row = if path == "internal" {
+            folio.internal()
+        } else {
+            copy(&home, &mut folio, &lock, "main", path)
+        };
+        let id = merge(&home, &mut folio, &mut lock, &row).unwrap();
+        assert_eq!(
+            folio.objects.get_commit(id, 16384).unwrap().parents,
+            vec![ours, theirs]
+        );
+        assert_eq!(
+            std::fs::read(row.path.to_path_buf()).unwrap(),
+            invalid.as_bytes()
+        );
+        assert!(
+            folio
+                .registry
+                .references(row.id, "main")
+                .unwrap()
+                .is_empty()
+        );
+    }
+}
+
 // Install a clean target tip while preserving the two-parent history built by
 // the fixture. This avoids making a staged commit that would add another tip.
 fn install_tip(
@@ -651,5 +860,106 @@ fn criss_cross_binary_conflict_between_ancestors_writes_nothing() {
     assert_eq!(
         refused(&home, &mut folio, &mut lock, &row),
         HistoryRefusal::MergeBaseBinaryConflict
+    );
+}
+
+fn ordered_ancestor(
+    folio: &TestFolio,
+    lock: &HomeLock,
+    bytes: &[u8],
+    parent: ObjectId,
+    range: std::ops::Range<u8>,
+) -> ObjectId {
+    use folt_core::object::{ObjectKind, hash_object};
+    let seed = folio.commit_with_parents(lock, bytes, &[parent]);
+    let mut candidate = folio.objects.get_commit(seed, 16384).unwrap();
+    for nonce in 0..256 {
+        candidate.message = format!("ordered ancestor {nonce}");
+        let id = hash_object(ObjectKind::Commit, &candidate.encode_body().unwrap());
+        if range.contains(&id.as_bytes()[0]) {
+            assert_eq!(folio.objects.put_commit(lock, &candidate).unwrap(), id);
+            return id;
+        }
+    }
+    panic!("bounded metadata search must find an ordered ancestor");
+}
+
+#[test]
+fn accumulated_ancestors_merge_stores_only_final_blob_and_commit() {
+    use folt_core::history::{MergeBase, merge_base, merge_base_from};
+    use folt_core::object::{ObjectKind, hash_blob};
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let r = folio.commit_internal(&home, &mut lock, b"a\nb\nc\nd\ne\n");
+    folio.second_branch(&home, &mut lock, "topic", r, b"topic\n");
+    let d = folio.commit_with_parents(&lock, b"A\nb\nc\nd\ne\n", &[r]);
+    let a = ordered_ancestor(&folio, &lock, b"A\nb\nc\nd\ne\n", d, 0..64);
+    let b = ordered_ancestor(&folio, &lock, b"a\nb\nc\nd\ne\n", r, 64..128);
+    let c = ordered_ancestor(&folio, &lock, b"a\nb\nc\nd\ne\n", d, 128..255);
+    assert!(a.as_bytes() < b.as_bytes() && b.as_bytes() < c.as_bytes());
+    assert_eq!(
+        merge_base(&folio.objects, b, c, 16384).unwrap(),
+        MergeBase::One(r)
+    );
+    assert_eq!(
+        merge_base_from(&folio.objects, &[a, b], c, 16384).unwrap(),
+        MergeBase::One(d)
+    );
+    let ab = folio.commit_with_parents(&lock, b"A\nb\nc\nd\ne\n", &[a, b]);
+    let bc = folio.commit_with_parents(&lock, b"a\nb\nc\nd\ne\n", &[b, c]);
+    let ours = folio.commit_with_parents(&lock, b"A\nb\nc\nd\ne\n", &[ab, c]);
+    let theirs = folio.commit_with_parents(&lock, b"a\nb\nc\nd\nE\n", &[a, bc]);
+    assert_ne!(ab, bc);
+    assert_eq!(
+        merge_base(&folio.objects, ours, theirs, 16384).unwrap(),
+        MergeBase::Several(vec![a, b, c])
+    );
+    install_tip(&home, &mut folio, &mut lock, "main", ours);
+    install_tip(&home, &mut folio, &mut lock, "topic", theirs);
+    let row = copy(&home, &mut folio, &lock, "main", "copy.md");
+    let object_dir = folio.folio.path().to_path_buf();
+    let before = snapshot(&object_dir, &home.path().join("lock"));
+    let id = merge(&home, &mut folio, &mut lock, &row).unwrap();
+    let commit = folio.objects.get_commit(id, 16384).unwrap();
+    assert_eq!(commit.parents, vec![ours, theirs]);
+    let expected = b"A\nb\nc\nd\nE\n";
+    assert_eq!(
+        folio
+            .objects
+            .get(commit.content, ObjectKind::Blob, u64::MAX)
+            .unwrap(),
+        expected
+    );
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), expected);
+    assert_eq!(
+        std::fs::read(folio.internal().path.to_path_buf()).unwrap(),
+        expected
+    );
+    assert_eq!(folio.internal().commit_id, Some(id));
+    assert_eq!(
+        folio
+            .registry
+            .placement_at(&row.path)
+            .unwrap()
+            .unwrap()
+            .commit_id,
+        Some(id)
+    );
+    let after = snapshot(&object_dir, &home.path().join("lock"));
+    let added: Vec<_> = after
+        .iter()
+        .filter(|(path, _)| !before.iter().any(|(old, _)| old == path))
+        .collect();
+    let mut expected_ids = vec![id.to_string(), hash_blob(expected).to_string()];
+    expected_ids.sort();
+    let mut added_ids: Vec<_> = added
+        .iter()
+        .map(|(path, _)| path.file_stem().unwrap().to_str().unwrap().to_owned())
+        .collect();
+    added_ids.sort();
+    assert_eq!(
+        added_ids, expected_ids,
+        "only the final merged blob and merge commit are stored"
     );
 }
