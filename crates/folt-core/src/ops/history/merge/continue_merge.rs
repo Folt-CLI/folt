@@ -1,6 +1,7 @@
 use crate::config::names::DEFAULT_BRANCH;
 use crate::home::HomeLock;
 use crate::id::ObjectId;
+use crate::object::ObjectKind;
 use crate::ops::history::commit::{
     Recovery, advance_branch, branch_moved, build_commit, move_internal, write_rows,
 };
@@ -9,6 +10,8 @@ use crate::ops::history::{
     judge_commit, require_blob, require_observation, require_row,
 };
 use crate::ops::placement::move_::MoveTarget;
+use crate::ops::refusal::{PlacementRefusal, RefusalReason};
+use crate::ops::stage::refuse::markers_remain;
 use crate::placement::{ConflictOperation, PlacementKind, PlacementOps};
 use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry};
@@ -81,6 +84,17 @@ pub(crate) fn continue_merge(
     let state = row.conflict.as_ref().ok_or(HistoryRefusal::InvalidFacts)?;
     let staged = row.staged.ok_or(HistoryRefusal::NothingStaged)?;
     require_blob(stores.objects, staged.hash)?;
+    let mut bytes = Vec::new();
+    stores
+        .objects
+        .get_to(staged.hash, ObjectKind::Blob, &mut bytes)?;
+    if markers_remain(state, &bytes) {
+        return Err(PlacementRefusal {
+            path: row.path.to_path_buf(),
+            reason: RefusalReason::ConflictMarkers,
+        }
+        .into());
+    }
     let commit = build_commit(
         staged.hash,
         vec![
