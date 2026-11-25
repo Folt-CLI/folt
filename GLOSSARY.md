@@ -268,7 +268,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### virtual base
 
 - **Layer:** History
-- **Definition:** In-memory content produced by folding several best common ancestors from left to right in object id byte order for a merge. Each pair uses its merge base content, recursively folding several merge bases and using empty bytes when there is none. Text conflicts remain as conflict marker lines in these bytes; a binary conflict between the ancestors refuses the merge. No object is stored for the virtual base.
+- **Definition:** In-memory content produced by folding several best common ancestors from left to right in object id byte order for a merge. Each next ancestor is folded into the accumulated content using the merge base content of all accumulated ancestors and itself, recursively folding several merge bases and using empty bytes when there is none. Text conflicts remain as conflict marker lines in these bytes; a binary conflict between the ancestors refuses the merge. No object is stored for the virtual base.
 - **Code:** `crates/folt-core/src/ops/history/merge/virtual_base.rs` (`fold`)
 - **Related:** [merge](#merge), [merge base](#merge-base), [three-way merge](#three-way-merge), [conflict marker](#conflict-marker).
 - **Not:** A stored commit or blob, a placement base, or conflict markers written into a working file.
