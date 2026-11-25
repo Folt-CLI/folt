@@ -77,6 +77,60 @@ fn merge_large_different_inputs_complete_with_all_bytes() {
     assert_eq!(marker_lines.len(), 3);
 }
 
+#[test]
+fn merge_large_scattered_edits_are_deterministic_and_not_whole_file() {
+    const LINE_COUNT: usize = 100_000;
+    const EDIT_COUNT: usize = 2_000;
+
+    fn scattered_indices(mut state: u64) -> std::collections::BTreeSet<usize> {
+        let mut indices = std::collections::BTreeSet::new();
+        while indices.len() < EDIT_COUNT {
+            // Fixed-seed xorshift64; keep the first and last two lines unchanged.
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let index = usize::try_from(state % (LINE_COUNT as u64 - 4)).unwrap() + 2;
+            indices.insert(index);
+        }
+        indices
+    }
+
+    let base: Vec<String> = (0..LINE_COUNT).map(|i| format!("line {i}\n")).collect();
+    let mut ours = base.clone();
+    let mut theirs = base.clone();
+    for index in scattered_indices(0x1234_5678_9abc_def0) {
+        ours[index] = format!("ours line {index}\n");
+    }
+    for index in scattered_indices(0xfedc_ba98_7654_3210) {
+        theirs[index] = format!("theirs line {index}\n");
+    }
+    let base = base.concat().into_bytes();
+    let ours = ours.concat().into_bytes();
+    let theirs = theirs.concat().into_bytes();
+    let first = merge3(&base, &ours, &theirs);
+    let second = merge3(&base, &ours, &theirs);
+    assert_eq!(first, second);
+
+    match first {
+        MergeResult::Clean(merged) => {
+            println!("conflict region count: 0 (clean merge)");
+            assert!(merged.starts_with(b"line 0\nline 1\n"));
+        }
+        MergeResult::Conflicted {
+            merged: Some(merged),
+            marker_lines,
+        } => {
+            let region_count = marker_lines.len() / 3;
+            println!("conflict region count: {region_count}");
+            assert_eq!(marker_lines.len() % 3, 0);
+            assert!(region_count > 1);
+            assert!(merged.starts_with(b"line 0\nline 1\n"));
+            assert!(merged.ends_with(b"line 99998\nline 99999\n"));
+        }
+        result => panic!("expected a clean merge or complete text conflicts, got {result:?}"),
+    }
+}
+
 // Scenarios 3–5: the public API is compiled with the normal dependency, and
 // its dependency selection, vocabulary and module ownership are documented.
 #[test]
@@ -100,6 +154,36 @@ fn merge_dependency_terms_and_ownership_are_documented() {
     assert!(glossary.contains("### conflict marker"));
     assert!(include_str!("../../docs/dev/library/layers.md").contains("| L1 | merge | config |"));
     assert!(include_str!("../../docs/dev/library/modules.md").contains("| `merge` |"));
+}
+
+#[test]
+fn merge_diff_decision_and_removed_limit_are_recorded() {
+    let manifest = include_str!("../../Cargo.toml");
+    let text = include_str!("../../crates/folt-core/src/merge/text.rs");
+    let module = include_str!("../../crates/folt-core/src/merge/mod.rs");
+    let limits = include_str!("../../crates/folt-core/src/config/limits.rs");
+    let stack = include_str!("../../docs/dev/stack.md");
+    let glossary = include_str!("../../GLOSSARY.md");
+
+    assert!(manifest.contains("similar = { version = \"=3.2.1\""));
+    assert!(text.contains("Algorithm::Histogram"));
+    assert!(!text.contains("deadline"));
+    assert!(stack.contains("3.2.1"));
+    assert!(stack.contains("Histogram"));
+    for (name, source) in [
+        ("limits.rs", limits),
+        ("text.rs", text),
+        ("mod.rs", module),
+        ("stack.md", stack),
+        ("GLOSSARY.md", glossary),
+    ] {
+        assert!(
+            !source.contains("MERGE_DIFF_COST_LIMIT"),
+            "{name} still contains the removed diff limit"
+        );
+    }
+    assert!(!module.contains("budget"));
+    assert!(!stack.contains("budget"));
 }
 
 #[test]
