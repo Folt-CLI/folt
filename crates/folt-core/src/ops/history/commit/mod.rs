@@ -13,4 +13,5 @@ pub use plan::CommitPlan;
 
 pub(crate) use apply::build_commit;
 pub(crate) use finish::{Recovery, advance_branch, move_internal, write_rows};
-pub(crate) use judge::branch_moved;
+pub(crate) use judge::{branch_moved, judge_commit_with_parents};
+pub(crate) use plan::matches_requested_commit;

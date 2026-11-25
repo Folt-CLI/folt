@@ -1,6 +1,6 @@
-use super::super::{HistoryError, HistoryRefusal, HistoryStores, judge_commit};
+use super::super::{HistoryError, HistoryRefusal, HistoryStores};
 use super::gather::CommitFacts;
-use super::judge::branch_moved;
+use super::judge::{branch_moved, judge_commit_with_parents};
 use super::plan::matches_requested_commit;
 use crate::fsx::Signature;
 use crate::history::{Expect, RefError};
@@ -52,7 +52,7 @@ pub(crate) fn advance_branch(
             {
                 return Err(branch_moved(facts).into());
             }
-            id = judge_commit(facts)?
+            id = judge_commit_with_parents(facts, &commit.parents)?
                 .resume
                 .ok_or_else(|| branch_moved(facts))?;
         }
