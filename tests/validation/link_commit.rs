@@ -808,3 +808,167 @@ fn selected_link_extension_controls_internal_reference_cache() {
         );
     }
 }
+
+#[test]
+fn markdown_link_identity_failures_preserve_internal_links_and_references() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let selected = link(&mut folio, &home, &lock, "selected.MD");
+    let other = link(&mut folio, &home, &lock, "other.txt");
+    let fs = LinkFs {
+        fs: PlacementFs::new(&home.home),
+        observation: Observation::IntactLink,
+    };
+    let internal = folio.internal();
+    std::fs::write(
+        internal.path.to_path_buf(),
+        b"---\nfolio-references: {kept: {name: target}}\n---\n",
+    )
+    .unwrap();
+    home.home
+        .stage(
+            &selected,
+            &fs,
+            &folio.objects,
+            &folio.refs,
+            &mut folio.registry,
+            &lock,
+        )
+        .unwrap();
+    let before = folio.internal();
+    let cached = folio.registry.references(before.id, "main").unwrap();
+    assert_eq!(cached.len(), 1);
+    let wrong = FolioId::generate();
+    for (metadata, diagnostic) in [
+        (
+            format!("folio-id: {}\nfolio-id: {}\n", before.id, before.id),
+            "duplicate key".to_string(),
+        ),
+        ("folio-id: invalid\n".into(), "invalid value".into()),
+        (
+            format!("folio-id: {wrong}\n"),
+            format!(
+                "folio-id: expected Folio id {}, actual Folio id {wrong}",
+                before.id
+            ),
+        ),
+    ] {
+        let bytes = format!("---\n{metadata}folio-references: {{new: {{name: changed}}}}\n---\n");
+        std::fs::write(before.path.to_path_buf(), &bytes).unwrap();
+        let error = home
+            .home
+            .stage(
+                &selected,
+                &fs,
+                &folio.objects,
+                &folio.refs,
+                &mut folio.registry,
+                &lock,
+            )
+            .unwrap_err();
+        assert!(
+            matches!(error, RulesError::Registry(folt_core::placement_path::RegistryError::References(ref message)) if message.contains(&diagnostic)),
+            "{error}"
+        );
+        assert_eq!(folio.internal(), before);
+        assert_eq!(
+            folio
+                .registry
+                .placement_at(&selected.path)
+                .unwrap()
+                .unwrap(),
+            selected
+        );
+        assert_eq!(
+            folio.registry.placement_at(&other.path).unwrap().unwrap(),
+            other
+        );
+        assert_eq!(
+            folio.registry.references(before.id, "main").unwrap(),
+            cached
+        );
+        assert_eq!(
+            std::fs::read(before.path.to_path_buf()).unwrap(),
+            bytes.as_bytes()
+        );
+    }
+    // The selected non-Markdown link bypasses identity inspection of the same bytes.
+    home.home
+        .stage(
+            &other,
+            &fs,
+            &folio.objects,
+            &folio.refs,
+            &mut folio.registry,
+            &lock,
+        )
+        .unwrap();
+    assert!(
+        folio
+            .registry
+            .references(before.id, "main")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(folio.internal().base, before.base);
+    assert_eq!(
+        folio.registry.placement_at(&other.path).unwrap().unwrap(),
+        other
+    );
+}
+
+#[test]
+fn markdown_link_accepts_absent_or_matching_identity_and_changes_only_internal_state() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let selected = link(&mut folio, &home, &lock, "selected.md");
+    let other = link(&mut folio, &home, &lock, "other.md");
+    let fs = LinkFs {
+        fs: PlacementFs::new(&home.home),
+        observation: Observation::IntactLink,
+    };
+    let internal = folio.internal();
+    for identity in [String::new(), format!("folio-id: {}\n", internal.id)] {
+        let bytes = format!("---\n{identity}folio-references: {{edge: {{name: target}}}}\n---\n");
+        std::fs::write(internal.path.to_path_buf(), &bytes).unwrap();
+        home.home
+            .stage(
+                &selected,
+                &fs,
+                &folio.objects,
+                &folio.refs,
+                &mut folio.registry,
+                &lock,
+            )
+            .unwrap();
+        let after = folio.internal();
+        assert_eq!(after.base, internal.base);
+        assert_eq!(after.commit_id, internal.commit_id);
+        assert_eq!(
+            after.staged.unwrap().hash,
+            folt_core::object::hash_blob(bytes.as_bytes())
+        );
+        assert_eq!(
+            std::fs::read(after.path.to_path_buf()).unwrap(),
+            bytes.as_bytes()
+        );
+        assert_eq!(
+            folio
+                .registry
+                .placement_at(&selected.path)
+                .unwrap()
+                .unwrap(),
+            selected
+        );
+        assert_eq!(
+            folio.registry.placement_at(&other.path).unwrap().unwrap(),
+            other
+        );
+        assert_eq!(
+            folio.registry.references(after.id, "main").unwrap()[0].key,
+            "edge"
+        );
+    }
+}
