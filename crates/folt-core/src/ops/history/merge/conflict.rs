@@ -34,6 +34,10 @@ pub(crate) enum ConflictStep {
     FileWritten,
 }
 
+/// Publishes the conflict file before writing the conflict state.
+/// A crash between these two writes leaves conflict marker lines in a copy with
+/// no conflict state, so stage can capture those lines for a commit.
+/// This crash window is accepted; recovery is discard checkout.
 pub(crate) fn apply_conflict_steps(
     plan: &MergePlan,
     fs: &impl PlacementOps,
