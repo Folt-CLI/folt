@@ -260,6 +260,259 @@ fn refused_stages_preserve_placement_and_all_previous_rows() {
     }
 }
 
+fn stage_selected(
+    home: &TempHome,
+    folio: &mut TestFolio,
+    lock: &folt_core::home::HomeLock,
+    selected: &Placement,
+    bytes: &[u8],
+) -> Result<(), RulesError> {
+    fs::write(selected.path.to_path_buf(), bytes).unwrap();
+    home.home.stage(
+        selected,
+        &PlacementFs::new(&home.home),
+        &folio.objects,
+        &folio.refs,
+        &mut folio.registry,
+        lock,
+    )
+}
+
+fn invalid_identity_cases(expected: FolioId) -> Vec<(String, String)> {
+    let other = FolioId::parse("aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa").unwrap();
+    vec![
+        (
+            format!("folio-id: {expected}\nfolio-id: {expected}\n"),
+            FrontMatterError::Duplicate.to_string(),
+        ),
+        (
+            format!("folio-id: {expected}\nfolio-id: {other}\n"),
+            FrontMatterError::Duplicate.to_string(),
+        ),
+        (
+            "folio-id:\n".into(),
+            FrontMatterError::InvalidValue.to_string(),
+        ),
+        (
+            "folio-id: invalid\n".into(),
+            FrontMatterError::InvalidValue.to_string(),
+        ),
+        (
+            "folio-id: AAAAAAAA-AAAA-4AAA-AAAA-AAAAAAAAAAAA\n".into(),
+            FrontMatterError::InvalidValue.to_string(),
+        ),
+        (
+            "folio-id: [unsupported]\n".into(),
+            FrontMatterError::Unsupported.to_string(),
+        ),
+        (
+            format!("folio-id: {other}\n"),
+            format!("folio-id: expected Folio id {expected}, actual Folio id {other}"),
+        ),
+    ]
+}
+
+#[test]
+fn stage_identity_errors_preserve_placement_and_all_cached_branches() {
+    for internal in [false, true] {
+        for name in ["", "folio-name: named\n"] {
+            let home = TempHome::new();
+            let lock = home.lock();
+            let mut folio = TestFolio::new(&home, &lock);
+            let selected = if internal {
+                folio.internal()
+            } else {
+                markdown_copy(&home, &mut folio, &lock)
+            };
+            let seed = b"---\nfolio-name: named\nfolio-references: {kept: {name: target}}\n---\n";
+            stage_selected(&home, &mut folio, &lock, &selected, seed).unwrap();
+            folio
+                .registry
+                .write(&lock, |tx| {
+                    tx.rebuild_references(
+                        selected.id,
+                        "dead",
+                        &[Reference {
+                            alias: "old".into(),
+                            name: Some("target".into()),
+                            id: None,
+                            pin: None,
+                        }],
+                    )
+                })
+                .unwrap();
+            let mut before = folio
+                .registry
+                .placement_at(&selected.path)
+                .unwrap()
+                .unwrap();
+            let main = folio.registry.references(selected.id, "main").unwrap();
+            let dead = folio.registry.references(selected.id, "dead").unwrap();
+            for (metadata, diagnostic) in invalid_identity_cases(selected.id) {
+                let bytes = format!("---\n{name}{metadata}---\n");
+                // Historical invalid bytes can also equal the base. An existing
+                // stage and every cached branch must survive that refusal.
+                for unchanged in [false, true] {
+                    if unchanged {
+                        let mut base = folio.internal().base.unwrap();
+                        base.hash = hash_blob(bytes.as_bytes());
+                        before.base = Some(base);
+                        folio
+                            .registry
+                            .write(&lock, |tx| tx.update_placement(&before))
+                            .unwrap();
+                    }
+                    let error = stage_selected(&home, &mut folio, &lock, &before, bytes.as_bytes())
+                        .unwrap_err();
+                    assert!(
+                        matches!(error, RulesError::Registry(RegistryError::References(ref message)) if message == &diagnostic),
+                        "{error}"
+                    );
+                    assert_eq!(
+                        folio.registry.placement_at(&before.path).unwrap().unwrap(),
+                        before
+                    );
+                    assert_eq!(
+                        folio.registry.references(selected.id, "main").unwrap(),
+                        main
+                    );
+                    assert_eq!(
+                        folio.registry.references(selected.id, "dead").unwrap(),
+                        dead
+                    );
+                    assert_eq!(
+                        fs::read(before.path.to_path_buf()).unwrap(),
+                        bytes.as_bytes()
+                    );
+                }
+            }
+            home.home
+                .unstage(
+                    &before,
+                    &PlacementFs::new(&home.home),
+                    &mut folio.registry,
+                    &lock,
+                )
+                .unwrap();
+            assert!(
+                folio
+                    .registry
+                    .placement_at(&before.path)
+                    .unwrap()
+                    .unwrap()
+                    .staged
+                    .is_none()
+            );
+            assert_eq!(
+                folio.registry.references(selected.id, "main").unwrap(),
+                main
+            );
+            assert_eq!(
+                folio.registry.references(selected.id, "dead").unwrap(),
+                dead
+            );
+        }
+    }
+}
+
+#[test]
+fn stage_identity_acceptance_preserves_bytes_and_base_and_reference_detection() {
+    for internal in [false, true] {
+        for name in ["", "folio-name: named\n"] {
+            let home = TempHome::new();
+            let lock = home.lock();
+            let mut folio = TestFolio::new(&home, &lock);
+            let selected = if internal {
+                folio.internal()
+            } else {
+                markdown_copy(&home, &mut folio, &lock)
+            };
+            for identity in [String::new(), format!("folio-id: {}\n", selected.id)] {
+                let bytes = format!(
+                    "---\n{name}{identity}folio-references: {{edge: {{name: target}}}}\n---\n"
+                );
+                let mut before = folio
+                    .registry
+                    .placement_at(&selected.path)
+                    .unwrap()
+                    .unwrap();
+                for unchanged in [false, true] {
+                    if unchanged {
+                        let mut base = folio.internal().base.unwrap();
+                        base.hash = hash_blob(bytes.as_bytes());
+                        before.base = Some(base);
+                        folio
+                            .registry
+                            .write(&lock, |tx| tx.update_placement(&before))
+                            .unwrap();
+                    }
+                    stage_selected(&home, &mut folio, &lock, &before, bytes.as_bytes()).unwrap();
+                    let after = folio.registry.placement_at(&before.path).unwrap().unwrap();
+                    assert_eq!(after.base, before.base);
+                    assert_eq!(
+                        after.staged.map(|blob| blob.hash),
+                        (!unchanged).then(|| hash_blob(bytes.as_bytes()))
+                    );
+                    assert_eq!(
+                        fs::read(before.path.to_path_buf()).unwrap(),
+                        bytes.as_bytes()
+                    );
+                    let rows = folio.registry.references(selected.id, "main").unwrap();
+                    assert_eq!(rows.len(), usize::from(!internal || !name.is_empty()));
+                    if let Some(row) = rows.first() {
+                        assert_eq!(row.key, "edge");
+                    }
+                    before = after;
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn stage_identity_uses_markdown_extensions_and_bypasses_binary_and_non_markdown() {
+    let home = TempHome::new();
+    let lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let mut row = folio.copy(&home, &lock);
+    let invalid = b"---\nfolio-id: invalid\n---\n";
+    stage_selected(&home, &mut folio, &lock, &row, invalid).unwrap();
+    let old = row.path.clone();
+    row = folio.registry.placement_at(&old).unwrap().unwrap();
+    row.path = PlacementPath::resolve(home.root().join("note.MaRkDoWn")).unwrap();
+    folio
+        .registry
+        .write(&lock, |tx| {
+            tx.remove_placement(&old)?;
+            tx.add_placement(&NewPlacement {
+                path: row.path.clone(),
+                id: row.id,
+                kind: row.kind,
+                head: Some(row.head.clone()),
+                commit_id: row.commit_id,
+                base: row.base.clone(),
+                staged: row.staged,
+            })
+        })
+        .unwrap();
+    assert!(stage_selected(&home, &mut folio, &lock, &row, invalid).is_err());
+    for bytes in [
+        b"---\nfolio-id: invalid\n---\n\0".as_slice(),
+        b"plain content",
+    ] {
+        stage_selected(&home, &mut folio, &lock, &row, bytes).unwrap();
+        row = folio.registry.placement_at(&row.path).unwrap().unwrap();
+        assert!(
+            folio
+                .registry
+                .references(row.id, "main")
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(row.staged.unwrap().hash, hash_blob(bytes));
+    }
+}
+
 #[test]
 fn empty_binary_and_plain_non_markdown_stages_clear_the_branch() {
     let home = TempHome::new();

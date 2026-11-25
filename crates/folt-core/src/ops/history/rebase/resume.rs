@@ -11,7 +11,7 @@ use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::stage::refuse::markers_remain;
 use crate::ops::step_hook::StepHook;
 use crate::placement::PlacementOps;
-use crate::ref_name::RefName;
+use crate::ref_name::{RefKind, RefName};
 use crate::registry::{Placement, Registry, StoppedRebase};
 
 pub(super) fn continue_steps(
@@ -22,7 +22,8 @@ pub(super) fn continue_steps(
     lock: &mut HomeLock,
     mut hook: impl StepHook<RebaseStep, HistoryError>,
 ) -> Result<RebaseOutcome, HistoryError> {
-    let mut progress = stopped::checked(row, registry, stores)?;
+    let mut progress = stopped::checked(row, registry)?;
+    require_tip(&progress, stores)?;
     if progress.current_replay.is_none() {
         return super::finish::finish(row, &progress, fs, stores, registry, lock, hook);
     }
@@ -154,4 +155,19 @@ fn gather_remaining(
         facts.commits.insert(id, commit);
     }
     Ok(facts)
+}
+
+fn require_tip(progress: &StoppedRebase, stores: &HistoryStores<'_>) -> Result<(), HistoryError> {
+    let branch = RefName::parse(&progress.branch).map_err(crate::history::RefError::from)?;
+    let tip = stores.refs.read(RefKind::Branch, &branch)?;
+    if tip != Some(progress.original_tip)
+        && !(progress.current_replay.is_none() && tip == Some(progress.new_tip))
+    {
+        return Err(HistoryRefusal::BranchMoved {
+            tip,
+            ahead: Vec::new(),
+        }
+        .into());
+    }
+    Ok(())
 }

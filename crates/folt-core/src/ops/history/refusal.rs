@@ -55,7 +55,10 @@ impl fmt::Display for HistoryRefusal {
                 for path in ahead {
                     write!(f, "; ahead at {}", path.display())?;
                 }
-                Ok(())
+                write!(
+                    f,
+                    "; if a rebase is stopped, use rebase abort to restore the copy; edited conflict content requires discard"
+                )
             }
             Self::InternalEdited(path) => write!(
                 f,

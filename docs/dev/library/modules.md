@@ -73,7 +73,7 @@ Each rule has one owner. Extend the owner; do not add a second one.
 | Binary test, whole-file equality rules, line merge and conflict marker rendering | `merge` |
 | History operations and their refusals | `ops::history` |
 | Merge entry, two-parent merge commit, merge refusals, and abort and continue of a copy with conflict state | `ops::history` |
-| Validation of merged content: reference keys, reference cycles and folio-name collisions | `ops::stage::validate` |
+| Shared folio-id validation during stage and merged-content validation; merged reference keys, reference cycles and folio-name collisions | `ops::stage::validate` |
 | Registration plan, apply and refusals | `ops::register` |
 | Rename plan and apply | `ops::rename` |
 | Prune judge and apply | `ops::prune` |

@@ -263,4 +263,5 @@ fn branch_moved_refuses_even_after_final_row_and_preserves_progress() {
     assert_eq!(registry.stopped_rebase(copy.id).unwrap(), before);
 }
 
+mod moved_tip;
 mod replay_cases;
