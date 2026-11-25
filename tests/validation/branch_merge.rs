@@ -653,3 +653,104 @@ fn criss_cross_binary_conflict_between_ancestors_writes_nothing() {
         HistoryRefusal::MergeBaseBinaryConflict
     );
 }
+
+fn ordered_ancestor(
+    folio: &TestFolio,
+    lock: &HomeLock,
+    bytes: &[u8],
+    parent: ObjectId,
+    range: std::ops::Range<u8>,
+) -> ObjectId {
+    use folt_core::object::{ObjectKind, hash_object};
+    let seed = folio.commit_with_parents(lock, bytes, &[parent]);
+    let mut candidate = folio.objects.get_commit(seed, 16384).unwrap();
+    for nonce in 0..256 {
+        candidate.message = format!("ordered ancestor {nonce}");
+        let id = hash_object(ObjectKind::Commit, &candidate.encode_body().unwrap());
+        if range.contains(&id.as_bytes()[0]) {
+            assert_eq!(folio.objects.put_commit(lock, &candidate).unwrap(), id);
+            return id;
+        }
+    }
+    panic!("bounded metadata search must find an ordered ancestor");
+}
+
+#[test]
+fn accumulated_ancestors_merge_stores_only_final_blob_and_commit() {
+    use folt_core::history::{MergeBase, merge_base, merge_base_from};
+    use folt_core::object::{ObjectKind, hash_blob};
+    let home = TempHome::new();
+    let mut lock = home.lock();
+    let mut folio = TestFolio::new(&home, &lock);
+    let r = folio.commit_internal(&home, &mut lock, b"a\nb\nc\nd\ne\n");
+    folio.second_branch(&home, &mut lock, "topic", r, b"topic\n");
+    let d = folio.commit_with_parents(&lock, b"A\nb\nc\nd\ne\n", &[r]);
+    let a = ordered_ancestor(&folio, &lock, b"A\nb\nc\nd\ne\n", d, 0..64);
+    let b = ordered_ancestor(&folio, &lock, b"a\nb\nc\nd\ne\n", r, 64..128);
+    let c = ordered_ancestor(&folio, &lock, b"a\nb\nc\nd\ne\n", d, 128..255);
+    assert!(a.as_bytes() < b.as_bytes() && b.as_bytes() < c.as_bytes());
+    assert_eq!(
+        merge_base(&folio.objects, b, c, 16384).unwrap(),
+        MergeBase::One(r)
+    );
+    assert_eq!(
+        merge_base_from(&folio.objects, &[a, b], c, 16384).unwrap(),
+        MergeBase::One(d)
+    );
+    let ab = folio.commit_with_parents(&lock, b"A\nb\nc\nd\ne\n", &[a, b]);
+    let bc = folio.commit_with_parents(&lock, b"a\nb\nc\nd\ne\n", &[b, c]);
+    let ours = folio.commit_with_parents(&lock, b"A\nb\nc\nd\ne\n", &[ab, c]);
+    let theirs = folio.commit_with_parents(&lock, b"a\nb\nc\nd\nE\n", &[a, bc]);
+    assert_ne!(ab, bc);
+    assert_eq!(
+        merge_base(&folio.objects, ours, theirs, 16384).unwrap(),
+        MergeBase::Several(vec![a, b, c])
+    );
+    install_tip(&home, &mut folio, &mut lock, "main", ours);
+    install_tip(&home, &mut folio, &mut lock, "topic", theirs);
+    let row = copy(&home, &mut folio, &lock, "main", "copy.md");
+    let object_dir = folio.folio.path().to_path_buf();
+    let before = snapshot(&object_dir, &home.path().join("lock"));
+    let id = merge(&home, &mut folio, &mut lock, &row).unwrap();
+    let commit = folio.objects.get_commit(id, 16384).unwrap();
+    assert_eq!(commit.parents, vec![ours, theirs]);
+    let expected = b"A\nb\nc\nd\nE\n";
+    assert_eq!(
+        folio
+            .objects
+            .get(commit.content, ObjectKind::Blob, u64::MAX)
+            .unwrap(),
+        expected
+    );
+    assert_eq!(std::fs::read(row.path.to_path_buf()).unwrap(), expected);
+    assert_eq!(
+        std::fs::read(folio.internal().path.to_path_buf()).unwrap(),
+        expected
+    );
+    assert_eq!(folio.internal().commit_id, Some(id));
+    assert_eq!(
+        folio
+            .registry
+            .placement_at(&row.path)
+            .unwrap()
+            .unwrap()
+            .commit_id,
+        Some(id)
+    );
+    let after = snapshot(&object_dir, &home.path().join("lock"));
+    let added: Vec<_> = after
+        .iter()
+        .filter(|(path, _)| !before.iter().any(|(old, _)| old == path))
+        .collect();
+    let mut expected_ids = vec![id.to_string(), hash_blob(expected).to_string()];
+    expected_ids.sort();
+    let mut added_ids: Vec<_> = added
+        .iter()
+        .map(|(path, _)| path.file_stem().unwrap().to_str().unwrap().to_owned())
+        .collect();
+    added_ids.sort();
+    assert_eq!(
+        added_ids, expected_ids,
+        "only the final merged blob and merge commit are stored"
+    );
+}
