@@ -94,6 +94,8 @@ impl RegistryTransaction<'_> {
         Ok(if count == 0 {
             RemoveResult::NotRegistered
         } else {
+            self.tx
+                .execute("DELETE FROM stopped_rebases WHERE copy_path=?1", [&path.0])?;
             RemoveResult::Removed
         })
     }
