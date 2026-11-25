@@ -1,7 +1,8 @@
 use super::super::HistoryRefusal;
 use super::gather::CommitFacts;
-use super::plan::{CommitPlan, resume_commit};
+use super::plan::{CommitPlan, resume_commit, resume_commit_with_parents};
 use crate::config::names::DEFAULT_BRANCH;
+use crate::id::ObjectId;
 use crate::ops::placement::move_::{MoveTarget, judge_move};
 use crate::ops::refusal::{PlacementRefusal, RefusalReason};
 use crate::ops::stage::refuse::{is_conflicted, is_staged};
@@ -20,6 +21,25 @@ pub(crate) fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRef
             reason: RefusalReason::Conflicted,
         }));
     }
+    judge_commit_permissions(facts, resume_commit(facts))
+}
+
+/// The caller has checked whether conflict state permits this operation.
+pub(crate) fn judge_commit_with_parents(
+    facts: &CommitFacts,
+    parents: &[ObjectId],
+) -> Result<CommitPlan, HistoryRefusal> {
+    judge_commit_permissions(facts, resume_commit_with_parents(facts, parents))
+}
+
+fn judge_commit_permissions(
+    facts: &CommitFacts,
+    resume: Option<ObjectId>,
+) -> Result<CommitPlan, HistoryRefusal> {
+    let row = &facts.working.placement;
+    if row.kind == PlacementKind::Link {
+        return Err(HistoryRefusal::Link(row.path.to_path_buf()));
+    }
     let staged = row.staged.ok_or(HistoryRefusal::NothingStaged)?;
     if !matches!(facts.working.observation, Observation::File { .. }) {
         return Err(HistoryRefusal::Unusable(row.path.to_path_buf()));
@@ -27,7 +47,6 @@ pub(crate) fn judge_commit(facts: &CommitFacts) -> Result<CommitPlan, HistoryRef
     if row.kind == PlacementKind::Internal && row.head != DEFAULT_BRANCH {
         return Err(HistoryRefusal::InvalidFacts);
     }
-    let resume = resume_commit(facts);
     if facts.working.tip != row.commit_id && resume.is_none() {
         return Err(branch_moved(facts));
     }
