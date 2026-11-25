@@ -1,9 +1,6 @@
 use std::ops::Range;
-use std::time::Instant;
 
-use similar::{Algorithm, DiffTag, capture_diff_slices_deadline};
-
-use crate::config::limits::MERGE_DIFF_COST_LIMIT;
+use similar::{Algorithm, DiffTag};
 
 use super::{MergeResult, render::Render};
 
@@ -18,26 +15,17 @@ fn lines(bytes: &[u8]) -> Vec<&[u8]> {
 }
 
 fn changes<'a>(base: &[&[u8]], side: &[&'a [u8]], index: usize) -> Vec<Change<'a>> {
-    // similar 3.2.1 Myers falls back to delete + insert for remaining ranges
-    // when its search deadline is reached. Capture/Replace therefore
-    // returns a complete valid diff, though it may be less precise. Compaction
-    // and preprocessing are outside the search deadline: it is not a hard cap.
-    capture_diff_slices_deadline(
-        Algorithm::Myers,
-        base,
-        side,
-        Instant::now().checked_add(MERGE_DIFF_COST_LIMIT),
-    )
-    .into_iter()
-    .filter_map(|op| {
-        let (tag, old, new) = op.as_tag_tuple();
-        (tag != DiffTag::Equal).then(|| Change {
-            range: old,
-            lines: side[new].to_vec(),
-            side: index,
+    similar::capture_diff_slices(Algorithm::Histogram, base, side)
+        .into_iter()
+        .filter_map(|op| {
+            let (tag, old, new) = op.as_tag_tuple();
+            (tag != DiffTag::Equal).then(|| Change {
+                range: old,
+                lines: side[new].to_vec(),
+                side: index,
+            })
         })
-    })
-    .collect()
+        .collect()
 }
 
 pub(super) fn merge(base: &[u8], ours: &[u8], theirs: &[u8]) -> MergeResult {
