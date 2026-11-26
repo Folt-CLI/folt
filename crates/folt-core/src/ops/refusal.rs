@@ -18,6 +18,7 @@ pub enum RefusalReason {
     Conflicted,
     ConflictMarkers,
     Staged,
+    NoCommit,
     InternalEdited,
     Link,
     InternalBranch,
@@ -65,6 +66,9 @@ impl fmt::Display for PlacementRefusal {
             }
             RefusalReason::Staged => {
                 "copy has a recorded stage; commit or checkout main with discard first"
+            }
+            RefusalReason::NoCommit => {
+                "Folio has no commit; make the first commit before converting to a link"
             }
             RefusalReason::InternalEdited => {
                 "internal working file holds edits; commit or checkout main with discard first (#119)"

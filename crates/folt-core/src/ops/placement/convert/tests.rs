@@ -136,18 +136,25 @@ fn convert_decision_table() {
 }
 
 #[test]
-fn conversion_without_history_keeps_all_copy_refusals() {
+fn conversion_without_tip_refuses_after_copy_state_checks() {
     let mut copy = facts();
     copy.placement.head = "main".into();
     copy.placement.commit_id = None;
     copy.tip = None;
-    assert!(judge_convert(&copy, PlacementKind::Link, None, None).is_ok());
+    let refusal = judge_convert(&copy, PlacementKind::Link, None, None).unwrap_err();
+    assert_eq!(refusal.reason, RefusalReason::NoCommit);
+    assert!(
+        refusal
+            .to_string()
+            .contains("Folio has no commit; make the first commit before converting to a link")
+    );
     for (change, reason) in [
         (0, RefusalReason::CopyBranch),
-        (1, RefusalReason::Edited),
+        (1, RefusalReason::NoCommit),
         (2, RefusalReason::Staged),
         (3, RefusalReason::Internal),
-        (4, RefusalReason::ConvertGone),
+        (4, RefusalReason::NoCommit),
+        (5, RefusalReason::Conflicted),
     ] {
         let mut altered = copy.clone();
         match change {
@@ -160,7 +167,11 @@ fn conversion_without_history_keeps_all_copy_refusals() {
                 })
             }
             3 => altered.placement.kind = PlacementKind::Internal,
-            _ => altered.observation = Observation::Missing,
+            4 => altered.observation = Observation::Missing,
+            _ => {
+                altered.placement.conflict =
+                    crate::test_support::conflicted_facts().placement.conflict
+            }
         }
         assert_eq!(
             judge_convert(&altered, PlacementKind::Link, None, None)
@@ -169,6 +180,9 @@ fn conversion_without_history_keeps_all_copy_refusals() {
             reason
         );
     }
+    let mut with_tip = copy.clone();
+    with_tip.tip = Some(hash_blob(b"tip"));
+    assert!(judge_convert(&with_tip, PlacementKind::Link, None, None).is_ok());
     let mut link = copy;
     link.placement.kind = PlacementKind::Link;
     link.observation = Observation::IntactLink;
