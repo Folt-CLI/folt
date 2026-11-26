@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::config::names::MARKER_FILE;
+use crate::config::names::{DEFAULT_BRANCH, MARKER_FILE};
 use crate::fsx::RealFileSystem;
 use crate::ops::register::links::{LinkStep, apply_links_steps};
 use crate::ops::register::tests::resolved_path;
@@ -13,6 +13,50 @@ use crate::placement_fs::PlacementFs;
 use crate::placement_path::PlacementPath;
 use crate::registry::Registry;
 use crate::test_support::TempHome;
+
+fn add_main_commit(fixture: &TempHome, path: &std::path::Path) {
+    use crate::history::{Expect, RefStore};
+    use crate::object::{Author, Commit, CommitTime, ObjectKind};
+    use crate::ref_name::{RefKind, RefName};
+    use crate::store::ObjectStore;
+
+    let mut lock = fixture.home.lock().unwrap();
+    let registry = Registry::open_existing(&fixture.home).unwrap();
+    let row = registry
+        .placement_at(&PlacementPath::resolve(path).unwrap())
+        .unwrap()
+        .unwrap();
+    let folio = registry.folio_row(row.id).unwrap().unwrap();
+    let directory = crate::folio::dir::validate(fixture.home.path(), &folio).unwrap();
+    let objects = ObjectStore::open(&directory, &folio.format).unwrap();
+    let content = objects
+        .put(&lock, ObjectKind::Blob, &fs::read(path).unwrap())
+        .unwrap();
+    let commit = objects
+        .put_commit(
+            &lock,
+            &Commit {
+                content,
+                parents: vec![],
+                author: Author::anonymous(),
+                time: CommitTime::from_unix_seconds(0).unwrap(),
+                message: "initial".into(),
+                body: None,
+                group: None,
+            },
+        )
+        .unwrap();
+    RefStore::open(&directory, &folio.format)
+        .unwrap()
+        .update(
+            &mut lock,
+            RefKind::Branch,
+            &RefName::parse(DEFAULT_BRANCH).unwrap(),
+            commit,
+            Expect::Absent,
+        )
+        .unwrap();
+}
 
 #[test]
 fn blocked_link_registration_does_not_probe_or_create_markers() {
@@ -80,6 +124,14 @@ fn crash_after_registration_keeps_copies_and_retry_converts_without_new_folios()
     assert!(!fs::symlink_metadata(&path).unwrap().is_symlink());
     assert_eq!(fs::read(&path).unwrap(), b"content");
     let result = apply_register_links(&fixture.home, &plan, false).unwrap();
+    assert!(matches!(
+        &result.paths[0].1,
+        RegisterLinkResult::LeftAsCopy { reason } if reason.contains("Folio has no commit")
+    ));
+    assert!(!fs::symlink_metadata(&path).unwrap().is_symlink());
+    assert_eq!(fs::read(&path).unwrap(), b"content");
+    add_main_commit(&fixture, &path);
+    let result = apply_register_links(&fixture.home, &plan, false).unwrap();
     assert_eq!(result.registration.summary.already_registered, 1);
     assert_eq!(result.paths[0].1, RegisterLinkResult::Linked);
     assert_eq!(fixture.folio_count(), 1);
@@ -95,6 +147,10 @@ fn edited_path_is_reported_and_other_conversions_continue() {
     }
     let edited = resolved_path(&paths[1]);
     let plan = plan_register(&fixture.home, &paths).unwrap();
+    apply_register(&fixture.home, &plan, false).unwrap();
+    for path in &paths {
+        add_main_commit(&fixture, path);
+    }
     let result = apply_links_steps(
         &RealFileSystem,
         &fixture.home,
@@ -141,6 +197,7 @@ fn conversion_syncs_link_creation_and_rename_and_retry_finishes_copy_row() {
         fs::write(&path, b"content").unwrap();
         let plan = plan_register(&fixture.home, [&path]).unwrap();
         apply_register(&fixture.home, &plan, false).unwrap();
+        add_main_commit(&fixture, &path);
         let fs =
             crate::fsx::fault::FaultFileSystem::new().sync_failure(&directory, successful_syncs);
         let apply = || {

@@ -202,6 +202,30 @@ mod conversion {
     }
 
     #[test]
+    fn refuses_copy_to_link_without_main_tip_without_changes() {
+        let home = TempHome::new();
+        let lock = home.lock();
+        let mut folio = TestFolio::new(&home, &lock);
+        let row = folio.copy(&home, &lock);
+        let path = row.path.to_path_buf();
+        let bytes = std::fs::read(&path).unwrap();
+        let facts = home
+            .home
+            .gather_convert(&row, &PlacementFs::new(&home.home), |_| Ok(&folio.refs))
+            .unwrap();
+        assert_eq!(facts.tip, None);
+        let refusal = home
+            .home
+            .judge_convert(&facts, PlacementKind::Link, None, None)
+            .unwrap_err();
+        assert_eq!(refusal.reason, RefusalReason::NoCommit);
+        assert!(std::fs::symlink_metadata(&path).unwrap().is_file());
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert_eq!(folio.registry.placement_at(&row.path).unwrap(), Some(row));
+        assert_no_temporary(&home);
+    }
+
+    #[test]
     fn converts_link_to_copy_of_main_with_mode() {
         #[cfg(unix)]
         use std::os::unix::fs::PermissionsExt;

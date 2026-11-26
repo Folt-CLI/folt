@@ -20,6 +20,50 @@ fn resolved_path(path: impl AsRef<Path>) -> PathBuf {
     fs::canonicalize(path).unwrap()
 }
 
+fn add_main_commit(home: &TempHome, path: &std::path::Path) {
+    use folt_core::history::{Expect, RefStore};
+    use folt_core::object::{Author, Commit, CommitTime, ObjectKind};
+    use folt_core::ref_name::{RefKind, RefName};
+    use folt_core::store::ObjectStore;
+
+    let mut lock = home.home.lock().unwrap();
+    let registry = Registry::open_existing(&home.home).unwrap();
+    let row = registry
+        .placement_at(&PlacementPath::resolve(path).unwrap())
+        .unwrap()
+        .unwrap();
+    let folio = registry.folio_row(row.id).unwrap().unwrap();
+    let directory = folt_core::folio::dir::validate(home.home.path(), &folio).unwrap();
+    let objects = ObjectStore::open(&directory, &folio.format).unwrap();
+    let content = objects
+        .put(&lock, ObjectKind::Blob, &fs::read(path).unwrap())
+        .unwrap();
+    let commit = objects
+        .put_commit(
+            &lock,
+            &Commit {
+                content,
+                parents: vec![],
+                author: Author::anonymous(),
+                time: CommitTime::from_unix_seconds(0).unwrap(),
+                message: "initial".into(),
+                body: None,
+                group: None,
+            },
+        )
+        .unwrap();
+    RefStore::open(&directory, &folio.format)
+        .unwrap()
+        .update(
+            &mut lock,
+            RefKind::Branch,
+            &RefName::parse(&row.head).unwrap(),
+            commit,
+            Expect::Absent,
+        )
+        .unwrap();
+}
+
 #[test]
 fn files_are_captured_without_history_and_repeated_registration_is_a_noop() {
     let home = TempHome::new();
@@ -1045,7 +1089,7 @@ fn link_dry_run_creates_no_marker_folio_registry_or_probe() {
 
 #[cfg_attr(windows, ignore = "real symlinks require privileges")]
 #[test]
-fn link_registration_without_a_tip_and_repeated_requests_use_the_same_folio() {
+fn link_registration_refuses_without_a_tip_then_reuses_the_same_folio() {
     assert_link_registration(&TempHome::new());
 }
 
@@ -1066,6 +1110,14 @@ fn assert_link_registration(home: &TempHome) {
     fs::write(&path, b"content").unwrap();
     let expected_path = resolved_path(&path);
     let plan = home.home.plan_register([&path]).unwrap();
+    let result = home.home.apply_register_links(&plan, false).unwrap();
+    assert!(matches!(
+        &result.paths[0].1,
+        RegisterLinkResult::LeftAsCopy { reason } if reason.contains("Folio has no commit")
+    ));
+    assert!(fs::symlink_metadata(&path).unwrap().is_file());
+    assert_eq!(fs::read(&path).unwrap(), b"content");
+    add_main_commit(home, &path);
     let result = home.home.apply_register_links(&plan, false).unwrap();
     assert_eq!(
         result.paths,
@@ -1110,6 +1162,7 @@ fn link_request_retries_an_already_registered_copy() {
     home.home.apply_register(&plan, false).unwrap();
     let registry = Registry::open_existing(&home.home).unwrap();
     let ids = registry.folios().unwrap();
+    add_main_commit(&home, &path);
     let result = home.home.apply_register_links(&plan, false).unwrap();
     assert_eq!(result.registration.summary.already_registered, 1);
     assert_eq!(result.paths[0].1, RegisterLinkResult::Linked);
@@ -1140,6 +1193,9 @@ fn assert_hard_linked_source_remains_a_registered_copy() {
     fs::hard_link(&path, &alias).unwrap();
     fs::write(&other, b"other").unwrap();
     let plan = home.home.plan_register([&path, &other]).unwrap();
+    home.home.apply_register(&plan, false).unwrap();
+    add_main_commit(&home, &path);
+    add_main_commit(&home, &other);
     let result = home.home.apply_register_links(&plan, false).unwrap();
     assert!(
         matches!(&result.paths[0].1, RegisterLinkResult::LeftAsCopy { reason }
@@ -1620,7 +1676,11 @@ fn link_apply_replays_explicit_names_and_stores_them() {
     fs::write(&path, b"body").unwrap();
     let plan = home.home.plan_register([named(&path, "Chosen")]).unwrap();
     let linked = home.home.apply_register_links(&plan, false).unwrap();
-    assert_eq!(linked.paths[0].1, register::RegisterLinkResult::Linked);
+    assert!(matches!(
+        &linked.paths[0].1,
+        register::RegisterLinkResult::LeftAsCopy { reason } if reason.contains("Folio has no commit")
+    ));
+    assert!(fs::symlink_metadata(&path).unwrap().is_file());
     let registry = Registry::open_existing(&home.home).unwrap();
     assert!(registry.find_by_name(&name("Chosen")).unwrap().is_some());
     assert_eq!(registry.find_by_name(&name("file")).unwrap(), None);

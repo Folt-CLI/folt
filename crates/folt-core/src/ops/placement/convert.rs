@@ -34,7 +34,8 @@ impl ConvertPlan {
     }
 }
 
-/// The optional target is the resolved main tip; Copy-to-Link needs no tip.
+/// The optional target is the resolved main tip. Copy-to-link requires `facts.tip`
+/// and is refused with `NoCommit` without it.
 /// Link-to-copy also requires the Internal row's facts. The home lock must cover
 /// collecting these facts through apply.
 pub(crate) fn judge_convert(
@@ -64,6 +65,9 @@ pub(crate) fn judge_convert(
     }
     if is_staged(&facts.placement) {
         return Err(refuse(RefusalReason::Staged));
+    }
+    if to_kind == PlacementKind::Link && facts.tip.is_none() {
+        return Err(refuse(RefusalReason::NoCommit));
     }
     if to_kind == PlacementKind::Copy && target.is_none() {
         return Err(refuse(RefusalReason::InternalEdited));
