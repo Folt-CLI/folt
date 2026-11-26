@@ -174,6 +174,41 @@ fn completely_different_large_inputs_produce_valid_complete_conflict() {
 }
 
 #[test]
+fn repeated_large_multi_hunk_conflicts_are_identical() {
+    let mut base = String::new();
+    let mut ours = String::new();
+    let mut theirs = String::new();
+    // Repeated shared lines make each large hunk costly for a Myers search;
+    // unique separators keep the conflicting hunks independent.
+    for index in 0..4 {
+        let separator = format!("separator {index}\n");
+        for (input, replacement) in [
+            (&mut base, "shared\nbase\n"),
+            (&mut ours, "shared\nours\n"),
+            (&mut theirs, "shared\ntheirs\n"),
+        ] {
+            input.push_str(&separator);
+            input.push_str(&replacement.repeat(2_500));
+        }
+    }
+    let expected = merge3(base.as_bytes(), ours.as_bytes(), theirs.as_bytes());
+    let MergeResult::Conflicted {
+        merged: Some(_),
+        marker_lines,
+    } = &expected
+    else {
+        panic!("expected text conflicts");
+    };
+    assert!(marker_lines.len() > 3, "expected multiple conflict regions");
+    for _ in 0..8 {
+        assert_eq!(
+            merge3(base.as_bytes(), ours.as_bytes(), theirs.as_bytes()),
+            expected
+        );
+    }
+}
+
+#[test]
 fn multiple_conflicts_record_marker_lines_in_file_order() {
     let MergeResult::Conflicted {
         merged: Some(merged),

@@ -11,7 +11,8 @@
 - **Home:** one global home, `~/.folt` (`%USERPROFILE%\.folt` on Windows), with a `FOLT_HOME` environment override; Folt writes nothing into user directories ([#14](https://github.com/Folt-CLI/folt/issues/14)). The home's layout version is the `format_version` row in the registry's `folt_metadata` table; a newer version is refused. A directory that is neither empty nor recognisably a Folt home is refused before the lock is taken ([#65](https://github.com/Folt-CLI/folt/issues/65)). This replaces the per-workspace `.folt/` marker of [#2](https://github.com/Folt-CLI/folt/issues/2).
 - **Registry:** an embedded SQLite database in the home through `rusqlite` with the bundled C library; a Folio exists independently of its placements. Building needs a C compiler ([#27](https://github.com/Folt-CLI/folt/issues/27)).
 - **Lock:** an exclusive file lock on a permanent `lock` file in the home; temporary files live in `<home>/tmp/`; leftovers are deleted when the lock is acquired ([#19](https://github.com/Folt-CLI/folt/issues/19)).
-- **Three-way merge:** `similar` 2.7 is a normal dependency of `folt-core`, licensed Apache-2.0, with default features disabled; slice diffs need no `text` feature ([#74](https://github.com/Folt-CLI/folt/issues/74), [#158](https://github.com/Folt-CLI/folt/issues/158)). The per-side Myers search budget is 100 ms, an implementation budget introduced by #158 in `config::limits::MERGE_DIFF_COST_LIMIT`; deadline fallback yields complete valid delete/insert operations, while conflict boundaries can depend on machine speed. This budget is not a hard total runtime cap.
+- **Three-way merge:** `similar` 3.2.1 is a normal dependency of `folt-core`, licensed Apache-2.0, with default features disabled and only `std` enabled; slice diffs need no `text` feature ([#74](https://github.com/Folt-CLI/folt/issues/74), [#158](https://github.com/Folt-CLI/folt/issues/158), [#349](https://github.com/Folt-CLI/folt/issues/349)). The line diff uses `Algorithm::Histogram` with its bounded Myers fallback; no time limit or speed-dependent behaviour applies, and work is bounded by input size, so equal inputs give equal results on every machine.
+- **Merge and rebase:** the developer selected conflict markers with merge conflict state in the registry and resumable rebase with continue and abort operations ([#74](https://github.com/Folt-CLI/folt/issues/74)).
 - **Tests:** the test structure and tiers are described in [Testing](delivery/testing.md) ([#96](https://github.com/Folt-CLI/folt/issues/96)).
 
 Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
@@ -22,7 +23,6 @@ The home and every Folio directory are trusted: whoever can change them can chan
 
 - How remotes are configured and authenticated; each host defines its own authentication ([#5](https://github.com/Folt-CLI/folt/issues/5)).
 - Command set ([#6](https://github.com/Folt-CLI/folt/issues/6)).
-- Merge and rebase ([#74](https://github.com/Folt-CLI/folt/issues/74)).
 - The lifecycle of registered Folios ([#15](https://github.com/Folt-CLI/folt/issues/15)).
 - One Folio at several paths ([#16](https://github.com/Folt-CLI/folt/issues/16)).
 - Portability and multi-user use of the home ([#17](https://github.com/Folt-CLI/folt/issues/17)).

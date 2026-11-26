@@ -21,17 +21,22 @@ impl CommitPlan {
 
 /// Recognises a published commit whose remaining file/registry work can be finished.
 pub(crate) fn resume_commit(facts: &CommitFacts) -> Option<ObjectId> {
+    resume_commit_with_parents(facts, facts.working.placement.commit_id.as_slice())
+}
+
+pub(super) fn resume_commit_with_parents(
+    facts: &CommitFacts,
+    parents: &[ObjectId],
+) -> Option<ObjectId> {
     let row = &facts.working.placement;
     let staged = row.staged?;
     let tip = facts.working.tip?;
     let commit = facts.tip_commit.as_ref()?;
-    (Some(tip) != row.commit_id
-        && commit.content == staged.hash
-        && commit.parents == row.commit_id.into_iter().collect::<Vec<_>>())
-    .then_some(tip)
+    (Some(tip) != row.commit_id && commit.content == staged.hash && commit.parents == parents)
+        .then_some(tip)
 }
 
-pub(super) fn matches_requested_commit(actual: &Commit, requested: &Commit) -> bool {
+pub(crate) fn matches_requested_commit(actual: &Commit, requested: &Commit) -> bool {
     actual.author == requested.author
         && actual.message == requested.message
         && actual.body.as_deref() == requested.body.as_deref().filter(|body| !body.is_empty())

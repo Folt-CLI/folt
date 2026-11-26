@@ -268,7 +268,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### virtual base
 
 - **Layer:** History
-- **Definition:** In-memory content produced by folding several best common ancestors from left to right in object id byte order for a merge. Each pair uses its merge base content, recursively folding several merge bases and using empty bytes when there is none. Text conflicts remain as conflict marker lines in these bytes; a binary conflict between the ancestors refuses the merge. No object is stored for the virtual base.
+- **Definition:** In-memory content produced by folding several best common ancestors from left to right in object id byte order for a merge. Each next ancestor is folded into the accumulated content using the merge base content of all accumulated ancestors and itself, recursively folding several merge bases and using empty bytes when there is none. Text conflicts remain as conflict marker lines in these bytes; a binary conflict between the ancestors refuses the merge. No object is stored for the virtual base.
 - **Code:** `crates/folt-core/src/ops/history/merge/virtual_base.rs` (`fold`)
 - **Related:** [merge](#merge), [merge base](#merge-base), [three-way merge](#three-way-merge), [conflict marker](#conflict-marker).
 - **Not:** A stored commit or blob, a placement base, or conflict markers written into a working file.
@@ -432,7 +432,7 @@ Read this file before analysis or implementation. Terms are exact: use each only
 ### stage
 
 - **Layer:** Placements and working state
-- **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage; later changes to staged bytes show StagedThenModified.
+- **Definition:** To capture working bytes as a blob, record its hash and size for the next commit, and rebuild that Folio branch’s cached declared references. Bytes equal to the base clear the stage unless the copy has merge conflict state; in that case stage records the resolution even when it equals the base. Later changes to staged bytes show StagedThenModified.
 - **Code:** `crates/folt-core/src/ops/stage/mod.rs:14` (`stage`); `crates/folt-core/src/placement.rs:93` (`StagedBlob`); `crates/folt-core/src/ops/status.rs:20` (`Staged`)
 - **Related:** [blob](#blob), [commit](#commit), [unstage](#unstage), [refs table](#refs-table).
 - **Not:** Git staging or a development workflow stage; staging does not change the base.
@@ -966,7 +966,7 @@ These rows distinguish existing meanings and link to defined terms without selec
 | explicit | YAML `? key` syntax; user-given name; registration confirmation | [Explicit key](#explicit-key) means the YAML syntax; explicit name means a user-given name; explicit confirmation means registration confirmation. |
 | rollback | Test wording for undoing writes; restore in registration code | Say restore, the word used in the code. |
 | internal row | Registry row; internal placement; internal file; internal main file; `folio.main` | Internal row means the registry row; `folio.main` means the file. Say the internal row on `main`. |
-| stale | Failed ref compare-and-swap; differing branch tip; old child label; reference cache older than edits; obsolete path | Say failed ref update, behind, cached child label or references from the last stage. Merge is implemented here. Rebase has a selected solution in [#74](https://github.com/Folt-CLI/folt/issues/74), but is not implemented here; local path resolution is open: [#28](https://github.com/Folt-CLI/folt/issues/28). |
+| stale | Failed ref compare-and-swap; differing branch tip; old child label; reference cache older than edits; obsolete path | Say failed ref update, behind, cached child label or references from the last stage. Merge and rebase are implemented here. Local path resolution is open: [#28](https://github.com/Folt-CLI/folt/issues/28). |
 | name | Folio label; path-derived label; reference target name; child_label; ref name; object hash; path holding a reserved label | Use folio-name for the Folio label, ref name for history refs, and object id for the hash. Upper case works today; lowercase-only policy is open: [#47](https://github.com/Folt-CLI/folt/issues/47). |
 | link | Symbolic-link placement; link row; Markdown link; hard link | Link means the symbolic-link placement; qualify Markdown links and hard links. The row records the expected kind even if the filesystem entry changes. |
 | copy | Regular-file placement; duplicated Folio or directory; ordinary copying action | Copy means the regular-file placement. Identity after duplication is open: [#16](https://github.com/Folt-CLI/folt/issues/16). |
